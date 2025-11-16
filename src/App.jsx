@@ -477,7 +477,7 @@ const App = () => {
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
 
     // ADMIN CONFIG: កំណត់ Email របស់អ្នកជា Admin តែម្នាក់គត់
-    const ADMIN_EMAIL = "moeuphcarom268@gmail.com";
+    const ADMIN_EMAIL = "admin@gmail.com";
     const isAdmin = userProfile.email === ADMIN_EMAIL; 
 
     const showNotification = useCallback((msg, type = 'info') => {
