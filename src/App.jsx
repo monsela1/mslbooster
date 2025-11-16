@@ -46,7 +46,7 @@ try {
     console.error("Firebase initialization failed:", error);
 }
 
-// Helper Functions (UPDATED: USE LOCAL TIME)
+// Helper Functions
 const getTodayDateKey = () => {
     const d = new Date();
     const year = d.getFullYear();
@@ -71,6 +71,7 @@ const defaultGlobalConfig = {
     dailyCheckinReward: 200,
     referrerReward: 1000,
     adsReward: 30,
+    maxDailyAds: 15, // Added Max Limit
     adsSettings: {
         bannerId: "ca-app-pub-xxxxxxxx/yyyyyy",
         interstitialId: "ca-app-pub-xxxxxxxx/zzzzzz",
@@ -163,6 +164,15 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                 </div>
             </Card>
 
+            <Card className="p-4 border-l-4 border-pink-500">
+                <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ Ads (Limit)</h3>
+                <div className="space-y-3">
+                     <div><label className="text-xs font-bold text-purple-300">Max Ads Per Day</label><InputField name="maxDailyAds" type="number" value={config.maxDailyAds} onChange={handleChange} /></div>
+                     <div><label className="text-xs font-bold text-purple-300">Banner ID</label><InputField name="bannerId" type="text" value={config.adsSettings?.bannerId || ''} onChange={handleAdsChange} /></div>
+                     <div><label className="text-xs font-bold text-purple-300">Interstitial/Video ID</label><InputField name="interstitialId" type="text" value={config.adsSettings?.interstitialId || ''} onChange={handleAdsChange} /></div>
+                </div>
+            </Card>
+
             <Card className="p-4 border-l-4 border-green-500">
                 <h3 className="font-bold text-lg mb-3 text-green-400 flex items-center"><ShoppingCart className="w-5 h-5 mr-2"/> កំណត់កញ្ចប់កាក់ (Sell Coins)</h3>
                 <div className="space-y-3">
@@ -179,14 +189,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                             </div>
                         </div>
                     ))}
-                </div>
-            </Card>
-
-            <Card className="p-4 border-l-4 border-pink-500">
-                <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ Ads IDs</h3>
-                <div className="space-y-3">
-                     <div><label className="text-xs font-bold text-purple-300">Banner ID</label><InputField name="bannerId" type="text" value={config.adsSettings?.bannerId || ''} onChange={handleAdsChange} /></div>
-                    <div><label className="text-xs font-bold text-purple-300">Interstitial/Video ID</label><InputField name="interstitialId" type="text" value={config.adsSettings?.interstitialId || ''} onChange={handleAdsChange} /></div>
                 </div>
             </Card>
 
@@ -552,7 +554,6 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     );
 };
 
-// MODIFIED: EarnPage with Auto Claim for View/Website AND Click-to-Subscribe logic
 const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
@@ -724,9 +725,19 @@ const BalanceDetailsPage = ({ setPage, userProfile }) => (
 );
 
 const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
+    const [adsWatched, setAdsWatched] = useState(0);
     const [timer, setTimer] = useState(15);
     const [finished, setFinished] = useState(false);
     const reward = globalConfig.adsReward || 30;
+    const maxDaily = globalConfig.maxDailyAds || 15;
+
+    // Fetch daily status to get current count
+    useEffect(() => {
+        const unsub = onSnapshot(getDailyStatusDocRef(userId), (doc) => {
+            if(doc.exists()) setAdsWatched(doc.data().adsWatchedCount || 0);
+        });
+        return () => unsub();
+    }, [userId]);
 
     useEffect(() => {
         if (timer > 0) { const interval = setInterval(() => setTimer(t => t - 1), 1000); return () => clearInterval(interval); } 
@@ -734,23 +745,42 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
     }, [timer]);
 
     const claimReward = async () => {
+        if (adsWatched >= maxDaily) return showNotification('អស់សិទ្ធិមើលសម្រាប់ថ្ងៃនេះហើយ!', 'error');
         try {
-            await runTransaction(db, async (tx) => { tx.update(getProfileDocRef(userId), { points: increment(reward) }); });
+            await runTransaction(db, async (tx) => { 
+                const dailyRef = getDailyStatusDocRef(userId);
+                tx.update(getProfileDocRef(userId), { points: increment(reward) });
+                // Use set with merge true in case doc created today but field missing, or simple update if exists
+                // Safe way:
+                tx.set(dailyRef, { adsWatchedCount: increment(1), date: getTodayDateKey() }, { merge: true });
+            });
             showNotification(`ទទួលបាន ${reward} Coins!`, 'success');
             setPage('DASHBOARD');
         } catch (e) { showNotification(e.message, 'error'); }
     };
 
+    const isLimitReached = adsWatched >= maxDaily;
+
     return (
         <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 z-50">
             <div className="text-white text-2xl font-bold mb-4">កំពុងមើលពាណិជ្ជកម្ម...</div>
-            <div className="w-full h-64 bg-gray-800 flex items-center justify-center rounded-lg mb-6 border-2 border-yellow-500">
+            <div className="w-full h-64 bg-gray-800 flex items-center justify-center rounded-lg mb-6 border-2 border-yellow-500 relative">
+                <div className="absolute top-2 right-2 bg-red-600 text-white text-xs px-2 py-1 rounded">
+                    Watched: {adsWatched} / {maxDaily}
+                </div>
                 <div className="text-center">
                     <MonitorPlay className="w-16 h-16 text-yellow-500 mx-auto mb-2" />
                     <p className="text-white">ADS ID: {globalConfig.adsSettings?.interstitialId || 'N/A'}</p>
                 </div>
             </div>
-            {finished ? <button onClick={claimReward} className="bg-green-500 text-white font-bold py-3 px-8 rounded-full text-xl shadow-lg animate-bounce">ទទួលរង្វាន់ (Claim)</button> : <div className="text-white text-xl">រង់ចាំ: {timer} វិនាទី</div>}
+            
+            {isLimitReached ? (
+                 <div className="text-red-500 font-bold text-xl bg-white p-3 rounded">អស់សិទ្ធិមើលសម្រាប់ថ្ងៃនេះហើយ</div>
+            ) : (
+                finished ? 
+                <button onClick={claimReward} className="bg-green-500 text-white font-bold py-3 px-8 rounded-full text-xl shadow-lg animate-bounce">ទទួលរង្វាន់ (Claim)</button> 
+                : <div className="text-white text-xl">រង់ចាំ: {timer} វិនាទី</div>
+            )}
         </div>
     );
 };
