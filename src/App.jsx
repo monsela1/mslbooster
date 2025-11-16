@@ -79,7 +79,7 @@ const Loading = () => (
 );
 
 const IconButton = ({ icon: Icon, title, onClick, iconColor = 'text-gray-600', textColor = 'text-gray-800' }) => (
-    <button onClick={onClick} className="flex flex-col items-center justify-start p-2 rounded-xl transition transform hover:scale-105 active:scale-95 w-full h-32 bg-white shadow-sm">
+    <button onClick={onClick} className="flex flex-col items-center justify-start p-2 rounded-xl transition transform hover:scale-105 active:scale-95 w-full h-32 bg-white shadow-md border border-gray-200">
         <div className={`p-3 rounded-xl bg-gray-100 shadow-inner`}>
             <Icon className={`w-8 h-8 ${iconColor}`} />
         </div>
@@ -179,23 +179,23 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                         ))}
                     </div>
                     <form onSubmit={handleSubmit} className="space-y-3">
-                        <input type="url" value={link} onChange={e => setLink(e.target.value)} placeholder="Link URL..." className="w-full p-3 border border-gray-300 rounded bg-white text-black" required />
+                        <input type="url" value={link} onChange={e => setLink(e.target.value)} placeholder="Link URL..." className="w-full p-3 border-2 border-gray-300 rounded-lg bg-white text-black font-medium" required />
                         <div className="flex justify-between space-x-2">
                             <div className="w-1/2">
                                 <label className="text-xs text-gray-500 font-bold">ចំនួន (Count)</label>
-                                <input type="number" value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value)))} className="w-full p-3 border border-gray-300 rounded bg-white text-black" />
+                                <input type="number" value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value)))} className="w-full p-3 border-2 border-gray-300 rounded-lg bg-white text-black font-medium" />
                             </div>
                             {type !== 'sub' && (
                                 <div className="w-1/2">
                                     <label className="text-xs text-gray-500 font-bold">ពេល (Sec)</label>
-                                    <input type="number" value={time} onChange={e => setTime(Math.max(10, parseInt(e.target.value)))} className="w-full p-3 border border-gray-300 rounded bg-white text-black" />
+                                    <input type="number" value={time} onChange={e => setTime(Math.max(10, parseInt(e.target.value)))} className="w-full p-3 border-2 border-gray-300 rounded-lg bg-white text-black font-medium" />
                                 </div>
                             )}
                         </div>
-                        <div className="bg-yellow-100 p-3 rounded text-center font-bold text-yellow-800 border border-yellow-300">
+                        <div className="bg-yellow-100 p-3 rounded-lg text-center font-bold text-yellow-800 border border-yellow-400">
                             តម្លៃ: {formatNumber(calculateCost())} Coins
                         </div>
-                        <button type="submit" disabled={isSubmitting} className="w-full bg-teal-600 text-white py-3 rounded font-bold shadow-lg">
+                        <button type="submit" disabled={isSubmitting} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-teal-700">
                             {isSubmitting ? 'កំពុងដាក់...' : 'ដាក់យុទ្ធនាការ'}
                         </button>
                     </form>
@@ -203,7 +203,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                 <div className="space-y-2">
                     <h3 className="text-white font-bold">ប្រវត្តិ ({userCampaigns.length})</h3>
                     {userCampaigns.map(c => (
-                        <div key={c.id} className="bg-white p-3 rounded shadow flex justify-between items-center">
+                        <div key={c.id} className="bg-white p-3 rounded-lg shadow flex justify-between items-center">
                             <div className='w-2/3'>
                                 <p className="font-bold text-sm truncate text-gray-800">{c.link}</p>
                                 <p className="text-xs text-gray-500">{c.type.toUpperCase()} - នៅសល់: {c.remaining}</p>
@@ -422,23 +422,9 @@ const MyPlanPage = ({ setPage }) => (
 
 // 7. Admin Dashboard Page (NEWLY RESTORED)
 const AdminDashboardPage = ({ db, setPage, showNotification }) => {
-    const [users, setUsers] = useState([]);
     const [campaigns, setCampaigns] = useState([]);
-    const [activeTab, setActiveTab] = useState('USERS');
+    const [activeTab, setActiveTab] = useState('CAMPAIGNS');
 
-    // Fetch Users
-    useEffect(() => {
-        const fetch = async () => {
-            // This is a simplified fetch. In production, use pagination.
-            // Since we don't have a clear 'users' collection iteration without admin SDK,
-            // we rely on campaigns or manually known IDs. 
-            // FOR NOW: We will fetch all campaigns and extract unique users.
-            // Ideally, you should store all users in a 'public/data/users' collection if you want to list them.
-            // But let's just show Campaigns for now as it's fully functional.
-        };
-    }, [db]);
-
-    // Fetch Campaigns (Real-time)
     useEffect(() => {
         const q = query(getCampaignsCollectionRef());
         return onSnapshot(q, (snap) => {
@@ -460,7 +446,6 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
             <main className="p-4">
                 <div className="flex space-x-2 mb-4">
                     <button onClick={() => setActiveTab('CAMPAIGNS')} className={`flex-1 py-2 rounded font-bold ${activeTab === 'CAMPAIGNS' ? 'bg-teal-500 text-white' : 'bg-gray-200'}`}>Campaigns</button>
-                    {/* Users tab placeholder */}
                 </div>
 
                 {activeTab === 'CAMPAIGNS' && (
@@ -491,9 +476,9 @@ const App = () => {
     const [authPage, setAuthPage] = useState('LOGIN');
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
 
-    // ADMIN LOGIC: For now, everyone is Admin so you can test.
-    // Change this later to: const isAdmin = userProfile.email === 'your-email@gmail.com';
-    const isAdmin = true; 
+    // ADMIN CONFIG: កំណត់ Email របស់អ្នកជា Admin តែម្នាក់គត់
+    const ADMIN_EMAIL = "moeuphcarom268@gmail.com";
+    const isAdmin = userProfile.email === ADMIN_EMAIL; 
 
     const showNotification = useCallback((msg, type = 'info') => {
         setNotification({ message: msg, type });
