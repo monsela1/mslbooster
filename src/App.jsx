@@ -15,7 +15,7 @@ import {
 import {
     Users, Coins, Video, Link, Globe, MonitorPlay, Zap,
     UserPlus, ChevronLeft, BookOpen, ShoppingCart,
-    CalendarCheck, Target, Wallet, Film,
+    CalendarCheck, Target, Wallet, Film, UserCheck,
     DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, Settings, Copy, Save, Search, PlusCircle, MinusCircle, CheckCircle, XCircle
 } from 'lucide-react';
 
@@ -801,7 +801,8 @@ const App = () => {
                     <div className="px-4">
                         <Card className="p-4 grid grid-cols-3 gap-3">
                             <IconButton icon={CalendarCheck} title="DAILY TASK" onClick={handleDailyCheckin} iconColor={userProfile.dailyCheckin ? 'text-gray-500' : 'text-blue-400'} textColor={userProfile.dailyCheckin ? 'text-gray-400' : 'text-white'} />
-                            <IconButton icon={BookOpen} title="MY PLAN" onClick={() => setPage('MY_PLAN')} iconColor="text-green-400" />
+                            {/* MODIFIED: SUBSCRIBE BUTTON (Replaces My Plan) */}
+                            <IconButton icon={UserCheck} title="SUBSCRIBE" onClick={() => setPage('EXPLORE_SUBSCRIPTION')} iconColor="text-pink-400" />
                             <IconButton icon={Film} title="PLAY VIDEO" onClick={() => setPage('EARN_POINTS')} iconColor="text-red-400" />
                             <IconButton icon={Wallet} title="MY BALANCE" onClick={() => setPage('BALANCE_DETAILS')} iconColor="text-orange-400" />
                             <IconButton icon={ShoppingCart} title="BUY COINS" onClick={() => setPage('BUY_COINS')} iconColor="text-purple-400" />
@@ -810,6 +811,15 @@ const App = () => {
                             <IconButton icon={Globe} title="មើល WEBSITE" onClick={() => setPage('EXPLORE_WEBSITE')} iconColor="text-indigo-400" />
                             <IconButton icon={MonitorPlay} title="មើល ADS" onClick={() => setPage('WATCH_ADS')} iconColor="text-pink-400" />
                         </Card>
+                    </div>
+
+                    {/* DASHBOARD BOTTOM AD */}
+                    <div className="px-4 mt-6">
+                        <div className="w-full bg-white h-20 flex flex-col items-center justify-center rounded-lg border-2 border-yellow-500/50 shadow-lg relative overflow-hidden">
+                             <div className="absolute top-0 right-0 bg-yellow-500 text-purple-900 text-[10px] px-2 font-bold">AD</div>
+                            <MonitorPlay className="w-6 h-6 text-gray-400 mb-1" />
+                            <p className="text-xs text-gray-500 font-mono">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p>
+                        </div>
                     </div>
                 </div>
             );
