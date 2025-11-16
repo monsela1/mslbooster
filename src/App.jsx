@@ -922,16 +922,15 @@ const MyPlanPage = ({ setPage }) => (
     </div>
 );
 
-// --- AUTH COMPONENT (REGISTER FORM UPDATED) ---
+// --- AUTH COMPONENT (REMOVED REFERRAL) ---
 const AuthForm = ({ onSubmit, btnText, isRegister = false }) => {
     const [email, setEmail] = useState('');
     const [pass, setPass] = useState('');
     const [username, setUsername] = useState('');
-    const [referralCode, setReferralCode] = useState('');
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSubmit(email, pass, username, referralCode);
+        onSubmit(email, pass, username); // Pass 3 args
     };
 
     return (
@@ -950,12 +949,6 @@ const AuthForm = ({ onSubmit, btnText, isRegister = false }) => {
                 <Lock className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input type="password" placeholder="ពាក្យសម្ងាត់ (Password)" value={pass} onChange={e => setPass(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" />
             </div>
-             {isRegister && (
-                 <div className="relative">
-                    <UserPlus className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input type="text" placeholder="កូដអ្នកណែនាំ (Optional)" value={referralCode} onChange={e => setReferralCode(e.target.value.toUpperCase())} maxLength={6} className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400 uppercase" />
-                </div>
-            )}
             <button className="w-full bg-teal-500 text-white p-3 rounded font-bold hover:bg-teal-600 transition shadow-lg">{btnText}</button>
         </form>
     );
@@ -972,8 +965,7 @@ const App = () => {
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
 
     // --- ADMIN SECURITY (USING UID) ---
-    // ដាក់ User ID របស់ Admin ជំនួស Email
-    const ADMIN_UID = "48wx8GPZbVYSxmfws1MxbuEOzsE3"; // <--- UID របស់អ្នកត្រូវបានដាក់នៅទីនេះ
+    const ADMIN_UID = "48wx8GPZbVYSxmfws1MxbuEOzsE3"; // UID របស់អ្នក
     const isAdmin = userId === ADMIN_UID; 
 
     const showNotification = useCallback((msg, type = 'info') => {
@@ -1037,46 +1029,22 @@ const App = () => {
         catch (e) { showNotification('បរាជ័យ: ' + e.code, 'error'); }
     };
 
-    const handleRegister = async (email, password, username, referralCode) => {
+    // MODIFIED: handleRegister (Removed referral code)
+    const handleRegister = async (email, password, username) => {
         if (password.length < 6) return showNotification('Password must be 6+ chars', 'error');
         try {
             const cred = await createUserWithEmailAndPassword(auth, email, password);
             const uid = cred.user.uid;
             const shortId = getShortId(uid);
             
-            let bonusPoints = 5000;
-            let referrerId = null;
-
-            // Process Referral Code
-            if (referralCode && referralCode.length === 6) {
-                try {
-                    const shortDoc = await getDoc(getShortCodeDocRef(referralCode));
-                    if (shortDoc.exists()) {
-                        referrerId = shortDoc.data().fullUserId;
-                        
-                        // Check for self-referral
-                        if (referrerId === uid) {
-                            showNotification("Cannot refer yourself", "error");
-                            referrerId = null; // Nullify if self-referral
-                        } else {
-                            // If valid, reward referrer and add bonus
-                            await updateDoc(getProfileDocRef(referrerId), { points: increment(globalConfig.referrerReward) });
-                            bonusPoints += (globalConfig.referredBonus || 0);
-                        }
-                    } else {
-                        showNotification("Referral code not found", "error");
-                    }
-                } catch(e) { console.error("Referral error", e); }
-            }
-
             await setDoc(getProfileDocRef(uid), { 
                 userId: uid, 
                 email, 
                 userName: username || `User_${shortId}`, 
-                points: bonusPoints, 
+                points: 5000, // Standard starting points
                 shortId, 
                 createdAt: serverTimestamp(), 
-                referredBy: referrerId ? referralCode : null 
+                referredBy: null // Set to null
             });
             
             await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
