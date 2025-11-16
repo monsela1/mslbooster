@@ -959,13 +959,13 @@ const App = () => {
     const [page, setPage] = useState('DASHBOARD');
     const [userId, setUserId] = useState(null);
     const [userProfile, setUserProfile] = useState({});
-    const [isAuthReady, setIsAuthReady] = useState(false);
+    const [isLoading, setIsLoading] = useState(true); // Replaced isAuthReady
     const [notification, setNotification] = useState(null);
     const [authPage, setAuthPage] = useState('LOGIN');
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
 
     // --- ADMIN SECURITY (USING UID) ---
-    const ADMIN_UID = "48wx8GPZbVYSxmfws1MxbuEOzsE3"; // UID របស់អ្នក
+    const ADMIN_UID = "48wx8GPZbVYSxmfws1MxbuEOzsE3"; // Your Admin UID
     const isAdmin = userId === ADMIN_UID; 
 
     const showNotification = useCallback((msg, type = 'info') => {
@@ -973,49 +973,54 @@ const App = () => {
         setTimeout(() => setNotification(null), 3000);
     }, []);
 
+    // --- MODIFIED: Auth and Profile Loading (Safer) ---
     useEffect(() => {
-        if (!auth) return;
+        if (!auth) {
+            setIsLoading(false);
+            return;
+        }
+        
         return onAuthStateChanged(auth, (user) => {
             if (user) {
                 setUserId(user.uid);
-                // Check if daily status doc exists, if not, create it
-                (async () => {
-                    const dailyRef = getDailyStatusDocRef(user.uid);
-                    const docSnap = await getDoc(dailyRef);
-                    if (!docSnap.exists()) {
-                        await setDoc(dailyRef, { date: getTodayDateKey(), checkinDone: false, adsWatchedCount: 0 });
+                const profileRef = getProfileDocRef(user.uid);
+                const dailyRef = getDailyStatusDocRef(user.uid);
+                
+                getDoc(profileRef).then(async (docSnap) => {
+                    if (docSnap.exists()) {
+                        // Profile exists, load daily status
+                        const dailySnap = await getDoc(dailyRef);
+                        const today = getTodayDateKey();
+                        let dailyData = { checkinDone: false, adsWatchedCount: 0 };
+
+                        if (dailySnap.exists() && dailySnap.data().date === today) {
+                            dailyData = dailySnap.data();
+                        } else {
+                            await setDoc(dailyRef, { date: today, checkinDone: false, adsWatchedCount: 0 });
+                        }
+                        setUserProfile({ ...docSnap.data(), id: user.uid, ...dailyData });
+                        setIsLoading(false);
+                    } else {
+                        // FIX: User is logged in but profile is missing (crashed during register)
+                        showNotification("Profile data missing. Logging out.", "error");
+                        console.error("Profile missing for UID:", user.uid);
+                        signOut(auth); // Force logout
+                        setIsLoading(false);
                     }
-                })();
+                }).catch(e => {
+                    // This can happen if rules are wrong
+                    showNotification("Error loading profile.", "error");
+                    console.error(e);
+                    signOut(auth);
+                    setIsLoading(false);
+                });
             } else { 
                 setUserId(null); 
-                setPage('DASHBOARD'); 
-            }
-            setIsAuthReady(true);
-        });
-    }, []);
-
-    useEffect(() => {
-        if (!db || !userId) return;
-        return onSnapshot(getProfileDocRef(userId), (doc) => {
-            if (doc.exists()) {
-                // Check daily status when profile loads
-                (async () => {
-                    const dailyRef = getDailyStatusDocRef(userId);
-                    const dailySnap = await getDoc(dailyRef);
-                    const today = getTodayDateKey();
-                    let dailyData = { checkinDone: false, adsWatchedCount: 0 };
-
-                    if (dailySnap.exists() && dailySnap.data().date === today) {
-                        dailyData = dailySnap.data();
-                    } else {
-                        // Reset for new day
-                        await setDoc(dailyRef, { date: today, checkinDone: false, adsWatchedCount: 0 });
-                    }
-                    setUserProfile({ ...doc.data(), id: userId, ...dailyData });
-                })();
+                setPage('DASHBOARD');
+                setIsLoading(false);
             }
         });
-    }, [db, userId]);
+    }, [db, auth]);
 
     useEffect(() => {
         if (!db) return;
@@ -1029,25 +1034,41 @@ const App = () => {
         catch (e) { showNotification('បរាជ័យ: ' + e.code, 'error'); }
     };
 
-    // MODIFIED: handleRegister (Removed referral code)
+    // MODIFIED: handleRegister (Safer)
     const handleRegister = async (email, password, username) => {
         if (password.length < 6) return showNotification('Password must be 6+ chars', 'error');
         try {
+            // 1. Create User
             const cred = await createUserWithEmailAndPassword(auth, email, password);
             const uid = cred.user.uid;
             const shortId = getShortId(uid);
             
-            await setDoc(getProfileDocRef(uid), { 
-                userId: uid, 
-                email, 
-                userName: username || `User_${shortId}`, 
-                points: 5000, // Standard starting points
-                shortId, 
-                createdAt: serverTimestamp(), 
-                referredBy: null // Set to null
-            });
+            // 2. Create Profile & Shortcode (Try/Catch this specifically)
+            try {
+                const profileRef = getProfileDocRef(uid);
+                const shortCodeRef = getShortCodeDocRef(shortId);
+                const dailyRef = getDailyStatusDocRef(uid);
+
+                await setDoc(profileRef, { 
+                    userId: uid, 
+                    email, 
+                    userName: username || `User_${shortId}`, 
+                    points: 5000, 
+                    shortId, 
+                    createdAt: serverTimestamp(), 
+                    referredBy: null 
+                });
+                
+                await setDoc(shortCodeRef, { fullUserId: uid, shortId });
+                await setDoc(dailyRef, { date: getTodayDateKey(), checkinDone: false, adsWatchedCount: 0 });
+
+            } catch (dbError) {
+                showNotification("Error saving profile. Check Firestore Rules/Creation.", "error");
+                console.error(dbError);
+                await signOut(auth); // Log out the broken user
+                return;
+            }
             
-            await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
             showNotification('ចុះឈ្មោះជោគជ័យ!', 'success');
 
         } catch (e) { 
@@ -1076,7 +1097,7 @@ const App = () => {
         }
     };
 
-    if (!isAuthReady) return <Loading />;
+    if (isLoading) return <Loading />; // Use new loading state
 
     if (!userId) return (
         <div className="min-h-screen bg-purple-900 flex items-center justify-center p-4">
