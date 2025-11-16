@@ -10,13 +10,13 @@ import {
 import {
     getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc,
     collection, query, where, serverTimestamp, getDocs,
-    runTransaction, increment
+    runTransaction, increment, limit, orderBy
 } from 'firebase/firestore';
 import {
     Users, Coins, Video, Link, Globe, MonitorPlay, Zap,
     UserPlus, ChevronLeft, BookOpen, ShoppingCart,
     CalendarCheck, Target, Wallet, Film, UserCheck,
-    DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, Settings, Copy, Save, Search, PlusCircle, MinusCircle, CheckCircle, XCircle, User
+    DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, Settings, Copy, Save, Search, PlusCircle, MinusCircle, CheckCircle, XCircle, RefreshCw
 } from 'lucide-react';
 
 // --- Configuration ---
@@ -70,8 +70,8 @@ const getShortCodeDocRef = (shortId) => db && shortId ? doc(db, 'artifacts', app
 const defaultGlobalConfig = {
     dailyCheckinReward: 200,
     referrerReward: 1000,
-    referredBonus: 500, // Bonus for entering code
     adsReward: 30,
+    maxDailyAds: 15,
     adsSettings: {
         bannerId: "ca-app-pub-xxxxxxxx/yyyyyy",
         interstitialId: "ca-app-pub-xxxxxxxx/zzzzzz",
@@ -160,7 +160,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                 <div className="grid grid-cols-1 gap-3">
                     <div><label className="text-xs font-bold text-purple-300">Daily Check-in Points</label><InputField name="dailyCheckinReward" type="number" value={config.dailyCheckinReward} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" value={config.referrerReward} onChange={handleChange} /></div>
-                     <div><label className="text-xs font-bold text-purple-300">Referred Bonus (New User)</label><InputField name="referredBonus" type="number" value={config.referredBonus} onChange={handleChange} /></div>
                      <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" value={config.adsReward} onChange={handleChange} /></div>
                 </div>
             </Card>
@@ -199,10 +198,40 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     );
 };
 
+// --- MODIFIED: USER MANAGER TAB WITH USER LIST ---
 const AdminUserManagerTab = ({ db, showNotification }) => {
     const [searchId, setSearchId] = useState('');
     const [foundUser, setFoundUser] = useState(null);
     const [pointsToAdd, setPointsToAdd] = useState(0);
+    const [allUsers, setAllUsers] = useState([]);
+    const [loadingList, setLoadingList] = useState(false);
+
+    // Load recent users
+    const loadUserList = async () => {
+        setLoadingList(true);
+        try {
+            // Fetch short codes doc to map to profiles
+            const shortCodesRef = collection(db, 'artifacts', appId, 'public', 'data', 'short_codes');
+            const q = query(shortCodesRef, limit(20)); // Limit to 20 for performance
+            const snap = await getDocs(q);
+            
+            const usersData = await Promise.all(snap.docs.map(async (docSnap) => {
+                const { fullUserId, shortId } = docSnap.data();
+                const profileSnap = await getDoc(getProfileDocRef(fullUserId));
+                if (profileSnap.exists()) {
+                    return { ...profileSnap.data(), uid: fullUserId };
+                }
+                return null;
+            }));
+            
+            setAllUsers(usersData.filter(u => u !== null));
+        } catch (e) { console.error(e); }
+        setLoadingList(false);
+    };
+
+    useEffect(() => {
+        loadUserList();
+    }, []);
 
     const handleSearch = async () => {
         if(searchId.length !== 6) return showNotification('Please enter 6-digit Short ID', 'error');
@@ -228,43 +257,69 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
             showNotification('Points updated successfully', 'success');
             setFoundUser(prev => ({...prev, points: prev.points + parseInt(pointsToAdd)}));
             setPointsToAdd(0);
+            loadUserList(); // Refresh list
         } catch(e) { showNotification('Update failed', 'error'); }
     };
 
     return (
-        <Card className="p-4">
-            <h3 className="font-bold text-lg mb-4 text-white">ស្វែងរក & កែប្រែអ្នកប្រើប្រាស់</h3>
-            <div className="flex space-x-2 mb-4">
-                <InputField 
-                    value={searchId} 
-                    onChange={e => setSearchId(e.target.value.toUpperCase())} 
-                    placeholder="Enter ID (e.g. A1B2C3)" 
-                    className="uppercase font-mono"
-                    maxLength={6}
-                />
-                <button onClick={handleSearch} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"><Search/></button>
-            </div>
-            
-            {foundUser && (
-                <div className="bg-purple-900 p-4 rounded-lg border border-purple-600">
-                    <p className="font-bold text-lg text-white">{foundUser.userName}</p>
-                    <p className="text-purple-300 text-sm">Email: {foundUser.email}</p>
-                    <p className="text-purple-300 text-sm mb-2">Current Points: <span className="font-bold text-yellow-400">{formatNumber(foundUser.points)}</span></p>
-                    
-                    <div className="flex items-center space-x-2 mt-4">
-                        <button onClick={() => setPointsToAdd(p => p - 100)} className="p-2 bg-red-600 rounded text-white"><MinusCircle size={20}/></button>
-                        <InputField 
-                            type="number" 
-                            value={pointsToAdd} 
-                            onChange={e => setPointsToAdd(e.target.value)} 
-                            className="text-center font-bold"
-                        />
-                        <button onClick={() => setPointsToAdd(p => p + 100)} className="p-2 bg-green-600 rounded text-white"><PlusCircle size={20}/></button>
-                    </div>
-                    <button onClick={handleUpdatePoints} className="w-full mt-3 bg-teal-600 text-white py-2 rounded font-bold hover:bg-teal-700">Update Points</button>
+        <div className='space-y-4'>
+            {/* Edit Section */}
+            <Card className="p-4">
+                <h3 className="font-bold text-lg mb-4 text-white">ស្វែងរក & កែប្រែ</h3>
+                <div className="flex space-x-2 mb-4">
+                    <InputField 
+                        value={searchId} 
+                        onChange={e => setSearchId(e.target.value.toUpperCase())} 
+                        placeholder="Enter ID (e.g. A1B2C3)" 
+                        className="uppercase font-mono"
+                        maxLength={6}
+                    />
+                    <button onClick={handleSearch} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"><Search/></button>
                 </div>
-            )}
-        </Card>
+                
+                {foundUser && (
+                    <div className="bg-purple-900 p-4 rounded-lg border border-purple-600">
+                        <p className="font-bold text-lg text-white">{foundUser.userName}</p>
+                        <p className="text-purple-300 text-sm">Email: {foundUser.email}</p>
+                        <p className="text-purple-300 text-sm mb-2">Current Points: <span className="font-bold text-yellow-400">{formatNumber(foundUser.points)}</span></p>
+                        
+                        <div className="flex items-center space-x-2 mt-4">
+                            <button onClick={() => setPointsToAdd(p => p - 100)} className="p-2 bg-red-600 rounded text-white"><MinusCircle size={20}/></button>
+                            <InputField 
+                                type="number" 
+                                value={pointsToAdd} 
+                                onChange={e => setPointsToAdd(e.target.value)} 
+                                className="text-center font-bold"
+                            />
+                            <button onClick={() => setPointsToAdd(p => p + 100)} className="p-2 bg-green-600 rounded text-white"><PlusCircle size={20}/></button>
+                        </div>
+                        <button onClick={handleUpdatePoints} className="w-full mt-3 bg-teal-600 text-white py-2 rounded font-bold hover:bg-teal-700">Update Points</button>
+                    </div>
+                )}
+            </Card>
+
+            {/* User List Table */}
+            <Card className="p-4">
+                <div className='flex justify-between items-center mb-3'>
+                    <h3 className="font-bold text-lg text-white">បញ្ជីអ្នកប្រើប្រាស់ ({allUsers.length})</h3>
+                    <button onClick={loadUserList} className='p-2 bg-purple-600 rounded hover:bg-purple-500'><RefreshCw size={18} className='text-white'/></button>
+                </div>
+                
+                {loadingList ? <div className='text-center text-purple-300'>Loading users...</div> : (
+                    <div className='overflow-y-auto max-h-64 space-y-2'>
+                        {allUsers.map((u, i) => (
+                            <div key={i} onClick={() => {setFoundUser(u); setSearchId(u.shortId);}} className='flex justify-between items-center bg-purple-900 p-3 rounded border border-purple-700 cursor-pointer hover:bg-purple-700 transition'>
+                                <div>
+                                    <p className='font-bold text-white text-sm'>{u.userName}</p>
+                                    <p className='text-xs text-purple-400 font-mono'>{u.shortId} | {u.email}</p>
+                                </div>
+                                <div className='font-bold text-yellow-400'>{formatNumber(u.points)}</div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </Card>
+        </div>
     );
 };
 
@@ -353,9 +408,6 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
 
 const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) => {
     const [referrals, setReferrals] = useState([]);
-    const [referrer, setReferrer] = useState(null);
-    const [isEnteringCode, setIsEnteringCode] = useState(false);
-    const [inputCode, setInputCode] = useState('');
     const shortId = getShortId(userId);
 
     useEffect(() => {
@@ -364,76 +416,12 @@ const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) =
         onSnapshot(q, (snap) => {
             setReferrals(snap.docs.map(d => d.data()));
         });
-
-        // Check if user already has a referrer
-        getDoc(getProfileDocRef(userId)).then(doc => {
-            if (doc.exists() && doc.data().referredBy) {
-                setReferrer(doc.data().referredBy);
-            }
-        });
     }, [db, userId]);
-
-    const handleEnterCode = async () => {
-        if (inputCode.toUpperCase() === shortId) return showNotification('មិនអាចដាក់កូដខ្លួនឯងបានទេ', 'error');
-        if (inputCode.length !== 6) return showNotification('កូដត្រូវមាន ៦ ខ្ទង់', 'error');
-
-        try {
-            await runTransaction(db, async (tx) => {
-                // 1. Get Referrer ID
-                const shortCodeRef = getShortCodeDocRef(inputCode.toUpperCase());
-                const shortDoc = await tx.get(shortCodeRef);
-                if (!shortDoc.exists()) throw new Error("កូដមិនត្រឹមត្រូវ");
-                const referrerId = shortDoc.data().fullUserId;
-
-                // 2. Check if already referred (Double Check)
-                const myProfileRef = getProfileDocRef(userId);
-                const myProfile = await tx.get(myProfileRef);
-                if(myProfile.data().referredBy) throw new Error("អ្នកបានដាក់កូដរួចហើយ");
-
-                // 3. Reward Referrer
-                tx.update(getProfileDocRef(referrerId), { points: increment(globalConfig.referrerReward) });
-                
-                // 4. Reward User (Bonus)
-                tx.update(myProfileRef, { 
-                    points: increment(globalConfig.referredBonus),
-                    referredBy: inputCode.toUpperCase()
-                });
-
-                // 5. Record
-                const refRecord = doc(getReferralCollectionRef());
-                tx.set(refRecord, { referrerId, referredId: userId, referredName: myProfile.data().userName, reward: globalConfig.referrerReward, createdAt: serverTimestamp() });
-            });
-            showNotification(`ជោគជ័យ! ទទួលបាន ${globalConfig.referredBonus} ពិន្ទុ`, 'success');
-            setReferrer(inputCode.toUpperCase());
-            setIsEnteringCode(false);
-        } catch (e) { showNotification(e.message, 'error'); }
-    };
 
     return (
         <div className="min-h-screen bg-purple-900 pb-16 pt-20">
             <Header title="ណែនាំមិត្ត" onBack={() => setPage('DASHBOARD')} />
             <main className="p-4 space-y-4">
-                {/* Enter Code Section */}
-                {!referrer ? (
-                    <Card className="p-4 bg-teal-800 border-teal-600">
-                        <h3 className="font-bold text-white mb-2">បញ្ចូលកូដអ្នកណែនាំ</h3>
-                        {isEnteringCode ? (
-                            <div className="flex space-x-2">
-                                <InputField value={inputCode} onChange={e => setInputCode(e.target.value.toUpperCase())} placeholder="CODE (6 Digits)" maxLength={6} className="uppercase text-center" />
-                                <button onClick={handleEnterCode} className="bg-yellow-500 text-black font-bold px-4 rounded">OK</button>
-                            </div>
-                        ) : (
-                            <button onClick={() => setIsEnteringCode(true)} className="text-sm text-teal-200 underline">
-                                ចុចទីនេះដើម្បីដាក់កូដ និងទទួល {formatNumber(globalConfig.referredBonus)} ពិន្ទុ
-                            </button>
-                        )}
-                    </Card>
-                ) : (
-                    <div className="bg-green-800 p-3 rounded text-green-200 text-sm text-center border border-green-600">
-                        អ្នកត្រូវបានណែនាំដោយ: <span className="font-bold text-white">{referrer}</span>
-                    </div>
-                )}
-
                 <Card className="p-6 text-center bg-purple-800 border-2 border-yellow-500/50">
                     <h3 className="font-bold text-white text-lg">កូដណែនាំរបស់អ្នក</h3>
                     <div className="text-4xl font-mono font-extrabold text-yellow-400 my-4 tracking-widest bg-purple-900 p-2 rounded-lg shadow-inner">{shortId}</div>
@@ -639,11 +627,13 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
 
     useEffect(() => { if (current) { setTimer(current.requiredDuration || 30); setClaimed(false); } }, [current]);
     
+    // AUTO CLAIM LOGIC (Only for 'view' and 'website')
     useEffect(() => { 
         if (timer > 0) { 
             const interval = setInterval(() => setTimer(t => t - 1), 1000); 
             return () => clearInterval(interval); 
         } else if (timer === 0 && !claimed && current) {
+            // If it's NOT subscription, auto claim
             if (type !== 'sub') {
                 handleClaim();
             }
@@ -662,8 +652,11 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                 transaction.update(campRef, { remaining: increment(-1) });
             });
             showNotification('Success! Points Added.', 'success');
+            
+            // For website, open link if not already (Subscribe handles this separately)
             if (type === 'website') window.open(current.link, '_blank');
             
+            // Auto Next
             setTimeout(() => {
                 const next = campaigns.filter(c => c.id !== current?.id && c.remaining > 0)[0];
                 setCurrent(next || null);
@@ -677,10 +670,11 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
          setCurrent(next || null);
     }
 
+    // Special handler for Subscription Button
     const handleSubscribeClick = () => {
         if(!current) return;
-        window.open(current.link, '_blank'); 
-        handleClaim(); 
+        window.open(current.link, '_blank'); // Open channel
+        handleClaim(); // Then claim and skip
     };
 
     const getEmbedUrl = (link) => {
@@ -697,6 +691,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
             <main className="p-0">
                 {current ? (
                     <div className='flex flex-col h-full'>
+                        {/* Show Video for View AND Sub types */}
                         {(type === 'view' || type === 'sub') ? (
                             <div className="aspect-video bg-black w-full">
                                 <iframe src={getEmbedUrl(current.link)} className="w-full h-full" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
@@ -720,11 +715,13 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                                 </button>
                             </div>
 
+                            {/* MOCK AD BANNER */}
                             <div className="w-full bg-gray-200 h-20 flex flex-col items-center justify-center mb-4 border border-gray-400 rounded">
                                 <p className="text-xs text-gray-500 font-bold">SPONSORED AD</p>
                                 <p className="text-xs text-gray-400">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p>
                             </div>
 
+                            {/* Logic for Buttons based on Type */}
                             {type === 'sub' && timer === 0 && !claimed ? (
                                 <button onClick={handleSubscribeClick} className="w-full py-3 rounded-full font-bold text-white shadow-lg mb-4 bg-red-600 animate-bounce">
                                     SUBSCRIBE & CLAIM
@@ -984,20 +981,32 @@ const App = () => {
     const handleLogout = async () => { await signOut(auth); showNotification('បានចាកចេញ', 'success'); };
 
     const handleDailyCheckin = async () => {
-        if (userProfile.dailyCheckin) return showNotification('បាន Check-in រួចហើយ!', 'info');
+        // Check local status immediately to prevent multiple clicks
+        if (userProfile.dailyCheckin) {
+             showNotification('បាន Check-in រួចហើយ!', 'info');
+             return;
+        }
+
         try {
             await runTransaction(db, async (tx) => {
+                // Read inside transaction for consistency
                 const dailyRef = getDailyStatusDocRef(userId);
                 const dailyDoc = await tx.get(dailyRef);
-                if (dailyDoc.exists() && dailyDoc.data().checkinDone) throw new Error("Already checked in today");
+                
+                if (dailyDoc.exists() && dailyDoc.data().checkinDone) {
+                    throw new Error("Already checked in today");
+                }
 
                 tx.update(getProfileDocRef(userId), { points: increment(globalConfig.dailyCheckinReward) });
                 tx.set(dailyRef, { checkinDone: true, date: getTodayDateKey() }, { merge: true });
             });
             showNotification('Check-in ជោគជ័យ!', 'success');
         } catch (e) { 
-            if (e.message === "Already checked in today") showNotification('បាន Check-in រួចហើយ!', 'info');
-            else console.error(e);
+            console.error(e); 
+            // Only show error if it wasn't the "already checked in" one, or just show info
+            if (e.message === "Already checked in today") {
+                showNotification('បាន Check-in រួចហើយ!', 'info');
+            }
         }
     };
 
