@@ -477,7 +477,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     );
 };
 
-// MODIFIED: EarnPage with Video Support for Subscriptions
+// MODIFIED: EarnPage with Auto Claim for View/Website AND Click-to-Subscribe logic
 const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
@@ -496,19 +496,21 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
 
     useEffect(() => { if (current) { setTimer(current.requiredDuration || 30); setClaimed(false); } }, [current]);
     
-    // AUTO CLAIM LOGIC
+    // AUTO CLAIM LOGIC (Only for 'view' and 'website')
     useEffect(() => { 
         if (timer > 0) { 
             const interval = setInterval(() => setTimer(t => t - 1), 1000); 
             return () => clearInterval(interval); 
         } else if (timer === 0 && !claimed && current) {
-            // Automatically trigger claim when timer hits 0
-            handleClaim();
+            // If it's NOT subscription, auto claim
+            if (type !== 'sub') {
+                handleClaim();
+            }
         }
-    }, [timer, claimed, current]);
+    }, [timer, claimed, current, type]);
 
     const handleClaim = async () => {
-        if (claimed) return; // Prevent double claim
+        if (claimed) return;
         setClaimed(true);
         try {
             await runTransaction(db, async (transaction) => {
@@ -518,12 +520,12 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                 transaction.update(getProfileDocRef(userId), { points: increment(current.requiredDuration || 50) });
                 transaction.update(campRef, { remaining: increment(-1) });
             });
-            showNotification('Auto Claimed: Points Added!', 'success');
+            showNotification('Success! Points Added.', 'success');
             
-            // Open external link if needed
-            if (type === 'website' || type === 'sub') window.open(current.link, '_blank');
+            // For website, open link if not already (Subscribe handles this separately)
+            if (type === 'website') window.open(current.link, '_blank');
             
-            // Auto Next with small delay
+            // Auto Next
             setTimeout(() => {
                 const next = campaigns.filter(c => c.id !== current?.id && c.remaining > 0)[0];
                 setCurrent(next || null);
@@ -537,10 +539,16 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
          setCurrent(next || null);
     }
 
+    // Special handler for Subscription Button
+    const handleSubscribeClick = () => {
+        if(!current) return;
+        window.open(current.link, '_blank'); // Open channel
+        handleClaim(); // Then claim and skip
+    };
+
     const getEmbedUrl = (link) => {
         if (link.includes('youtu')) {
              const id = link.split('v=')[1]?.split('&')[0] || link.split('/').pop();
-             // MODIFIED: Autoplay=1 and Mute=1 (browsers block autoplay with sound)
              return `https://www.youtube.com/embed/${id}?autoplay=1&mute=0&controls=0`; 
         }
         return link;
@@ -552,6 +560,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
             <main className="p-0">
                 {current ? (
                     <div className='flex flex-col h-full'>
+                        {/* Show Video for View AND Sub types */}
                         {(type === 'view' || type === 'sub') ? (
                             <div className="aspect-video bg-black w-full">
                                 <iframe src={getEmbedUrl(current.link)} className="w-full h-full" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
@@ -581,6 +590,17 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                                 <p className="text-xs text-gray-400">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p>
                             </div>
 
+                            {/* Logic for Buttons based on Type */}
+                            {type === 'sub' && timer === 0 && !claimed ? (
+                                <button onClick={handleSubscribeClick} className="w-full py-3 rounded-full font-bold text-white shadow-lg mb-4 bg-red-600 animate-bounce">
+                                    SUBSCRIBE & CLAIM
+                                </button>
+                            ) : (
+                                <button onClick={handleClaim} disabled={timer > 0 || claimed} className={`w-full py-3 rounded-full font-bold text-white shadow-lg mb-4 ${timer > 0 || claimed ? 'bg-gray-400' : 'bg-green-500'}`}>
+                                    {timer > 0 ? `Please wait ${timer}s` : 'CLAIM REWARD'}
+                                </button>
+                            )}
+                            
                             <button className="w-full py-3 bg-teal-500 text-white font-bold rounded-full shadow-md">WATCH VIDEO ADS</button>
                         </div>
                     </div>
