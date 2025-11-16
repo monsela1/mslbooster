@@ -59,11 +59,11 @@ const getDailyStatusDocRef = (userId) => db && userId ? doc(db, 'artifacts', app
 const getGlobalConfigDocRef = () => db ? doc(db, 'artifacts', appId, 'public', 'data', 'config', 'global_settings') : null;
 const getShortCodeDocRef = (shortId) => db && shortId ? doc(db, 'artifacts', appId, 'public', 'data', 'short_codes', shortId) : null;
 
-// --- Default Config (Will be overwritten by Admin Settings) ---
+// --- Default Config ---
 const defaultGlobalConfig = {
     dailyCheckinReward: 200,
     referrerReward: 1000,
-    adsReward: 30, // Points for watching ads
+    adsReward: 30,
     adsSettings: {
         bannerId: "ca-app-pub-xxxxxxxx/yyyyyy",
         interstitialId: "ca-app-pub-xxxxxxxx/zzzzzz",
@@ -77,17 +77,17 @@ const defaultGlobalConfig = {
     ]
 };
 
-// --- UI Components ---
+// --- UI Components (Purple Theme) ---
 const Loading = () => (
-    <div className="flex justify-center items-center h-screen bg-blue-900">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-yellow-500"></div>
+    <div className="flex justify-center items-center h-screen bg-purple-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-yellow-400"></div>
         <span className="ml-3 text-white text-lg font-semibold">កំពុងផ្ទុក...</span>
     </div>
 );
 
-const IconButton = ({ icon: Icon, title, onClick, iconColor = 'text-gray-600', textColor = 'text-gray-800' }) => (
-    <button onClick={onClick} className="flex flex-col items-center justify-start p-2 rounded-xl transition transform hover:scale-105 active:scale-95 w-full h-32 bg-white shadow-md border border-gray-200">
-        <div className={`p-3 rounded-xl bg-gray-100 shadow-inner`}>
+const IconButton = ({ icon: Icon, title, onClick, iconColor = 'text-purple-300', textColor = 'text-white' }) => (
+    <button onClick={onClick} className="flex flex-col items-center justify-start p-2 rounded-xl transition transform hover:scale-105 active:scale-95 w-full h-32 bg-purple-800 shadow-lg border border-purple-700">
+        <div className={`p-3 rounded-xl bg-purple-900 shadow-inner`}>
             <Icon className={`w-8 h-8 ${iconColor}`} />
         </div>
         <span className={`mt-2 text-xs font-bold text-center ${textColor} break-words leading-tight`}>{title}</span>
@@ -95,14 +95,14 @@ const IconButton = ({ icon: Icon, title, onClick, iconColor = 'text-gray-600', t
 );
 
 const Card = ({ children, className = '' }) => (
-    <div className={`bg-white rounded-xl shadow-xl ${className}`}>{children}</div>
+    <div className={`bg-purple-800 rounded-xl shadow-xl border border-purple-700 text-white ${className}`}>{children}</div>
 );
 
 const Header = ({ title, onBack, rightContent, className = '' }) => (
-    <header className={`flex items-center justify-between p-4 bg-teal-700 shadow-md text-white fixed top-0 w-full z-20 ${className}`}>
+    <header className={`flex items-center justify-between p-4 bg-purple-950 shadow-md text-white fixed top-0 w-full z-20 border-b border-purple-800 ${className}`}>
         <div className="flex items-center">
             {onBack && (
-                <button onClick={onBack} className="p-1 mr-2 rounded-full hover:bg-teal-600 transition">
+                <button onClick={onBack} className="p-1 mr-2 rounded-full hover:bg-purple-800 transition">
                     <ChevronLeft className="w-6 h-6" />
                 </button>
             )}
@@ -112,9 +112,15 @@ const Header = ({ title, onBack, rightContent, className = '' }) => (
     </header>
 );
 
+const InputField = (props) => (
+    <input 
+        {...props}
+        className={`w-full p-3 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-400 focus:outline-none focus:border-yellow-400 ${props.className || ''}`}
+    />
+);
+
 // --- ADMIN SUB-COMPONENTS ---
 
-// 1. General Settings (Rewards & Ads)
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -131,45 +137,44 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
 
     return (
         <div className="space-y-4">
-            <Card className="p-4 border-l-4 border-blue-500">
-                <h3 className="font-bold text-lg mb-3 text-gray-800 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់ (Rewards)</h3>
+            <Card className="p-4 border-l-4 border-yellow-400">
+                <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់ (Rewards)</h3>
                 <div className="grid grid-cols-1 gap-3">
                     <div>
-                        <label className="text-xs font-bold text-gray-500">Daily Check-in Points</label>
-                        <input name="dailyCheckinReward" type="number" value={config.dailyCheckinReward} onChange={handleChange} className="w-full p-2 border rounded bg-gray-50" />
+                        <label className="text-xs font-bold text-purple-300">Daily Check-in Points</label>
+                        <InputField name="dailyCheckinReward" type="number" value={config.dailyCheckinReward} onChange={handleChange} />
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-gray-500">Referral Reward Points</label>
-                        <input name="referrerReward" type="number" value={config.referrerReward} onChange={handleChange} className="w-full p-2 border rounded bg-gray-50" />
+                        <label className="text-xs font-bold text-purple-300">Referral Reward Points</label>
+                        <InputField name="referrerReward" type="number" value={config.referrerReward} onChange={handleChange} />
                     </div>
                      <div>
-                        <label className="text-xs font-bold text-gray-500">Watch Ads Reward</label>
-                        <input name="adsReward" type="number" value={config.adsReward} onChange={handleChange} className="w-full p-2 border rounded bg-gray-50" />
+                        <label className="text-xs font-bold text-purple-300">Watch Ads Reward</label>
+                        <InputField name="adsReward" type="number" value={config.adsReward} onChange={handleChange} />
                     </div>
                 </div>
             </Card>
 
             <Card className="p-4 border-l-4 border-pink-500">
-                <h3 className="font-bold text-lg mb-3 text-gray-800 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ពាណិជ្ជកម្ម (Ads)</h3>
+                <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ពាណិជ្ជកម្ម (Ads)</h3>
                 <div className="space-y-3">
                      <div>
-                        <label className="text-xs font-bold text-gray-500">Banner ID</label>
-                        <input name="bannerId" type="text" value={config.adsSettings?.bannerId || ''} onChange={handleAdsChange} className="w-full p-2 border rounded bg-gray-50" />
+                        <label className="text-xs font-bold text-purple-300">Banner ID</label>
+                        <InputField name="bannerId" type="text" value={config.adsSettings?.bannerId || ''} onChange={handleAdsChange} />
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-gray-500">Interstitial/Video ID</label>
-                        <input name="interstitialId" type="text" value={config.adsSettings?.interstitialId || ''} onChange={handleAdsChange} className="w-full p-2 border rounded bg-gray-50" />
+                        <label className="text-xs font-bold text-purple-300">Interstitial/Video ID</label>
+                        <InputField name="interstitialId" type="text" value={config.adsSettings?.interstitialId || ''} onChange={handleAdsChange} />
                     </div>
                 </div>
             </Card>
-             <button onClick={onSave} className="w-full py-3 bg-green-600 text-white font-bold rounded-lg shadow-lg flex justify-center items-center">
+             <button onClick={onSave} className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-lg flex justify-center items-center transition">
                 <Save className="w-5 h-5 mr-2"/> រក្សាទុកការកំណត់
             </button>
         </div>
     );
 };
 
-// 2. User Manager (Edit Points)
 const AdminUserManagerTab = ({ db, showNotification }) => {
     const [searchId, setSearchId] = useState('');
     const [foundUser, setFoundUser] = useState(null);
@@ -204,48 +209,46 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
 
     return (
         <Card className="p-4">
-            <h3 className="font-bold text-lg mb-4 text-gray-800">ស្វែងរក & កែប្រែអ្នកប្រើប្រាស់</h3>
+            <h3 className="font-bold text-lg mb-4 text-white">ស្វែងរក & កែប្រែអ្នកប្រើប្រាស់</h3>
             <div className="flex space-x-2 mb-4">
-                <input 
+                <InputField 
                     value={searchId} 
                     onChange={e => setSearchId(e.target.value.toUpperCase())} 
-                    placeholder="Enter User ID (e.g. A1B2C3)" 
-                    className="flex-1 p-2 border-2 border-blue-300 rounded bg-white text-black font-mono uppercase"
+                    placeholder="Enter ID (e.g. A1B2C3)" 
+                    className="uppercase font-mono"
                     maxLength={6}
                 />
-                <button onClick={handleSearch} className="bg-blue-600 text-white p-2 rounded"><Search/></button>
+                <button onClick={handleSearch} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"><Search/></button>
             </div>
             
             {foundUser && (
-                <div className="bg-gray-100 p-4 rounded-lg border border-gray-300">
-                    <p className="font-bold text-lg text-gray-800">{foundUser.userName}</p>
-                    <p className="text-gray-600 text-sm">Email: {foundUser.email}</p>
-                    <p className="text-gray-600 text-sm mb-2">Current Points: <span className="font-bold text-green-600">{formatNumber(foundUser.points)}</span></p>
+                <div className="bg-purple-900 p-4 rounded-lg border border-purple-600">
+                    <p className="font-bold text-lg text-white">{foundUser.userName}</p>
+                    <p className="text-purple-300 text-sm">Email: {foundUser.email}</p>
+                    <p className="text-purple-300 text-sm mb-2">Current Points: <span className="font-bold text-yellow-400">{formatNumber(foundUser.points)}</span></p>
                     
                     <div className="flex items-center space-x-2 mt-4">
-                        <button onClick={() => setPointsToAdd(p => p - 100)} className="p-1 bg-red-200 rounded text-red-700"><MinusCircle/></button>
-                        <input 
+                        <button onClick={() => setPointsToAdd(p => p - 100)} className="p-2 bg-red-600 rounded text-white"><MinusCircle size={20}/></button>
+                        <InputField 
                             type="number" 
                             value={pointsToAdd} 
                             onChange={e => setPointsToAdd(e.target.value)} 
-                            className="w-24 text-center p-1 border rounded font-bold"
+                            className="text-center font-bold"
                         />
-                        <button onClick={() => setPointsToAdd(p => p + 100)} className="p-1 bg-green-200 rounded text-green-700"><PlusCircle/></button>
-                        <button onClick={handleUpdatePoints} className="flex-1 bg-teal-600 text-white py-1 rounded font-bold">Update</button>
+                        <button onClick={() => setPointsToAdd(p => p + 100)} className="p-2 bg-green-600 rounded text-white"><PlusCircle size={20}/></button>
                     </div>
+                    <button onClick={handleUpdatePoints} className="w-full mt-3 bg-teal-600 text-white py-2 rounded font-bold hover:bg-teal-700">Update Points</button>
                 </div>
             )}
         </Card>
     );
 };
 
-// 7. Admin Dashboard Page (MAIN ADMIN CONTAINER)
 const AdminDashboardPage = ({ db, setPage, showNotification }) => {
     const [activeTab, setActiveTab] = useState('SETTINGS');
     const [config, setConfig] = useState(null);
     const [campaigns, setCampaigns] = useState([]);
 
-    // Fetch Config
     useEffect(() => {
         const fetchConfig = async () => {
             const docSnap = await getDoc(getGlobalConfigDocRef());
@@ -255,7 +258,6 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
         fetchConfig();
     }, [db]);
 
-    // Fetch Campaigns for listing
     useEffect(() => {
         if(activeTab === 'CAMPAIGNS') {
             const q = query(getCampaignsCollectionRef());
@@ -281,16 +283,15 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
     if (!config) return <Loading />;
 
     return (
-        <div className="min-h-screen bg-gray-900 pb-16 pt-20">
-            <Header title="ADMIN PANEL" onBack={() => setPage('DASHBOARD')} className="bg-gray-800" />
+        <div className="min-h-screen bg-purple-950 pb-16 pt-20">
+            <Header title="ADMIN PANEL" onBack={() => setPage('DASHBOARD')} className="bg-purple-900" />
             <main className="p-4">
-                {/* Tabs */}
-                <div className="flex space-x-1 mb-4 bg-gray-700 p-1 rounded-lg">
+                <div className="flex space-x-1 mb-4 bg-purple-800 p-1 rounded-lg">
                     {['SETTINGS', 'USERS', 'CAMPAIGNS'].map(tab => (
                         <button 
                             key={tab}
                             onClick={() => setActiveTab(tab)} 
-                            className={`flex-1 py-2 rounded font-bold text-xs ${activeTab === tab ? 'bg-blue-500 text-white shadow' : 'text-gray-300 hover:bg-gray-600'}`}
+                            className={`flex-1 py-2 rounded-lg font-bold text-xs transition ${activeTab === tab ? 'bg-teal-600 text-white shadow' : 'text-purple-300 hover:bg-purple-700'}`}
                         >
                             {tab}
                         </button>
@@ -303,20 +304,20 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
                 {activeTab === 'CAMPAIGNS' && (
                     <div className="space-y-2">
                         {campaigns.map(c => (
-                             <div key={c.id} className={`bg-white p-3 rounded-lg shadow flex justify-between items-center border-l-4 ${c.remaining > 0 ? 'border-green-500' : 'border-red-500'}`}>
+                             <div key={c.id} className={`bg-purple-800 p-3 rounded-lg shadow flex justify-between items-center border-l-4 ${c.remaining > 0 ? 'border-green-500' : 'border-red-500'}`}>
                                 <div className='overflow-hidden'>
-                                    <p className="font-bold text-sm truncate text-gray-800 w-48">{c.link}</p>
+                                    <p className="font-bold text-sm truncate text-white w-48">{c.link}</p>
                                     <div className='flex space-x-2 text-xs mt-1'>
-                                        <span className='bg-gray-200 px-2 py-0.5 rounded text-gray-700'>{c.type}</span>
-                                        <span className={`${c.remaining > 0 ? 'text-green-600' : 'text-red-600'} font-bold`}>
+                                        <span className='bg-purple-900 px-2 py-0.5 rounded text-purple-200'>{c.type}</span>
+                                        <span className={`${c.remaining > 0 ? 'text-green-400' : 'text-red-400'} font-bold`}>
                                             Rem: {c.remaining}
                                         </span>
                                     </div>
                                 </div>
-                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-100 text-red-600 rounded-full"><Trash2 size={18}/></button>
+                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-900 text-red-200 rounded-full hover:bg-red-800"><Trash2 size={18}/></button>
                             </div>
                         ))}
-                         {campaigns.length === 0 && <p className="text-white text-center opacity-50">No campaigns found.</p>}
+                         {campaigns.length === 0 && <p className="text-purple-300 text-center opacity-50">No campaigns found.</p>}
                     </div>
                 )}
             </main>
@@ -324,9 +325,8 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
     );
 };
 
-// ... (Standard User Pages - No changes needed here but included for completeness) ...
+// ... (User Pages - PURPLE THEMED) ...
 
-// 1. Referral Page
 const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) => {
     const [referrals, setReferrals] = useState([]);
     const shortId = getShortId(userId);
@@ -340,26 +340,26 @@ const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) =
     }, [db, userId]);
 
     return (
-        <div className="min-h-screen bg-blue-900 pb-16 pt-20">
+        <div className="min-h-screen bg-purple-900 pb-16 pt-20">
             <Header title="ណែនាំមិត្ត" onBack={() => setPage('DASHBOARD')} />
             <main className="p-4 space-y-4">
-                <Card className="p-6 text-center bg-yellow-50 border-2 border-yellow-400">
-                    <h3 className="font-bold text-gray-800 text-lg">កូដណែនាំរបស់អ្នក</h3>
-                    <div className="text-4xl font-mono font-extrabold text-red-600 my-4 tracking-widest bg-white p-2 rounded-lg shadow-inner">{shortId}</div>
-                    <p className="text-sm text-gray-700 font-medium">ទទួលបាន <span className='text-green-600 font-bold'>{formatNumber(globalConfig.referrerReward)} ពិន្ទុ!</span> ក្នុងម្នាក់</p>
+                <Card className="p-6 text-center bg-purple-800 border-2 border-yellow-500/50">
+                    <h3 className="font-bold text-white text-lg">កូដណែនាំរបស់អ្នក</h3>
+                    <div className="text-4xl font-mono font-extrabold text-yellow-400 my-4 tracking-widest bg-purple-900 p-2 rounded-lg shadow-inner">{shortId}</div>
+                    <p className="text-sm text-purple-200 font-medium">ទទួលបាន <span className='text-green-400 font-bold'>{formatNumber(globalConfig.referrerReward)} ពិន្ទុ!</span> ក្នុងម្នាក់</p>
                     <button onClick={() => {navigator.clipboard.writeText(shortId); showNotification('ចម្លងរួចរាល់!', 'success')}} className="mt-5 bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-full text-sm font-bold flex items-center justify-center mx-auto shadow-lg active:scale-95 transition">
                         <Copy className='w-4 h-4 mr-2'/> ចម្លងកូដ
                     </button>
                 </Card>
                 <Card className="p-4">
-                    <h3 className="font-bold mb-4 text-gray-800 border-b pb-2">បញ្ជីអ្នកដែលបានណែនាំ ({referrals.length})</h3>
+                    <h3 className="font-bold mb-4 text-white border-b border-purple-600 pb-2">បញ្ជីអ្នកដែលបានណែនាំ ({referrals.length})</h3>
                     <div className="max-h-80 overflow-y-auto space-y-2">
                         {referrals.length > 0 ? referrals.map((r, i) => (
-                            <div key={i} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                <span className="text-gray-800 font-semibold">{i+1}. {r.referredName || 'User'}</span>
-                                <span className="text-green-600 font-bold">+{formatNumber(r.reward)}</span>
+                            <div key={i} className="flex justify-between items-center bg-purple-700 p-3 rounded-lg border border-purple-600">
+                                <span className="text-white font-semibold">{i+1}. {r.referredName || 'User'}</span>
+                                <span className="text-green-400 font-bold">+{formatNumber(r.reward)}</span>
                             </div>
-                        )) : <div className="text-center py-8 text-gray-500">មិនទាន់មានការណែនាំ</div>}
+                        )) : <div className="text-center py-8 text-purple-400">មិនទាន់មានការណែនាំ</div>}
                     </div>
                 </Card>
             </main>
@@ -411,32 +411,32 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     };
 
     return (
-        <div className="min-h-screen bg-blue-900 pb-16 pt-20">
+        <div className="min-h-screen bg-purple-900 pb-16 pt-20">
             <Header title="យុទ្ធនាការខ្ញុំ" onBack={() => setPage('DASHBOARD')} />
             <main className="p-4 space-y-4">
                 <Card className="p-4">
-                    <h2 className="font-bold text-lg mb-4 text-gray-800">បង្កើតយុទ្ធនាការថ្មី</h2>
+                    <h2 className="font-bold text-lg mb-4 text-white">បង្កើតយុទ្ធនាការថ្មី</h2>
                     <div className="flex space-x-2 mb-4">
                         {['view', 'sub', 'website'].map(t => (
-                            <button key={t} onClick={() => setType(t)} className={`flex-1 py-2 rounded font-bold ${type === t ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}>{t.toUpperCase()}</button>
+                            <button key={t} onClick={() => setType(t)} className={`flex-1 py-2 rounded font-bold ${type === t ? 'bg-teal-600 text-white' : 'bg-purple-900 text-purple-300'}`}>{t.toUpperCase()}</button>
                         ))}
                     </div>
                     <form onSubmit={handleSubmit} className="space-y-3">
-                        <input type="url" value={link} onChange={e => setLink(e.target.value)} placeholder="Link URL..." className="w-full p-3 border-2 border-gray-300 rounded-lg bg-white text-black font-medium" required />
+                        <InputField value={link} onChange={e => setLink(e.target.value)} placeholder="Link URL..." required />
                         <div className="flex justify-between space-x-2">
-                            <div className="w-1/2"><label className="text-xs text-gray-500 font-bold">ចំនួន (Count)</label><input type="number" value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value)))} className="w-full p-3 border-2 border-gray-300 rounded-lg bg-white text-black font-medium" /></div>
-                            {type !== 'sub' && (<div className="w-1/2"><label className="text-xs text-gray-500 font-bold">ពេល (Sec)</label><input type="number" value={time} onChange={e => setTime(Math.max(10, parseInt(e.target.value)))} className="w-full p-3 border-2 border-gray-300 rounded-lg bg-white text-black font-medium" /></div>)}
+                            <div className="w-1/2"><label className="text-xs text-purple-300 font-bold">ចំនួន (Count)</label><InputField type="number" value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value)))} /></div>
+                            {type !== 'sub' && (<div className="w-1/2"><label className="text-xs text-purple-300 font-bold">ពេល (Sec)</label><InputField type="number" value={time} onChange={e => setTime(Math.max(10, parseInt(e.target.value)))} /></div>)}
                         </div>
-                        <div className="bg-yellow-100 p-3 rounded-lg text-center font-bold text-yellow-800 border border-yellow-400">តម្លៃ: {formatNumber(calculateCost())} Coins</div>
+                        <div className="bg-purple-900 p-3 rounded-lg text-center font-bold text-yellow-400 border border-purple-600">តម្លៃ: {formatNumber(calculateCost())} Coins</div>
                         <button type="submit" disabled={isSubmitting} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-teal-700">{isSubmitting ? 'កំពុងដាក់...' : 'ដាក់យុទ្ធនាការ'}</button>
                     </form>
                 </Card>
                 <div className="space-y-2">
                      <h3 className="text-white font-bold">ប្រវត្តិ ({userCampaigns.length})</h3>
                     {userCampaigns.map(c => (
-                        <div key={c.id} className="bg-white p-3 rounded-lg shadow flex justify-between items-center">
-                            <div className='w-2/3'><p className="font-bold text-sm truncate text-gray-800">{c.link}</p><p className="text-xs text-gray-500">{c.type.toUpperCase()} - នៅសល់: {c.remaining}</p></div>
-                            <span className={`text-xs font-bold ${c.remaining > 0 ? 'text-green-600' : 'text-red-500'}`}>{c.remaining > 0 ? 'Active' : 'Finished'}</span>
+                        <div key={c.id} className="bg-purple-800 p-3 rounded-lg shadow flex justify-between items-center border-b border-purple-700">
+                            <div className='w-2/3'><p className="font-bold text-sm truncate text-white">{c.link}</p><p className="text-xs text-purple-300">{c.type.toUpperCase()} - នៅសល់: {c.remaining}</p></div>
+                            <span className={`text-xs font-bold ${c.remaining > 0 ? 'text-green-400' : 'text-red-400'}`}>{c.remaining > 0 ? 'Active' : 'Finished'}</span>
                         </div>
                     ))}
                 </div>
@@ -482,7 +482,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
     };
 
     return (
-        <div className="min-h-screen bg-blue-900 pb-16 pt-20">
+        <div className="min-h-screen bg-purple-900 pb-16 pt-20">
             <Header title={type === 'view' ? 'មើលវីដេអូ' : type === 'website' ? 'មើល Website' : 'Subscribe'} onBack={() => setPage('DASHBOARD')} />
             <main className="p-4">
                 {current ? (
@@ -490,13 +490,13 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                         {type === 'view' ? (
                             <div className="aspect-video bg-black mb-4"><iframe src={current.link.includes('youtu') ? `https://www.youtube.com/embed/${current.link.split('v=')[1]?.split('&')[0] || current.link.split('/').pop()}?autoplay=0` : current.link} className="w-full h-full" frameBorder="0" allowFullScreen /></div>
                         ) : (
-                            <div className="bg-gray-100 h-32 flex items-center justify-center mb-4 rounded"><Globe className="w-10 h-10 text-gray-400" /></div>
+                            <div className="bg-purple-900 h-32 flex items-center justify-center mb-4 rounded border border-purple-600"><Globe className="w-10 h-10 text-purple-400" /></div>
                         )}
                         <div className="flex justify-around mb-4">
-                            <div className="text-center"><Coins className="w-6 h-6 mx-auto text-yellow-500" /><span className="font-bold text-gray-800">{current.requiredDuration} Pts</span></div>
-                            <div className="text-center"><Zap className="w-6 h-6 mx-auto text-red-500" /><span className="font-bold text-gray-800">{timer}s</span></div>
+                            <div className="text-center"><Coins className="w-6 h-6 mx-auto text-yellow-400" /><span className="font-bold text-white">{current.requiredDuration} Pts</span></div>
+                            <div className="text-center"><Zap className="w-6 h-6 mx-auto text-red-500" /><span className="font-bold text-white">{timer}s</span></div>
                         </div>
-                        <button onClick={handleClaim} disabled={timer > 0 || claimed} className={`w-full py-3 rounded font-bold text-white ${timer > 0 || claimed ? 'bg-gray-400' : 'bg-green-500'}`}>{timer > 0 ? `រង់ចាំ ${timer}s` : 'ទទួលពិន្ទុ (Claim)'}</button>
+                        <button onClick={handleClaim} disabled={timer > 0 || claimed} className={`w-full py-3 rounded font-bold text-white ${timer > 0 || claimed ? 'bg-gray-600' : 'bg-green-600'}`}>{timer > 0 ? `រង់ចាំ ${timer}s` : 'ទទួលពិន្ទុ (Claim)'}</button>
                     </Card>
                 ) : <div className="text-white text-center mt-10 text-xl">មិនមានយុទ្ធនាការទេ</div>}
             </main>
@@ -512,7 +512,7 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
         } catch (error) { showNotification(`បរាជ័យ: ${error.message}`, 'error'); }
     };
     return (
-        <div className="min-h-screen bg-blue-900 pb-16 pt-20">
+        <div className="min-h-screen bg-purple-900 pb-16 pt-20">
             <Header title="BUY COINS" onBack={() => setPage('DASHBOARD')} />
             <main className="p-4 space-y-4">
                 {globalConfig.coinPackages.map((pkg) => (
@@ -530,14 +530,14 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
 };
 
 const BalanceDetailsPage = ({ setPage, userProfile }) => (
-    <div className="min-h-screen bg-blue-900 pb-16 pt-20">
+    <div className="min-h-screen bg-purple-900 pb-16 pt-20">
         <Header title="MY BALANCE" onBack={() => setPage('DASHBOARD')} />
         <main className="p-4 space-y-4">
-            <Card className="bg-gradient-to-r from-teal-600 to-teal-800 text-center p-6 text-white">
+            <Card className="bg-gradient-to-r from-purple-600 to-purple-800 text-center p-6 text-white border-none">
                 <p className="text-sm opacity-80">សមតុល្យបច្ចុប្បន្ន</p>
                 <div className="flex justify-center items-center mt-2"><Coins className="w-8 h-8 text-yellow-400 mr-2" /><span className="text-4xl font-extrabold">{formatNumber(userProfile.points)}</span></div>
             </Card>
-             <div className="text-center text-white mt-10 opacity-50">ប្រវត្តិប្រតិបត្តិការនឹងបង្ហាញនៅទីនេះ</div>
+             <div className="text-center text-purple-300 mt-10 opacity-50">ប្រវត្តិប្រតិបត្តិការនឹងបង្ហាញនៅទីនេះ</div>
         </main>
     </div>
 );
@@ -575,16 +575,16 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
 };
 
 const MyPlanPage = ({ setPage }) => (
-    <div className="min-h-screen bg-blue-900 pb-16 pt-20">
+    <div className="min-h-screen bg-purple-900 pb-16 pt-20">
         <Header title="MY PLAN" onBack={() => setPage('DASHBOARD')} />
         <main className="p-4">
             <Card className="p-6 text-center">
-                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4"><CheckSquare className="w-10 h-10 text-teal-600" /></div>
-                <h2 className="text-2xl font-bold text-gray-800">FREE PLAN</h2>
-                <p className="text-gray-500 mt-2">បច្ចុប្បន្នអ្នកកំពុងប្រើប្រាស់គម្រោងឥតគិតថ្លៃ។</p>
+                <div className="w-20 h-20 bg-purple-700 rounded-full flex items-center justify-center mx-auto mb-4"><CheckSquare className="w-10 h-10 text-teal-400" /></div>
+                <h2 className="text-2xl font-bold text-white">FREE PLAN</h2>
+                <p className="text-purple-300 mt-2">បច្ចុប្បន្នអ្នកកំពុងប្រើប្រាស់គម្រោងឥតគិតថ្លៃ។</p>
                  <div className="mt-6 space-y-3 text-left">
-                    <p className="flex items-center text-gray-700"><span className="mr-2 text-green-500">✔</span> មើលវីដេអូបាន</p>
-                    <p className="flex items-center text-gray-700"><span className="mr-2 text-green-500">✔</span> ដាក់យុទ្ធនាការបាន</p>
+                    <p className="flex items-center text-purple-200"><span className="mr-2 text-green-400">✔</span> មើលវីដេអូបាន</p>
+                    <p className="flex items-center text-purple-200"><span className="mr-2 text-green-400">✔</span> ដាក់យុទ្ធនាការបាន</p>
                 </div>
             </Card>
         </main>
@@ -665,12 +665,12 @@ const App = () => {
     if (!isAuthReady) return <Loading />;
 
     if (!userId) return (
-        <div className="min-h-screen bg-blue-900 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-purple-900 flex items-center justify-center p-4">
             <Card className="w-full max-w-sm p-6">
-                <h2 className="text-2xl font-bold text-center mb-4 text-teal-800">{authPage === 'LOGIN' ? 'ចូលគណនី' : 'បង្កើតគណនី'}</h2>
+                <h2 className="text-2xl font-bold text-center mb-4 text-white">{authPage === 'LOGIN' ? 'ចូលគណនី' : 'បង្កើតគណនី'}</h2>
                 <AuthForm onSubmit={authPage === 'LOGIN' ? handleLogin : handleRegister} btnText={authPage === 'LOGIN' ? 'ចូល' : 'ចុះឈ្មោះ'} />
                 <div className="text-center mt-4">
-                    <button onClick={() => setAuthPage(authPage === 'LOGIN' ? 'REGISTER' : 'LOGIN')} className="text-teal-600 underline">{authPage === 'LOGIN' ? 'មិនទាន់មានគណនី? ចុះឈ្មោះ' : 'មានគណនីហើយ? ចូល'}</button>
+                    <button onClick={() => setAuthPage(authPage === 'LOGIN' ? 'REGISTER' : 'LOGIN')} className="text-teal-400 underline hover:text-teal-300">{authPage === 'LOGIN' ? 'មិនទាន់មានគណនី? ចុះឈ្មោះ' : 'មានគណនីហើយ? ចូល'}</button>
                 </div>
             </Card>
             {notification && <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 p-2 rounded text-white bg-red-500`}>{notification.message}</div>}
@@ -679,9 +679,9 @@ const App = () => {
 
     let Content;
     switch (page) {
-        case 'EARN_POINTS': Content = <EarnPage db={db} userId={userId} type="view" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
-        case 'EXPLORE_WEBSITE': Content = <EarnPage db={db} userId={userId} type="website" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
-        case 'EXPLORE_SUBSCRIPTION': Content = <EarnPage db={db} userId={userId} type="sub" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
+        case 'EARN_POINTS': Content = <EarnPage db={db} userId={userId} type="view" setPage={setPage} showNotification={showNotification} />; break;
+        case 'EXPLORE_WEBSITE': Content = <EarnPage db={db} userId={userId} type="website" setPage={setPage} showNotification={showNotification} />; break;
+        case 'EXPLORE_SUBSCRIPTION': Content = <EarnPage db={db} userId={userId} type="sub" setPage={setPage} showNotification={showNotification} />; break;
         case 'MY_CAMPAIGNS': Content = <MyCampaignsPage db={db} userId={userId} userProfile={userProfile} setPage={setPage} showNotification={showNotification} />; break;
         case 'REFERRAL_PAGE': Content = <ReferralPage db={db} userId={userId} showNotification={showNotification} setPage={setPage} globalConfig={globalConfig} />; break;
         case 'BUY_COINS': Content = <BuyCoinsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
@@ -691,7 +691,7 @@ const App = () => {
         case 'ADMIN_DASHBOARD': Content = <AdminDashboardPage db={db} setPage={setPage} showNotification={showNotification} />; break;
         default:
             Content = (
-                <div className="min-h-screen bg-blue-900 pb-16 pt-20">
+                <div className="min-h-screen bg-purple-900 pb-16 pt-20">
                     <Header 
                         title="We4u App" 
                         className="z-20" 
@@ -706,7 +706,7 @@ const App = () => {
                     />
                     
                     <div className="px-4 mb-6">
-                        <div className="bg-gradient-to-r from-teal-500 to-teal-700 rounded-xl p-6 text-white shadow-lg text-center relative overflow-hidden">
+                        <div className="bg-gradient-to-r from-teal-500 to-teal-700 rounded-xl p-6 text-white shadow-lg text-center relative overflow-hidden border border-teal-400/30">
                             <div className="absolute -top-4 -left-4 w-16 h-16 bg-white opacity-10 rounded-full"></div>
                             <p className="text-sm opacity-80">សមតុល្យរបស់អ្នក</p>
                             <h1 className="text-4xl font-bold my-2 flex justify-center items-center gap-2">{formatNumber(userProfile.points)} <Coins className="w-6 h-6 text-yellow-300" /></h1>
@@ -715,15 +715,15 @@ const App = () => {
                     </div>
                     <div className="px-4">
                         <Card className="p-4 grid grid-cols-3 gap-3">
-                            <IconButton icon={CalendarCheck} title="DAILY TASK" onClick={handleDailyCheckin} iconColor={userProfile.dailyCheckin ? 'text-gray-400' : 'text-blue-500'} textColor={userProfile.dailyCheckin ? 'text-gray-400' : 'text-gray-800'} />
-                            <IconButton icon={BookOpen} title="MY PLAN" onClick={() => setPage('MY_PLAN')} iconColor="text-green-600" />
-                            <IconButton icon={Film} title="PLAY VIDEO" onClick={() => setPage('EARN_POINTS')} iconColor="text-red-500" />
-                            <IconButton icon={Wallet} title="MY BALANCE" onClick={() => setPage('BALANCE_DETAILS')} iconColor="text-orange-500" />
-                            <IconButton icon={ShoppingCart} title="BUY COINS" onClick={() => setPage('BUY_COINS')} iconColor="text-purple-600" />
-                            <IconButton icon={Target} title="CAMPAIGNS" onClick={() => setPage('MY_CAMPAIGNS')} iconColor="text-teal-600" />
-                            <IconButton icon={UserPlus} title="ណែនាំមិត្ត" onClick={() => setPage('REFERRAL_PAGE')} iconColor="text-blue-600" />
-                            <IconButton icon={Globe} title="មើល WEBSITE" onClick={() => setPage('EXPLORE_WEBSITE')} iconColor="text-indigo-600" />
-                            <IconButton icon={MonitorPlay} title="មើល ADS" onClick={() => setPage('WATCH_ADS')} iconColor="text-pink-600" />
+                            <IconButton icon={CalendarCheck} title="DAILY TASK" onClick={handleDailyCheckin} iconColor={userProfile.dailyCheckin ? 'text-gray-500' : 'text-blue-400'} textColor={userProfile.dailyCheckin ? 'text-gray-400' : 'text-white'} />
+                            <IconButton icon={BookOpen} title="MY PLAN" onClick={() => setPage('MY_PLAN')} iconColor="text-green-400" />
+                            <IconButton icon={Film} title="PLAY VIDEO" onClick={() => setPage('EARN_POINTS')} iconColor="text-red-400" />
+                            <IconButton icon={Wallet} title="MY BALANCE" onClick={() => setPage('BALANCE_DETAILS')} iconColor="text-orange-400" />
+                            <IconButton icon={ShoppingCart} title="BUY COINS" onClick={() => setPage('BUY_COINS')} iconColor="text-purple-400" />
+                            <IconButton icon={Target} title="CAMPAIGNS" onClick={() => setPage('MY_CAMPAIGNS')} iconColor="text-teal-400" />
+                            <IconButton icon={UserPlus} title="ណែនាំមិត្ត" onClick={() => setPage('REFERRAL_PAGE')} iconColor="text-blue-400" />
+                            <IconButton icon={Globe} title="មើល WEBSITE" onClick={() => setPage('EXPLORE_WEBSITE')} iconColor="text-indigo-400" />
+                            <IconButton icon={MonitorPlay} title="មើល ADS" onClick={() => setPage('WATCH_ADS')} iconColor="text-pink-400" />
                         </Card>
                     </div>
                 </div>
@@ -731,7 +731,7 @@ const App = () => {
     }
 
     return (
-        <div className="font-sans bg-blue-900 min-h-screen relative">
+        <div className="font-sans bg-purple-900 min-h-screen relative">
             {Content}
             {notification && <div className={`fixed bottom-10 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-2xl z-50 text-white font-bold transition-all ${notification.type === 'success' ? 'bg-green-600' : notification.type === 'error' ? 'bg-red-600' : 'bg-gray-800'}`}>{notification.message}</div>}
         </div>
@@ -743,9 +743,9 @@ const AuthForm = ({ onSubmit, btnText }) => {
     const [pass, setPass] = useState('');
     return (
         <form onSubmit={(e) => { e.preventDefault(); onSubmit(email, pass); }} className="space-y-3">
-            <input className="w-full p-3 border border-gray-300 rounded bg-white text-black" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
-            <input className="w-full p-3 border border-gray-300 rounded bg-white text-black" type="password" placeholder="Password" value={pass} onChange={e => setPass(e.target.value)} required />
-            <button className="w-full bg-teal-600 text-white p-3 rounded font-bold hover:bg-teal-700">{btnText}</button>
+            <InputField type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
+            <InputField type="password" placeholder="Password" value={pass} onChange={e => setPass(e.target.value)} required />
+            <button className="w-full bg-teal-500 text-white p-3 rounded font-bold hover:bg-teal-600 transition">{btnText}</button>
         </form>
     );
 };
