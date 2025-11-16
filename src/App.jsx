@@ -19,7 +19,7 @@ import {
     DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, Settings, Copy, Save, Search, PlusCircle, MinusCircle, RefreshCw
 } from 'lucide-react';
 
-// --- 1. CONFIGURATION (ពេញលេញ) ---
+// --- 1. CONFIGURATION ---
 const firebaseConfig = {
     apiKey: "AIzaSyDw-b18l9BgIv61DFBxWAFbP6Mh_HsBv24",
     authDomain: "we4u-e1134.firebaseapp.com",
@@ -31,8 +31,7 @@ const firebaseConfig = {
 };
 
 const appId = 'we4u_live_app';
-// UID របស់អ្នក (Admin)
-const ADMIN_UID = "48wx8GPZbVYSxmfws1MxbuEOzsE3";
+const ADMIN_UID = "48wx8GPZbVYSxmfws1MxbuEOzsE3"; // UID Admin
 
 // --- 2. FIREBASE INIT ---
 let app, db, auth;
@@ -95,7 +94,7 @@ const Loading = () => (
 const IconButton = ({ icon: Icon, title, onClick, iconColor = 'text-purple-300', textColor = 'text-white', disabled = false }) => (
     <button 
         onClick={!disabled ? onClick : undefined} 
-        className={`flex flex-col items-center justify-start p-2 rounded-xl w-full h-32 border ${disabled ? 'bg-gray-800 border-gray-700 opacity-60' : 'bg-purple-800 border-purple-700 shadow-lg active:scale-95'}`}
+        className={`flex flex-col items-center justify-start p-2 rounded-xl w-full h-32 border ${disabled ? 'bg-gray-800 border-gray-700 opacity-60 cursor-not-allowed' : 'bg-purple-800 border-purple-700 shadow-lg active:scale-95'}`}
     >
         <div className={`p-3 rounded-xl ${disabled ? 'bg-gray-700' : 'bg-purple-900 shadow-inner'}`}>
             <Icon className={`w-8 h-8 ${disabled ? 'text-gray-500' : iconColor}`} />
@@ -120,29 +119,71 @@ const InputField = (props) => <input {...props} className={`w-full p-3 border bo
 
 // --- 5. PAGES ---
 
+// --- ADMIN PAGES ---
 const AdminDashboardPage = ({ db, setPage, showNotification }) => {
+    const [activeTab, setActiveTab] = useState('SETTINGS');
     const [config, setConfig] = useState(defaultGlobalConfig);
+    const [campaigns, setCampaigns] = useState([]);
+    // User Manager State
     const [searchId, setSearchId] = useState('');
     const [foundUser, setFoundUser] = useState(null);
     const [pointsToAdd, setPointsToAdd] = useState(0);
+    const [allUsers, setAllUsers] = useState([]);
+    const [loadingList, setLoadingList] = useState(false);
 
     useEffect(() => {
         getDoc(getGlobalConfigDocRef()).then(doc => { if(doc.exists()) setConfig(doc.data()); });
     }, [db]);
 
-    const handleSave = async () => {
-        await setDoc(getGlobalConfigDocRef(), config);
-        showNotification('Saved!', 'success');
+    // Load Users List
+    const loadUserList = async () => {
+        setLoadingList(true);
+        try {
+            const shortCodesRef = collection(db, 'artifacts', appId, 'public', 'data', 'short_codes');
+            const q = query(shortCodesRef, limit(20));
+            const snap = await getDocs(q);
+            const usersData = await Promise.all(snap.docs.map(async (docSnap) => {
+                const { fullUserId } = docSnap.data();
+                const profileSnap = await getDoc(getProfileDocRef(fullUserId));
+                return profileSnap.exists() ? { ...profileSnap.data(), uid: fullUserId } : null;
+            }));
+            setAllUsers(usersData.filter(u => u !== null));
+        } catch (e) {}
+        setLoadingList(false);
     };
 
-    const handleSearch = async () => {
+    useEffect(() => { if(activeTab === 'USERS') loadUserList(); }, [activeTab]);
+
+    // Fetch Campaigns
+    useEffect(() => {
+        if(activeTab === 'CAMPAIGNS') {
+            return onSnapshot(query(getCampaignsCollectionRef()), snap => setCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+        }
+    }, [activeTab]);
+
+    const handleSaveConfig = async () => {
+        await setDoc(getGlobalConfigDocRef(), config);
+        showNotification('Settings Saved!', 'success');
+    };
+    
+    // Config handlers
+    const handleRewardChange = (e) => setConfig({...config, [e.target.name]: parseInt(e.target.value)||0});
+    const handleAdsChange = (e) => setConfig({...config, adsSettings: {...config.adsSettings, [e.target.name]: e.target.value}});
+    const handlePkgChange = (i, f, v) => {
+        const pkgs = [...config.coinPackages];
+        pkgs[i][f] = f === 'coins' ? parseInt(v)||0 : v;
+        setConfig({...config, coinPackages: pkgs});
+    };
+
+    // User Handlers
+    const handleSearchUser = async () => {
         try {
             const docSnap = await getDoc(getShortCodeDocRef(searchId.toUpperCase()));
             if(docSnap.exists()) {
                 const uid = docSnap.data().fullUserId;
                 const pSnap = await getDoc(getProfileDocRef(uid));
                 if(pSnap.exists()) setFoundUser({uid, ...pSnap.data()});
-            } else showNotification('Not Found', 'error');
+            } else showNotification('User Not Found', 'error');
         } catch(e) {}
     };
 
@@ -152,38 +193,104 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
         showNotification('Points Updated', 'success');
         setFoundUser(prev => ({...prev, points: prev.points + parseInt(pointsToAdd)}));
         setPointsToAdd(0);
+        loadUserList();
     };
+
+    const handleDeleteCampaign = async (id) => {
+        if(window.confirm('Stop Campaign?')) await updateDoc(doc(getCampaignsCollectionRef(), id), { remaining: 0 });
+    };
+
+    if(!config) return <Loading/>;
 
     return (
         <div className="min-h-screen bg-purple-950 pb-16 pt-20 p-4">
             <Header title="ADMIN" onBack={() => setPage('DASHBOARD')} />
-            <Card className="p-4 mb-4">
-                <h3 className="font-bold mb-2">Global Settings</h3>
-                <div className="space-y-2">
-                    <label>Daily Reward</label>
-                    <InputField type="number" value={config.dailyCheckinReward} onChange={e => setConfig({...config, dailyCheckinReward: parseInt(e.target.value)})} />
-                    <button onClick={handleSave} className="w-full bg-green-600 p-2 rounded mt-2 font-bold">SAVE</button>
-                </div>
-            </Card>
-            <Card className="p-4">
-                <h3 className="font-bold mb-2">User Manager</h3>
-                <div className="flex gap-2 mb-2">
-                    <InputField value={searchId} onChange={e => setSearchId(e.target.value)} placeholder="ID (6 chars)" />
-                    <button onClick={handleSearch} className="bg-blue-600 px-4 rounded"><Search/></button>
-                </div>
-                {foundUser && (
-                    <div className="bg-purple-900 p-2 rounded">
-                        <p>{foundUser.userName} | {formatNumber(foundUser.points)} pts</p>
-                        <div className="flex gap-2 mt-2">
-                             <InputField type="number" value={pointsToAdd} onChange={e => setPointsToAdd(e.target.value)} />
-                             <button onClick={handleUpdatePoints} className="bg-teal-600 px-4 rounded">Add</button>
+            <div className="flex gap-2 mb-4">
+                {['SETTINGS', 'USERS', 'CAMPAIGNS'].map(t => (
+                    <button key={t} onClick={() => setActiveTab(t)} className={`flex-1 py-2 rounded font-bold ${activeTab===t ? 'bg-teal-500 text-white' : 'bg-gray-700 text-gray-300'}`}>{t}</button>
+                ))}
+            </div>
+
+            {activeTab === 'SETTINGS' && (
+                <div className="space-y-4">
+                    <Card className="p-4">
+                        <h3 className="font-bold mb-2">Rewards</h3>
+                        <div className="grid gap-2">
+                            <label>Daily Reward: <InputField name="dailyCheckinReward" type="number" value={config.dailyCheckinReward} onChange={handleRewardChange}/></label>
+                            <label>Referral Reward: <InputField name="referrerReward" type="number" value={config.referrerReward} onChange={handleRewardChange}/></label>
+                            <label>Ads Reward: <InputField name="adsReward" type="number" value={config.adsReward} onChange={handleRewardChange}/></label>
+                            <label>Max Daily Ads: <InputField name="maxDailyAds" type="number" value={config.maxDailyAds} onChange={handleRewardChange}/></label>
                         </div>
-                    </div>
-                )}
-            </Card>
+                    </Card>
+                    <Card className="p-4">
+                        <h3 className="font-bold mb-2">Ads IDs</h3>
+                        <div className="grid gap-2">
+                             <InputField name="bannerId" value={config.adsSettings.bannerId} onChange={handleAdsChange} placeholder="Banner ID"/>
+                             <InputField name="interstitialId" value={config.adsSettings.interstitialId} onChange={handleAdsChange} placeholder="Interstitial ID"/>
+                        </div>
+                    </Card>
+                    <Card className="p-4">
+                        <h3 className="font-bold mb-2">Coin Packages</h3>
+                        {config.coinPackages.map((p, i) => (
+                            <div key={i} className="flex gap-2 mb-2">
+                                <InputField type="number" value={p.coins} onChange={e=>handlePkgChange(i,'coins',e.target.value)} />
+                                <InputField value={p.price} onChange={e=>handlePkgChange(i,'price',e.target.value)} />
+                            </div>
+                        ))}
+                    </Card>
+                    <button onClick={handleSaveConfig} className="w-full bg-green-600 py-3 rounded font-bold text-white">SAVE ALL</button>
+                </div>
+            )}
+
+            {activeTab === 'USERS' && (
+                <div className="space-y-4">
+                    <Card className="p-4">
+                        <div className="flex gap-2 mb-4">
+                            <InputField value={searchId} onChange={e=>setSearchId(e.target.value)} placeholder="Search ID..." />
+                            <button onClick={handleSearchUser} className="bg-blue-600 px-4 rounded"><Search/></button>
+                        </div>
+                        {foundUser && (
+                            <div className="bg-purple-900 p-3 rounded">
+                                <p className="font-bold">{foundUser.userName} ({foundUser.shortId})</p>
+                                <p>Points: {formatNumber(foundUser.points)}</p>
+                                <div className="flex gap-2 mt-2">
+                                    <InputField type="number" value={pointsToAdd} onChange={e=>setPointsToAdd(e.target.value)} />
+                                    <button onClick={handleUpdatePoints} className="bg-teal-600 px-4 rounded">Update</button>
+                                </div>
+                            </div>
+                        )}
+                    </Card>
+                    <Card className="p-4">
+                         <div className="flex justify-between mb-2"><h3>Recent Users</h3><button onClick={loadUserList}><RefreshCw size={16}/></button></div>
+                         <div className="max-h-64 overflow-y-auto space-y-2">
+                            {allUsers.map(u => (
+                                <div key={u.uid} onClick={()=>{setFoundUser(u); setSearchId(u.shortId)}} className="flex justify-between bg-purple-900 p-2 rounded cursor-pointer">
+                                    <span>{u.userName}</span><span>{formatNumber(u.points)}</span>
+                                </div>
+                            ))}
+                         </div>
+                    </Card>
+                </div>
+            )}
+
+            {activeTab === 'CAMPAIGNS' && (
+                <div className="space-y-2">
+                    {campaigns.map(c => (
+                        <div key={c.id} className="bg-white p-3 rounded shadow flex justify-between items-center text-black">
+                            <div className='w-2/3 truncate'>
+                                <p className="font-bold text-sm">{c.link}</p>
+                                <p className="text-xs">Rem: {c.remaining} | {c.type}</p>
+                            </div>
+                            <button onClick={() => handleDeleteCampaign(c.id)} className="text-red-600"><Trash2/></button>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
+
+// --- USER PAGES ---
 
 const ReferralPage = ({ userId, showNotification, setPage, globalConfig }) => {
     const [referrals, setReferrals] = useState([]);
@@ -200,7 +307,7 @@ const ReferralPage = ({ userId, showNotification, setPage, globalConfig }) => {
         if(inputCode.length !== 6 || inputCode === shortId) return showNotification('Invalid Code', 'error');
         try {
             await runTransaction(db, async (tx) => {
-                const codeDoc = await tx.get(getShortCodeDocRef(inputCode));
+                const codeDoc = await tx.get(getShortCodeDocRef(inputCode.toUpperCase()));
                 if(!codeDoc.exists()) throw "Code not found";
                 const referrerId = codeDoc.data().fullUserId;
                 
@@ -209,7 +316,7 @@ const ReferralPage = ({ userId, showNotification, setPage, globalConfig }) => {
                 if(myProfile.data().referredBy) throw "Already referred";
 
                 tx.update(getProfileDocRef(referrerId), { points: increment(globalConfig.referrerReward) });
-                tx.update(myProfileRef, { points: increment(globalConfig.referredBonus), referredBy: inputCode });
+                tx.update(myProfileRef, { points: increment(globalConfig.referredBonus), referredBy: inputCode.toUpperCase() });
                 tx.set(doc(getReferralCollectionRef()), { referrerId, referredId: userId, referredName: myProfile.data().userName, reward: globalConfig.referrerReward, createdAt: serverTimestamp() });
             });
             showNotification('Success!', 'success');
@@ -251,7 +358,7 @@ const MyCampaignsPage = ({ userId, userProfile, setPage, showNotification }) => 
 
     useEffect(() => {
         return onSnapshot(query(getCampaignsCollectionRef(), where('userId', '==', userId)), snap => {
-            setCamps(snap.docs.map(d => ({id: d.id, ...d.data()})));
+            setCamps(snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => b.createdAt - a.createdAt));
         });
     }, [userId]);
 
@@ -285,7 +392,7 @@ const MyCampaignsPage = ({ userId, userProfile, setPage, showNotification }) => 
                 </div>
                 {isVerified && (
                     <div className="space-y-3">
-                        {link.includes('youtu') && <div className="aspect-video bg-black"><iframe src={`https://www.youtube.com/embed/${link.split('v=')[1]?.split('&')[0] || link.split('/').pop()}`} className="w-full h-full" frameBorder="0"/></div>}
+                        {(link.includes('youtu') || type==='view') && <div className="aspect-video bg-black"><iframe src={`https://www.youtube.com/embed/${link.split('v=')[1]?.split('&')[0] || link.split('/').pop()}?autoplay=1&mute=1`} className="w-full h-full" frameBorder="0"/></div>}
                         <div className="flex justify-between items-center"><label>Count</label><InputField type="number" value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value)))} className="w-24 text-center" /></div>
                         {type !== 'sub' && <div className="flex justify-between items-center"><label>Seconds</label><InputField type="number" value={time} onChange={e => setTime(Math.max(10, parseInt(e.target.value)))} className="w-24 text-center" /></div>}
                         <div className="flex justify-between text-yellow-400 font-bold"><span>Cost</span><span>{formatNumber(cost)}</span></div>
@@ -308,7 +415,7 @@ const MyCampaignsPage = ({ userId, userProfile, setPage, showNotification }) => 
     );
 };
 
-const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig }) => {
+const EarnPage = ({ db, userId, type, setPage, showNotification }) => {
     const [list, setList] = useState([]);
     const [current, setCurrent] = useState(null);
     const [timer, setTimer] = useState(0);
@@ -323,7 +430,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
         });
     }, [userId, type]);
 
-    useEffect(() => { if(current) { setTimer(current.time || 60); setClaimed(false); } }, [current]);
+    useEffect(() => { if(current) { setTimer(current.requiredDuration || 30); setClaimed(false); } }, [current]);
 
     useEffect(() => {
         if(timer > 0) { const i = setInterval(() => setTimer(t => t-1), 1000); return () => clearInterval(i); }
@@ -338,7 +445,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                 const ref = doc(getCampaignsCollectionRef(), current.id);
                 const docSnap = await tx.get(ref);
                 if(docSnap.data().remaining <= 0) throw "Finished";
-                tx.update(getProfileDocRef(userId), { points: increment(current.cost / current.count) }); // Rough calc
+                tx.update(getProfileDocRef(userId), { points: increment(current.requiredDuration || 50) });
                 tx.update(ref, { remaining: increment(-1) });
             });
             showNotification('Points Added!', 'success');
@@ -361,7 +468,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
             </div>
             <Card className="m-4 p-4 bg-white text-black">
                 <div className="flex justify-between text-xl font-bold mb-4">
-                    <span className="text-yellow-600 flex items-center"><Coins className="mr-1"/> {current.cost/current.count}</span>
+                    <span className="text-yellow-600 flex items-center"><Coins className="mr-1"/> {current.requiredDuration}</span>
                     <span className="text-red-600 flex items-center"><Zap className="mr-1"/> {timer}s</span>
                 </div>
                 {type === 'sub' && timer === 0 && !claimed ? 
@@ -375,13 +482,99 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                     <button onClick={() => setAutoPlay(!autoPlay)} className={`w-10 h-5 rounded-full ${autoPlay ? 'bg-teal-500' : 'bg-gray-300'}`}><div className={`w-3 h-3 bg-white rounded-full shadow transform transition ${autoPlay ? 'translate-x-5' : 'translate-x-1'}`}></div></button>
                 </div>
             </Card>
-             {/* Banner Ad */}
-             <div className="mx-4 bg-gray-200 h-16 flex items-center justify-center rounded border border-gray-400">
-                <span className="text-xs text-gray-500">BANNER AD: {globalConfig.adsSettings?.bannerId}</span>
+        </div>
+    );
+};
+
+const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
+    const handlePurchase = async (pkg) => {
+        try {
+            await runTransaction(db, async (tx) => { tx.update(getProfileDocRef(userId), { points: increment(pkg.coins) }); });
+            showNotification(`Success! +${formatNumber(pkg.coins)}`, 'success');
+        } catch (error) { showNotification(`Error`, 'error'); }
+    };
+    return (
+        <div className="min-h-screen bg-purple-900 pb-16 pt-20 p-4">
+            <Header title="BUY COINS" onBack={() => setPage('DASHBOARD')} />
+            <div className="space-y-4">
+                {globalConfig.coinPackages.map((pkg) => (
+                    <button key={pkg.id} onClick={() => handlePurchase(pkg)} className={`w-full flex justify-between p-4 rounded-xl shadow-lg text-white transform active:scale-95 transition ${pkg.color}`}>
+                        <div className="flex items-center space-x-3">
+                            <div className="bg-white bg-opacity-20 p-3 rounded-full"><Coins className="w-6 h-6 text-yellow-100" /></div>
+                            <div className="text-left"><p className="text-xl font-bold">{formatNumber(pkg.coins)} Coins</p></div>
+                        </div>
+                        <div className="bg-white text-gray-800 font-bold px-4 py-2 rounded-lg">{pkg.price}</div>
+                    </button>
+                ))}
             </div>
         </div>
     );
 };
+
+const BalanceDetailsPage = ({ setPage, userProfile }) => (
+    <div className="min-h-screen bg-purple-900 pb-16 pt-20 p-4">
+        <Header title="BALANCE" onBack={() => setPage('DASHBOARD')} />
+        <Card className="text-center p-6 mb-4">
+            <h1 className="text-4xl font-bold">{formatNumber(userProfile.points)} <Coins className="inline"/></h1>
+        </Card>
+        <div className="text-center text-white opacity-50">History coming soon...</div>
+    </div>
+);
+
+const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
+    const [adsWatched, setAdsWatched] = useState(0);
+    const [timer, setTimer] = useState(15);
+    const [finished, setFinished] = useState(false);
+    const reward = globalConfig.adsReward || 30;
+    const maxDaily = globalConfig.maxDailyAds || 15;
+
+    useEffect(() => {
+        return onSnapshot(getDailyStatusDocRef(userId), (doc) => {
+            if(doc.exists()) setAdsWatched(doc.data().adsWatchedCount || 0);
+        });
+    }, [userId]);
+
+    useEffect(() => {
+        if (timer > 0) { const i = setInterval(() => setTimer(t => t - 1), 1000); return () => clearInterval(i); } 
+        else setFinished(true);
+    }, [timer]);
+
+    const claimReward = async () => {
+        if (adsWatched >= maxDaily) return showNotification('Daily Limit Reached', 'error');
+        try {
+            await runTransaction(db, async (tx) => { 
+                const dailyRef = getDailyStatusDocRef(userId);
+                tx.update(getProfileDocRef(userId), { points: increment(reward) });
+                tx.set(dailyRef, { adsWatchedCount: increment(1), date: getTodayDateKey() }, { merge: true });
+            });
+            showNotification(`+${reward} Coins`, 'success');
+            setPage('DASHBOARD');
+        } catch (e) {}
+    };
+
+    return (
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 z-50">
+             <div className="absolute top-4 right-4 text-white">Watched: {adsWatched}/{maxDaily}</div>
+            <div className="w-full h-64 bg-gray-800 flex items-center justify-center mb-6 border-2 border-yellow-500">
+                <p className="text-white">ADS: {globalConfig.adsSettings?.interstitialId}</p>
+            </div>
+            {finished && adsWatched < maxDaily ? <button onClick={claimReward} className="bg-green-500 px-8 py-3 rounded font-bold">CLAIM</button> : <div className="text-white">{adsWatched >= maxDaily ? 'Limit Reached' : `Wait ${timer}s`}</div>}
+        </div>
+    );
+};
+
+const MyPlanPage = ({ setPage }) => (
+    <div className="min-h-screen bg-purple-900 pb-16 pt-20 p-4">
+        <Header title="MY PLAN" onBack={() => setPage('DASHBOARD')} />
+        <Card className="p-6 text-center">
+            <CheckSquare className="w-16 h-16 mx-auto text-teal-400 mb-4"/>
+            <h2 className="text-2xl font-bold">FREE PLAN</h2>
+            <div className="mt-4 text-left space-y-2">
+                <p>✔ View Videos</p><p>✔ Create Campaigns</p>
+            </div>
+        </Card>
+    </div>
+);
 
 // --- AUTH ---
 const AuthForm = ({ onSubmit, btnText, isRegister }) => {
@@ -416,9 +609,21 @@ const App = () => {
         return onAuthStateChanged(auth, u => {
             if(u) {
                 setUserId(u.uid);
-                onSnapshot(getProfileDocRef(u.uid), doc => {
-                    if(doc.exists()) setUserProfile({ ...doc.data(), id: u.uid });
-                    setLoading(false);
+                onSnapshot(getProfileDocRef(u.uid), async doc => {
+                    if(doc.exists()) {
+                         // Load Daily Status
+                         const dailyRef = getDailyStatusDocRef(u.uid);
+                         const dailySnap = await getDoc(dailyRef);
+                         if(!dailySnap.exists() || dailySnap.data().date !== getTodayDateKey()) {
+                             await setDoc(dailyRef, { date: getTodayDateKey(), checkinDone: false, adsWatchedCount: 0 });
+                         }
+                         const dailyData = (await getDoc(dailyRef)).data();
+                         setUserProfile({ ...doc.data(), id: u.uid, ...dailyData });
+                         setLoading(false);
+                    } else {
+                        // Profile Missing? Logout.
+                        signOut(auth); setLoading(false);
+                    }
                 });
             } else { setUserId(null); setLoading(false); }
         });
@@ -434,7 +639,7 @@ const App = () => {
             const cred = await createUserWithEmailAndPassword(auth, email, pass);
             const uid = cred.user.uid;
             const shortId = getShortId(uid);
-            // Safe Creation
+            // Create Profile
             await setDoc(getProfileDocRef(uid), { userId: uid, email, userName: username, points: 5000, shortId, referredBy: null });
             await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
             await setDoc(getDailyStatusDocRef(uid), { date: getTodayDateKey(), checkinDone: false, adsWatchedCount: 0 });
@@ -447,7 +652,7 @@ const App = () => {
             await runTransaction(db, async (tx) => {
                 const ref = getDailyStatusDocRef(userId);
                 const doc = await tx.get(ref);
-                if(doc.exists() && doc.data().checkinDone && doc.data().date === getTodayDateKey()) throw "Checked in already";
+                if(doc.exists() && doc.data().checkinDone) throw "Checked in already";
                 tx.update(getProfileDocRef(userId), { points: increment(globalConfig.dailyCheckinReward) });
                 tx.set(ref, { checkinDone: true, date: getTodayDateKey() }, { merge: true });
             });
@@ -475,12 +680,11 @@ const App = () => {
         case 'EXPLORE_WEBSITE': Content = <EarnPage db={db} userId={userId} type="website" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'MY_CAMPAIGNS': Content = <MyCampaignsPage db={db} userId={userId} userProfile={userProfile} setPage={setPage} showNotification={showNotification} />; break;
         case 'REFERRAL_PAGE': Content = <ReferralPage db={db} userId={userId} showNotification={showNotification} setPage={setPage} globalConfig={globalConfig} />; break;
+        case 'BUY_COINS': Content = <BuyCoinsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
+        case 'BALANCE_DETAILS': Content = <BalanceDetailsPage setPage={setPage} userProfile={userProfile} />; break;
+        case 'WATCH_ADS': Content = <WatchAdsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
+        case 'MY_PLAN': Content = <MyPlanPage setPage={setPage} />; break;
         case 'ADMIN_DASHBOARD': Content = <AdminDashboardPage db={db} setPage={setPage} showNotification={showNotification} />; break;
-        case 'WATCH_ADS': 
-             // ... Watch Ads logic similar to previous ...
-             Content = <div className="text-white text-center pt-20">Watch Ads Page (Use previous code logic here if needed)</div>;
-             break; 
-        // ... Add other pages (Buy Coins, My Plan, Balance) similar to previous versions ...
         default: Content = (
             <div className="min-h-screen bg-purple-900 pb-16 pt-20">
                 <Header title="We4u App" rightContent={isAdmin ? <button onClick={() => setPage('ADMIN_DASHBOARD')}><Settings/></button> : <button onClick={() => signOut(auth)}><LogOut/></button>} />
@@ -489,12 +693,12 @@ const App = () => {
                     <IconButton icon={CalendarCheck} title="DAILY TASK" onClick={handleDailyCheckin} disabled={userProfile.dailyCheckin} />
                     <IconButton icon={UserCheck} title="SUBSCRIBE" onClick={() => setPage('EXPLORE_SUBSCRIPTION')} />
                     <IconButton icon={Film} title="PLAY VIDEO" onClick={() => setPage('EARN_POINTS')} />
-                    <IconButton icon={Wallet} title="MY BALANCE" onClick={() => {}} />
-                    <IconButton icon={ShoppingCart} title="BUY COINS" onClick={() => {}} />
+                    <IconButton icon={Wallet} title="MY BALANCE" onClick={() => setPage('BALANCE_DETAILS')} />
+                    <IconButton icon={ShoppingCart} title="BUY COINS" onClick={() => setPage('BUY_COINS')} />
                     <IconButton icon={Target} title="CAMPAIGNS" onClick={() => setPage('MY_CAMPAIGNS')} />
                     <IconButton icon={UserPlus} title="REFERRAL" onClick={() => setPage('REFERRAL_PAGE')} />
                     <IconButton icon={Globe} title="WEBSITE" onClick={() => setPage('EXPLORE_WEBSITE')} />
-                    <IconButton icon={MonitorPlay} title="WATCH ADS" onClick={() => {}} />
+                    <IconButton icon={MonitorPlay} title="WATCH ADS" onClick={() => setPage('WATCH_ADS')} />
                 </Card></div>
                 <div className="px-4 mt-6"><div className="w-full bg-white h-16 flex items-center justify-center rounded"><span className="text-gray-500 text-xs">BANNER AD: {globalConfig.adsSettings?.bannerId}</span></div></div>
             </div>
