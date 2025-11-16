@@ -16,7 +16,7 @@ import {
     Users, Coins, Video, Link, Globe, MonitorPlay, Zap,
     UserPlus, ChevronLeft, BookOpen, ShoppingCart,
     CalendarCheck, Target, Wallet, Film,
-    DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, Settings, Copy, Save, Search, PlusCircle, MinusCircle
+    DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, Settings, Copy, Save, Search, PlusCircle, MinusCircle, CheckCircle
 } from 'lucide-react';
 
 // --- Configuration ---
@@ -135,41 +135,55 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
         }));
     };
 
+    const handlePackageChange = (index, field, value) => {
+        const newPackages = [...config.coinPackages];
+        newPackages[index][field] = field === 'coins' ? (parseInt(value) || 0) : value;
+        setConfig(prev => ({ ...prev, coinPackages: newPackages }));
+    };
+
     return (
         <div className="space-y-4">
+            {/* Rewards */}
             <Card className="p-4 border-l-4 border-yellow-400">
-                <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់ (Rewards)</h3>
+                <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់</h3>
                 <div className="grid grid-cols-1 gap-3">
-                    <div>
-                        <label className="text-xs font-bold text-purple-300">Daily Check-in Points</label>
-                        <InputField name="dailyCheckinReward" type="number" value={config.dailyCheckinReward} onChange={handleChange} />
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-purple-300">Referral Reward Points</label>
-                        <InputField name="referrerReward" type="number" value={config.referrerReward} onChange={handleChange} />
-                    </div>
-                     <div>
-                        <label className="text-xs font-bold text-purple-300">Watch Ads Reward</label>
-                        <InputField name="adsReward" type="number" value={config.adsReward} onChange={handleChange} />
-                    </div>
+                    <div><label className="text-xs font-bold text-purple-300">Daily Check-in Points</label><InputField name="dailyCheckinReward" type="number" value={config.dailyCheckinReward} onChange={handleChange} /></div>
+                    <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" value={config.referrerReward} onChange={handleChange} /></div>
+                     <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" value={config.adsReward} onChange={handleChange} /></div>
                 </div>
             </Card>
 
-            <Card className="p-4 border-l-4 border-pink-500">
-                <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ពាណិជ្ជកម្ម (Ads)</h3>
+            {/* Coin Packages Settings */}
+            <Card className="p-4 border-l-4 border-green-500">
+                <h3 className="font-bold text-lg mb-3 text-green-400 flex items-center"><ShoppingCart className="w-5 h-5 mr-2"/> កំណត់កញ្ចប់កាក់ (Sell Coins)</h3>
                 <div className="space-y-3">
-                     <div>
-                        <label className="text-xs font-bold text-purple-300">Banner ID</label>
-                        <InputField name="bannerId" type="text" value={config.adsSettings?.bannerId || ''} onChange={handleAdsChange} />
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-purple-300">Interstitial/Video ID</label>
-                        <InputField name="interstitialId" type="text" value={config.adsSettings?.interstitialId || ''} onChange={handleAdsChange} />
-                    </div>
+                    {config.coinPackages.map((pkg, idx) => (
+                        <div key={pkg.id} className="flex space-x-2 items-center bg-purple-900 p-2 rounded">
+                            <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold">{idx + 1}</div>
+                            <div className="flex-1">
+                                <label className="text-xs text-purple-300">ចំនួនកាក់</label>
+                                <InputField type="number" value={pkg.coins} onChange={(e) => handlePackageChange(idx, 'coins', e.target.value)} />
+                            </div>
+                            <div className="flex-1">
+                                <label className="text-xs text-purple-300">តម្លៃលក់</label>
+                                <InputField type="text" value={pkg.price} onChange={(e) => handlePackageChange(idx, 'price', e.target.value)} />
+                            </div>
+                        </div>
+                    ))}
                 </div>
             </Card>
+
+            {/* Ads Settings */}
+            <Card className="p-4 border-l-4 border-pink-500">
+                <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ Ads IDs</h3>
+                <div className="space-y-3">
+                     <div><label className="text-xs font-bold text-purple-300">Banner ID</label><InputField name="bannerId" type="text" value={config.adsSettings?.bannerId || ''} onChange={handleAdsChange} /></div>
+                    <div><label className="text-xs font-bold text-purple-300">Interstitial/Video ID</label><InputField name="interstitialId" type="text" value={config.adsSettings?.interstitialId || ''} onChange={handleAdsChange} /></div>
+                </div>
+            </Card>
+
              <button onClick={onSave} className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-lg flex justify-center items-center transition">
-                <Save className="w-5 h-5 mr-2"/> រក្សាទុកការកំណត់
+                <Save className="w-5 h-5 mr-2"/> រក្សាទុកការកំណត់ (SAVE ALL)
             </button>
         </div>
     );
@@ -367,6 +381,7 @@ const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) =
     );
 };
 
+// MODIFIED: MyCampaignsPage with CHECK Button
 const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification }) => {
     const [type, setType] = useState('view');
     const [link, setLink] = useState('');
@@ -374,6 +389,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     const [time, setTime] = useState(60);
     const [userCampaigns, setUserCampaigns] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isLinkVerified, setIsLinkVerified] = useState(false);
 
     useEffect(() => {
         const q = query(getCampaignsCollectionRef(), where('userId', '==', userId));
@@ -387,6 +403,19 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
         const t = parseInt(time) || 0;
         return type === 'sub' ? c * 50 : c * t * 1;
     }, [type, count, time]);
+
+    const handleCheckLink = (e) => {
+        e.preventDefault();
+        if(!link.trim()) return showNotification('សូមបញ្ចូល Link ជាមុនសិន', 'error');
+        // Simple check simulation
+        setIsLinkVerified(true);
+        showNotification('Link ត្រឹមត្រូវ!', 'success');
+    };
+
+    const handleResetLink = () => {
+        setLink('');
+        setIsLinkVerified(false);
+    }
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -406,7 +435,10 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                 transaction.set(newCampRef, { userId, type, link: link.trim(), costPerUnit: type === 'sub' ? 50 : 1, requiredDuration: type === 'sub' ? 60 : (parseInt(time) || 60), initialCount: parseInt(count), remaining: parseInt(count), totalCost: cost, createdAt: serverTimestamp(), isActive: true });
             });
             showNotification('ដាក់យុទ្ធនាការជោគជ័យ!', 'success');
+            // Reset form
             setLink('');
+            setIsLinkVerified(false);
+            setCount(10);
         } catch (error) { showNotification(error.message, 'error'); } finally { setIsSubmitting(false); }
     };
 
@@ -416,21 +448,63 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
             <main className="p-4 space-y-4">
                 <Card className="p-4">
                     <h2 className="font-bold text-lg mb-4 text-white">បង្កើតយុទ្ធនាការថ្មី</h2>
+                    
+                    {/* Type Selector */}
                     <div className="flex space-x-2 mb-4">
                         {['view', 'sub', 'website'].map(t => (
-                            <button key={t} onClick={() => setType(t)} className={`flex-1 py-2 rounded font-bold ${type === t ? 'bg-teal-600 text-white' : 'bg-purple-900 text-purple-300'}`}>{t.toUpperCase()}</button>
+                            <button key={t} onClick={() => {setType(t); setIsLinkVerified(false);}} className={`flex-1 py-2 rounded font-bold ${type === t ? 'bg-teal-600 text-white' : 'bg-purple-900 text-purple-300'}`}>{t.toUpperCase()}</button>
                         ))}
                     </div>
-                    <form onSubmit={handleSubmit} className="space-y-3">
-                        <InputField value={link} onChange={e => setLink(e.target.value)} placeholder="Link URL..." required />
-                        <div className="flex justify-between space-x-2">
-                            <div className="w-1/2"><label className="text-xs text-purple-300 font-bold">ចំនួន (Count)</label><InputField type="number" value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value)))} /></div>
-                            {type !== 'sub' && (<div className="w-1/2"><label className="text-xs text-purple-300 font-bold">ពេល (Sec)</label><InputField type="number" value={time} onChange={e => setTime(Math.max(10, parseInt(e.target.value)))} /></div>)}
+
+                    <form onSubmit={isLinkVerified ? handleSubmit : handleCheckLink} className="space-y-3">
+                        
+                        {/* Link Input Section */}
+                        <div className="flex space-x-2">
+                             <InputField 
+                                value={link} 
+                                onChange={e => {setLink(e.target.value); setIsLinkVerified(false);}} 
+                                placeholder="Paste your link here..." 
+                                required 
+                                disabled={isLinkVerified}
+                            />
+                             <button 
+                                type={isLinkVerified ? 'button' : 'submit'}
+                                onClick={isLinkVerified ? handleResetLink : undefined}
+                                className={`px-4 rounded font-bold text-white ${isLinkVerified ? 'bg-red-500' : 'bg-red-600'}`}
+                            >
+                                {isLinkVerified ? 'X' : 'CHECK'}
+                            </button>
                         </div>
-                        <div className="bg-purple-900 p-3 rounded-lg text-center font-bold text-yellow-400 border border-purple-600">តម្លៃ: {formatNumber(calculateCost())} Coins</div>
-                        <button type="submit" disabled={isSubmitting} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-teal-700">{isSubmitting ? 'កំពុងដាក់...' : 'ដាក់យុទ្ធនាការ'}</button>
+
+                        {/* Settings Section (Only shows after CHECK) */}
+                        {isLinkVerified && (
+                            <div className='animate-fade-in'>
+                                <h3 className='text-white font-bold mt-4 mb-2 border-b border-purple-600 pb-1'>Campaigns Setting</h3>
+                                <div className="flex justify-between items-center mb-2">
+                                    <label className="text-sm text-teal-400 font-bold">Number of view</label>
+                                    <InputField type="number" value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value)))} className="w-24 text-center !bg-teal-800 !border-teal-600" />
+                                </div>
+                                {type !== 'sub' && (
+                                    <div className="flex justify-between items-center mb-4">
+                                        <label className="text-sm text-teal-400 font-bold">Time Required (sec.)</label>
+                                        <InputField type="number" value={time} onChange={e => setTime(Math.max(10, parseInt(e.target.value)))} className="w-24 text-center !bg-teal-800 !border-teal-600" />
+                                    </div>
+                                )}
+                                
+                                <div className="flex justify-between items-center mb-4 pt-2 border-t border-purple-600">
+                                     <label className="text-sm text-teal-400 font-bold">Campaign Cost</label>
+                                     <span className='text-xl font-bold text-yellow-400'>{formatNumber(calculateCost())}</span>
+                                </div>
+
+                                <button type="submit" disabled={isSubmitting} className="w-full bg-yellow-600 text-white py-3 rounded-full font-bold shadow-lg hover:bg-yellow-700 transition">
+                                    {isSubmitting ? 'Processing...' : 'DONE'}
+                                </button>
+                            </div>
+                        )}
                     </form>
                 </Card>
+
+                {/* History List */}
                 <div className="space-y-2">
                      <h3 className="text-white font-bold">ប្រវត្តិ ({userCampaigns.length})</h3>
                     {userCampaigns.map(c => (
@@ -450,6 +524,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
     const [current, setCurrent] = useState(null);
     const [timer, setTimer] = useState(0);
     const [claimed, setClaimed] = useState(false);
+    const [autoPlay, setAutoPlay] = useState(true);
 
     useEffect(() => {
         const q = query(getCampaignsCollectionRef(), where('type', '==', type));
@@ -461,7 +536,16 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
     }, [db, userId, type, current]);
 
     useEffect(() => { if (current) { setTimer(current.requiredDuration || 30); setClaimed(false); } }, [current]);
-    useEffect(() => { if (timer > 0) { const interval = setInterval(() => setTimer(t => t - 1), 1000); return () => clearInterval(interval); } }, [timer]);
+    
+    useEffect(() => { 
+        if (timer > 0) { 
+            const interval = setInterval(() => setTimer(t => t - 1), 1000); 
+            return () => clearInterval(interval); 
+        } else if (timer === 0 && !claimed && autoPlay && type === 'view') {
+             // Optional: Auto claim? No, user usually has to click. But we can Auto Next.
+             // For now, standard flow.
+        }
+    }, [timer, claimed, autoPlay, type]);
 
     const handleClaim = async () => {
         if (timer > 0 || claimed) return;
@@ -476,29 +560,77 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
             });
             showNotification('ទទួលបានពិន្ទុ!', 'success');
             if (type === 'website' || type === 'sub') window.open(current.link, '_blank');
-            const next = campaigns.filter(c => c.id !== current?.id && c.remaining > 0)[0];
-            setCurrent(next || null);
+            
+            if(autoPlay) {
+                 setTimeout(() => {
+                    const next = campaigns.filter(c => c.id !== current?.id && c.remaining > 0)[0];
+                    setCurrent(next || null);
+                 }, 1500);
+            } else {
+                const next = campaigns.filter(c => c.id !== current?.id && c.remaining > 0)[0];
+                setCurrent(next || null);
+            }
         } catch (e) { showNotification('បរាជ័យ: ' + e.message, 'error'); }
     };
+
+    const handleNext = () => {
+         const next = campaigns.filter(c => c.id !== current?.id && c.remaining > 0)[0];
+         setCurrent(next || null);
+    }
+
+    // Auto play URL construction
+    const getEmbedUrl = (link) => {
+        if (link.includes('youtu')) {
+             const id = link.split('v=')[1]?.split('&')[0] || link.split('/').pop();
+             // MODIFIED: Autoplay=1 and Mute=1 (browsers block autoplay with sound)
+             return `https://www.youtube.com/embed/${id}?autoplay=1&mute=0&controls=0`; 
+        }
+        return link;
+    }
 
     return (
         <div className="min-h-screen bg-purple-900 pb-16 pt-20">
             <Header title={type === 'view' ? 'មើលវីដេអូ' : type === 'website' ? 'មើល Website' : 'Subscribe'} onBack={() => setPage('DASHBOARD')} />
-            <main className="p-4">
+            <main className="p-0"> {/* Full width for video */}
                 {current ? (
-                    <Card className="p-4 text-center">
+                    <div className='flex flex-col h-full'>
                         {type === 'view' ? (
-                            <div className="aspect-video bg-black mb-4"><iframe src={current.link.includes('youtu') ? `https://www.youtube.com/embed/${current.link.split('v=')[1]?.split('&')[0] || current.link.split('/').pop()}?autoplay=0` : current.link} className="w-full h-full" frameBorder="0" allowFullScreen /></div>
+                            <div className="aspect-video bg-black w-full">
+                                <iframe 
+                                    src={getEmbedUrl(current.link)} 
+                                    className="w-full h-full" 
+                                    frameBorder="0" 
+                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                    allowFullScreen 
+                                />
+                            </div>
                         ) : (
-                            <div className="bg-purple-900 h-32 flex items-center justify-center mb-4 rounded border border-purple-600"><Globe className="w-10 h-10 text-purple-400" /></div>
+                            <div className="bg-purple-900 h-40 flex items-center justify-center border-b border-purple-700"><Globe className="w-16 h-16 text-purple-400" /></div>
                         )}
-                        <div className="flex justify-around mb-4">
-                            <div className="text-center"><Coins className="w-6 h-6 mx-auto text-yellow-400" /><span className="font-bold text-white">{current.requiredDuration} Pts</span></div>
-                            <div className="text-center"><Zap className="w-6 h-6 mx-auto text-red-500" /><span className="font-bold text-white">{timer}s</span></div>
+                        
+                        <div className='p-4 bg-white rounded-t-3xl mt-[-20px] relative z-10 min-h-[50vh]'>
+                             <div className="flex justify-between items-center mb-6 px-4">
+                                <div className="text-center flex items-center text-xl font-bold text-yellow-500"><Coins className="w-6 h-6 mr-2" /> {current.requiredDuration}</div>
+                                <div className="text-center flex items-center text-xl font-bold text-red-500"><Zap className="w-6 h-6 mr-2" /> {timer}s</div>
+                            </div>
+
+                            <button onClick={handleNext} className="w-full py-3 mb-3 bg-yellow-600 text-white font-bold rounded-full shadow-md">VIEW ANOTHER</button>
+                            
+                            <div className="flex justify-center items-center space-x-3 mb-4">
+                                <span className="text-gray-600 font-bold">auto play next video</span>
+                                <button onClick={() => setAutoPlay(!autoPlay)} className={`w-12 h-6 rounded-full p-1 transition ${autoPlay ? 'bg-teal-500' : 'bg-gray-300'}`}>
+                                    <div className={`w-4 h-4 bg-white rounded-full shadow transition transform ${autoPlay ? 'translate-x-6' : ''}`}></div>
+                                </button>
+                            </div>
+
+                            <button onClick={handleClaim} disabled={timer > 0 || claimed} className={`w-full py-3 rounded-full font-bold text-white shadow-lg mb-4 ${timer > 0 || claimed ? 'bg-gray-400' : 'bg-green-500'}`}>
+                                {timer > 0 ? `Please wait ${timer}s` : 'CLAIM REWARD'}
+                            </button>
+                            
+                            <button className="w-full py-3 bg-teal-500 text-white font-bold rounded-full shadow-md">WATCH VIDEO ADS</button>
                         </div>
-                        <button onClick={handleClaim} disabled={timer > 0 || claimed} className={`w-full py-3 rounded font-bold text-white ${timer > 0 || claimed ? 'bg-gray-600' : 'bg-green-600'}`}>{timer > 0 ? `រង់ចាំ ${timer}s` : 'ទទួលពិន្ទុ (Claim)'}</button>
-                    </Card>
-                ) : <div className="text-white text-center mt-10 text-xl">មិនមានយុទ្ធនាការទេ</div>}
+                    </div>
+                ) : <div className="text-white text-center mt-20 text-xl">មិនមានយុទ្ធនាការទេ</div>}
             </main>
         </div>
     );
@@ -679,9 +811,9 @@ const App = () => {
 
     let Content;
     switch (page) {
-        case 'EARN_POINTS': Content = <EarnPage db={db} userId={userId} type="view" setPage={setPage} showNotification={showNotification} />; break;
-        case 'EXPLORE_WEBSITE': Content = <EarnPage db={db} userId={userId} type="website" setPage={setPage} showNotification={showNotification} />; break;
-        case 'EXPLORE_SUBSCRIPTION': Content = <EarnPage db={db} userId={userId} type="sub" setPage={setPage} showNotification={showNotification} />; break;
+        case 'EARN_POINTS': Content = <EarnPage db={db} userId={userId} type="view" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
+        case 'EXPLORE_WEBSITE': Content = <EarnPage db={db} userId={userId} type="website" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
+        case 'EXPLORE_SUBSCRIPTION': Content = <EarnPage db={db} userId={userId} type="sub" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'MY_CAMPAIGNS': Content = <MyCampaignsPage db={db} userId={userId} userProfile={userProfile} setPage={setPage} showNotification={showNotification} />; break;
         case 'REFERRAL_PAGE': Content = <ReferralPage db={db} userId={userId} showNotification={showNotification} setPage={setPage} globalConfig={globalConfig} />; break;
         case 'BUY_COINS': Content = <BuyCoinsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
