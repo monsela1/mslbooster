@@ -77,7 +77,7 @@ const defaultGlobalConfig = {
     ]
 };
 
-// --- UI Components ---
+// --- UI Components (Purple Theme) ---
 const Loading = () => (
     <div className="flex justify-center items-center h-screen bg-purple-900">
         <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-yellow-400"></div>
@@ -378,7 +378,7 @@ const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) =
     );
 };
 
-// --- MODIFIED: MyCampaignsPage (Specific UI Request) ---
+// --- MY CAMPAIGNS PAGE (FIXED UI) ---
 const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification }) => {
     const [type, setType] = useState('view');
     const [link, setLink] = useState('');
@@ -387,7 +387,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     const [userCampaigns, setUserCampaigns] = useState([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLinkVerified, setIsLinkVerified] = useState(false);
-    const [previewUrl, setPreviewUrl] = useState(null); // For top preview
+    const [previewUrl, setPreviewUrl] = useState(null);
 
     useEffect(() => {
         const q = query(getCampaignsCollectionRef(), where('userId', '==', userId));
@@ -402,7 +402,6 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
         return type === 'sub' ? c * 50 : c * t * 1;
     }, [type, count, time]);
 
-    // Create Embed URL for preview
     const getEmbedUrl = (url) => {
         if (url.includes('youtu')) {
              const id = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
@@ -414,11 +413,9 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     const handleCheckLink = (e) => {
         e.preventDefault();
         if(!link.trim()) return showNotification('សូមបញ្ចូល Link ជាមុនសិន', 'error');
-        
         const embed = getEmbedUrl(link);
         if (embed) setPreviewUrl(embed);
-        else if(type !== 'view' && type !== 'sub') setPreviewUrl(null); // For website, no video preview
-
+        else if(type !== 'view' && type !== 'sub') setPreviewUrl(null);
         setIsLinkVerified(true);
         showNotification('Link ត្រឹមត្រូវ!', 'success');
     };
@@ -455,10 +452,9 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     };
 
     return (
-        <div className="min-h-screen bg-[#0f172a] pb-16 pt-20"> {/* Dark Slate BG to match screenshot */}
+        <div className="min-h-screen bg-[#0f172a] pb-16 pt-20">
             <Header title="យុទ្ធនាការខ្ញុំ" onBack={() => setPage('DASHBOARD')} />
             <main className="p-0">
-                {/* Video Preview Section (Top) */}
                 {isLinkVerified && previewUrl && (
                     <div className="w-full aspect-video bg-black mb-4">
                         <iframe src={previewUrl} className="w-full h-full" frameBorder="0" allowFullScreen />
@@ -466,16 +462,14 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                 )}
 
                 <div className="px-4 space-y-4">
-                    <div className="bg-[#0f172a] p-2"> {/* Transparent card look */}
-                        {/* Type Selector (Optional, keeping for functionality) */}
+                    <div className="bg-[#0f172a] p-2">
                         <div className="flex space-x-2 mb-4">
                             {['view', 'sub', 'website'].map(t => (
-                                <button key={t} onClick={() => {setType(t); setIsLinkVerified(false); setPreviewUrl(null);}} className={`flex-1 py-2 rounded font-bold text-xs ${type === t ? 'bg-teal-600 text-white' : 'bg-gray-700 text-gray-300'}`}>{t.toUpperCase()}</button>
+                                <button key={t} onClick={() => {setType(t); setIsLinkVerified(false); setPreviewUrl(null);}} className={`flex-1 py-2 rounded font-bold text-xs ${type === t ? 'bg-[#4c1d95] text-white border-b-2 border-teal-400' : 'bg-gray-800 text-gray-400'}`}>{t.toUpperCase()}</button>
                             ))}
                         </div>
 
                         <form onSubmit={isLinkVerified ? handleSubmit : handleCheckLink} className="space-y-3">
-                            {/* Link Input Row */}
                             <div className="flex">
                                 <input 
                                     value={link} 
@@ -483,7 +477,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                                     placeholder="https://youtu.be/..." 
                                     required 
                                     disabled={isLinkVerified}
-                                    className="flex-1 p-3 bg-gray-600 text-white placeholder-gray-400 border-l-2 border-t-2 border-b-2 border-gray-500 rounded-l-md focus:outline-none"
+                                    className="flex-1 p-3 bg-gray-700 text-white placeholder-gray-400 border-none rounded-l-md focus:outline-none focus:ring-1 focus:ring-teal-500"
                                 />
                                 <button 
                                     type={isLinkVerified ? 'button' : 'submit'}
@@ -494,42 +488,37 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                                 </button>
                             </div>
 
-                            {/* Settings Section */}
                             {isLinkVerified && (
                                 <div className='mt-4 space-y-4'>
-                                    <h3 className='text-white font-bold text-sm'>Campaigns Setting</h3>
+                                    <h3 className='text-white font-bold text-sm border-b border-gray-600 pb-2'>Campaigns Setting</h3>
                                     
-                                    {/* Count Input */}
-                                    <div className="flex justify-between items-center">
-                                        <label className="text-cyan-400 font-bold text-sm">Number of view</label>
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="text-white font-bold text-sm">Number of view</label>
                                         <input 
                                             type="number" 
                                             value={count} 
                                             onChange={e => setCount(Math.max(1, parseInt(e.target.value)))} 
-                                            className="w-32 p-2 bg-[#1e4e5f] text-white text-center font-bold rounded-full border-none focus:ring-2 focus:ring-teal-500" 
+                                            className="w-32 p-2 bg-white text-black text-center font-bold rounded-full border-none" 
                                         />
                                     </div>
 
-                                    {/* Time Input */}
                                     {type !== 'sub' && (
-                                        <div className="flex justify-between items-center">
-                                            <label className="text-cyan-400 font-bold text-sm">Time Required (sec.)</label>
+                                        <div className="flex justify-between items-center mb-4">
+                                            <label className="text-white font-bold text-sm">Time Required (sec.)</label>
                                             <input 
                                                 type="number" 
                                                 value={time} 
                                                 onChange={e => setTime(Math.max(10, parseInt(e.target.value)))} 
-                                                className="w-32 p-2 bg-[#1e4e5f] text-white text-center font-bold rounded-full border-none focus:ring-2 focus:ring-teal-500" 
+                                                className="w-32 p-2 bg-white text-black text-center font-bold rounded-full border-none" 
                                             />
                                         </div>
                                     )}
                                     
-                                    {/* Cost Display */}
-                                    <div className="flex justify-between items-center pt-2">
-                                         <label className="text-cyan-400 font-bold text-sm">Campaign Cost</label>
-                                         <span className='text-xl font-bold text-yellow-400'>{formatNumber(calculateCost())}</span>
+                                    <div className="flex justify-between items-center mb-4 pt-2 border-t border-gray-600">
+                                         <label className="text-white font-bold text-sm">Campaign Cost</label>
+                                         <span className='text-xl font-bold text-yellow-500'>{formatNumber(calculateCost())}</span>
                                     </div>
 
-                                    {/* Done Button */}
                                     <button type="submit" disabled={isSubmitting} className="w-full bg-yellow-600 text-white py-3 rounded-full font-bold shadow-lg hover:bg-yellow-700 transition mt-4">
                                         {isSubmitting ? 'Processing...' : 'DONE'}
                                     </button>
@@ -538,10 +527,8 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                         </form>
                     </div>
 
-                    {/* History List */}
-                    {/* Keeping existing history style but adjusting bg */}
                     <div className="space-y-2 mt-6">
-                        <h3 className="text-gray-400 font-bold text-sm">RECENT CAMPAIGNS</h3>
+                        <h3 className="text-gray-400 font-bold text-xs uppercase">Recent Campaigns</h3>
                         {userCampaigns.map(c => (
                             <div key={c.id} className="bg-gray-800 p-3 rounded shadow flex justify-between items-center border-l-4 border-teal-500">
                                 <div className='w-2/3'><p className="font-bold text-xs truncate text-gray-300">{c.link}</p><p className="text-[10px] text-gray-500">{c.type.toUpperCase()} - Rem: {c.remaining}</p></div>
@@ -555,7 +542,6 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     );
 };
 
-// MODIFIED: EarnPage with Auto Claim for View/Website AND Click-to-Subscribe logic
 const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
