@@ -46,8 +46,15 @@ try {
     console.error("Firebase initialization failed:", error);
 }
 
-// Helper Functions
-const getTodayDateKey = () => new Date().toISOString().split('T')[0];
+// Helper Functions (UPDATED: USE LOCAL TIME)
+const getTodayDateKey = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 const getShortId = (id) => id?.substring(0, 6).toUpperCase() || '------';
 const formatNumber = (num) => num?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') || '0';
 
@@ -85,12 +92,16 @@ const Loading = () => (
     </div>
 );
 
-const IconButton = ({ icon: Icon, title, onClick, iconColor = 'text-purple-300', textColor = 'text-white' }) => (
-    <button onClick={onClick} className="flex flex-col items-center justify-start p-2 rounded-xl transition transform hover:scale-105 active:scale-95 w-full h-32 bg-purple-800 shadow-lg border border-purple-700">
-        <div className={`p-3 rounded-xl bg-purple-900 shadow-inner`}>
-            <Icon className={`w-8 h-8 ${iconColor}`} />
+const IconButton = ({ icon: Icon, title, onClick, iconColor = 'text-purple-300', textColor = 'text-white', disabled = false }) => (
+    <button 
+        onClick={!disabled ? onClick : undefined} 
+        className={`flex flex-col items-center justify-start p-2 rounded-xl transition transform w-full h-32 border 
+        ${disabled ? 'bg-gray-800 border-gray-700 cursor-not-allowed opacity-70' : 'bg-purple-800 shadow-lg border-purple-700 hover:scale-105 active:scale-95'}`}
+    >
+        <div className={`p-3 rounded-xl ${disabled ? 'bg-gray-700' : 'bg-purple-900 shadow-inner'}`}>
+            <Icon className={`w-8 h-8 ${disabled ? 'text-gray-500' : iconColor}`} />
         </div>
-        <span className={`mt-2 text-xs font-bold text-center ${textColor} break-words leading-tight`}>{title}</span>
+        <span className={`mt-2 text-xs font-bold text-center ${disabled ? 'text-gray-500' : textColor} break-words leading-tight`}>{title}</span>
     </button>
 );
 
@@ -378,7 +389,6 @@ const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) =
     );
 };
 
-// --- MY CAMPAIGNS PAGE (FIXED UI) ---
 const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification }) => {
     const [type, setType] = useState('view');
     const [link, setLink] = useState('');
@@ -542,6 +552,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     );
 };
 
+// MODIFIED: EarnPage with Auto Claim for View/Website AND Click-to-Subscribe logic
 const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
@@ -822,14 +833,33 @@ const App = () => {
     const handleLogout = async () => { await signOut(auth); showNotification('បានចាកចេញ', 'success'); };
 
     const handleDailyCheckin = async () => {
-        if (userProfile.dailyCheckin) return showNotification('បាន Check-in រួចហើយ!', 'info');
+        // Check local status immediately to prevent multiple clicks
+        if (userProfile.dailyCheckin) {
+             showNotification('បាន Check-in រួចហើយ!', 'info');
+             return;
+        }
+
         try {
             await runTransaction(db, async (tx) => {
+                // Read inside transaction for consistency
+                const dailyRef = getDailyStatusDocRef(userId);
+                const dailyDoc = await tx.get(dailyRef);
+                
+                if (dailyDoc.exists() && dailyDoc.data().checkinDone) {
+                    throw new Error("Already checked in today");
+                }
+
                 tx.update(getProfileDocRef(userId), { points: increment(globalConfig.dailyCheckinReward) });
-                tx.set(getDailyStatusDocRef(userId), { checkinDone: true, date: getTodayDateKey() }, { merge: true });
+                tx.set(dailyRef, { checkinDone: true, date: getTodayDateKey() }, { merge: true });
             });
             showNotification('Check-in ជោគជ័យ!', 'success');
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            console.error(e); 
+            // Only show error if it wasn't the "already checked in" one, or just show info
+            if (e.message === "Already checked in today") {
+                showNotification('បាន Check-in រួចហើយ!', 'info');
+            }
+        }
     };
 
     if (!isAuthReady) return <Loading />;
@@ -885,7 +915,14 @@ const App = () => {
                     </div>
                     <div className="px-4">
                         <Card className="p-4 grid grid-cols-3 gap-3">
-                            <IconButton icon={CalendarCheck} title="DAILY TASK" onClick={handleDailyCheckin} iconColor={userProfile.dailyCheckin ? 'text-gray-500' : 'text-blue-400'} textColor={userProfile.dailyCheckin ? 'text-gray-400' : 'text-white'} />
+                            <IconButton 
+                                icon={CalendarCheck} 
+                                title="DAILY TASK" 
+                                onClick={handleDailyCheckin} 
+                                iconColor={userProfile.dailyCheckin ? 'text-gray-500' : 'text-blue-400'} 
+                                textColor={userProfile.dailyCheckin ? 'text-gray-400' : 'text-white'} 
+                                disabled={userProfile.dailyCheckin}
+                            />
                             {/* MODIFIED: SUBSCRIBE BUTTON (Replaces My Plan) */}
                             <IconButton icon={UserCheck} title="SUBSCRIBE" onClick={() => setPage('EXPLORE_SUBSCRIPTION')} iconColor="text-pink-400" />
                             <IconButton icon={Film} title="PLAY VIDEO" onClick={() => setPage('EARN_POINTS')} iconColor="text-red-400" />
