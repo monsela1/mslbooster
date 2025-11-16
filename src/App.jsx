@@ -21,7 +21,6 @@ import {
 } from 'lucide-react';
 
 // --- Configuration ---
-// នេះគឺជាកូដ Firebase របស់អ្នកដែលខ្ញុំបានដាក់ចូលរួចរាល់
 const firebaseConfig = {
     apiKey: "AIzaSyDw-b18l9BgIv61DFBxWAFbP6Mh_HsBv24",
     authDomain: "we4u-e1134.firebaseapp.com",
@@ -32,7 +31,6 @@ const firebaseConfig = {
     measurementId: "G-NN4S9Z8SB9"
 };
 
-// ឈ្មោះសម្រាប់បង្កើត Folder ក្នុង Database
 const appId = 'we4u_live_app'; 
 
 // --- Firebase Initialization ---
@@ -41,7 +39,6 @@ let db;
 let auth;
 
 try {
-    // ការពារកុំឱ្យ Initialize ពីរដង
     if (!getApps().length) {
         app = initializeApp(firebaseConfig);
     } else {
@@ -58,7 +55,7 @@ const getTodayDateKey = () => new Date().toISOString().split('T')[0];
 const getShortId = (id) => id?.substring(0, 6).toUpperCase() || '------';
 const formatNumber = (num) => num?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') || '0';
 
-// Firestore Paths helpers (Safe check for db)
+// Firestore Paths helpers
 const getProfileDocRef = (userId) => db && userId ? doc(db, 'artifacts', appId, 'users', userId, 'profile', 'user_data') : null;
 const getCampaignsCollectionRef = () => db ? collection(db, 'artifacts', appId, 'public', 'data', 'campaigns') : null;
 const getReferralCollectionRef = () => db ? collection(db, 'artifacts', appId, 'public', 'data', 'referrals') : null;
@@ -106,10 +103,10 @@ const Card = ({ children, className = '' }) => (
 );
 
 const Header = ({ title, onBack, className = '' }) => (
-    <header className={`flex items-center justify-between p-4 bg-teal-700 shadow-md text-white fixed top-0 w-full z-10 ${className}`}>
+    <header className={`flex items-center justify-between p-4 bg-green-700 shadow-md text-white fixed top-0 w-full z-10 ${className}`}>
         <div className="flex items-center">
             {onBack && (
-                <button onClick={onBack} className="p-1 mr-2 rounded-full hover:bg-teal-600 transition">
+                <button onClick={onBack} className="p-1 mr-2 rounded-full hover:bg-green-600 transition">
                     <ChevronLeft className="w-6 h-6" />
                 </button>
             )}
@@ -197,7 +194,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                     <h2 className="font-bold text-lg mb-4 text-gray-800">បង្កើតយុទ្ធនាការថ្មី</h2>
                     <div className="flex space-x-2 mb-4">
                         {['view', 'sub', 'website'].map(t => (
-                            <button key={t} onClick={() => setType(t)} className={`flex-1 py-2 rounded font-bold ${type === t ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
+                            <button key={t} onClick={() => setType(t)} className={`flex-1 py-2 rounded font-bold ${type === t ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
                                 {t.toUpperCase()}
                             </button>
                         ))}
@@ -219,7 +216,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                         <div className="bg-yellow-100 p-2 rounded text-center font-bold text-yellow-800">
                             តម្លៃ: {formatNumber(calculateCost())} Coins
                         </div>
-                        <button type="submit" disabled={isSubmitting} className="w-full bg-teal-600 text-white py-3 rounded font-bold">
+                        <button type="submit" disabled={isSubmitting} className="w-full bg-green-600 text-white py-3 rounded font-bold">
                             {isSubmitting ? 'កំពុងដាក់...' : 'ដាក់យុទ្ធនាការ'}
                         </button>
                     </form>
@@ -244,7 +241,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     );
 };
 
-// 2. Earn Points Page (Generic for View, Sub, Website)
+// 2. Earn Points Page
 const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
@@ -376,7 +373,7 @@ const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) =
                     <h3 className="font-bold text-gray-700">កូដណែនាំរបស់អ្នក</h3>
                     <div className="text-3xl font-mono font-bold text-red-600 my-3 tracking-widest">{shortId}</div>
                     <p className="text-sm text-gray-500">ចែករំលែកកូដនេះដើម្បីទទួលបាន {formatNumber(globalConfig.referrerReward)} ពិន្ទុ!</p>
-                    <button onClick={() => {navigator.clipboard.writeText(shortId); showNotification('ចម្លងរួចរាល់!', 'success')}} className="mt-4 bg-teal-600 text-white px-4 py-2 rounded-full text-sm">
+                    <button onClick={() => {navigator.clipboard.writeText(shortId); showNotification('ចម្លងរួចរាល់!', 'success')}} className="mt-4 bg-green-600 text-white px-4 py-2 rounded-full text-sm">
                         ចម្លងកូដ
                     </button>
                 </Card>
@@ -411,7 +408,6 @@ const App = () => {
         setTimeout(() => setNotification(null), 3000);
     }, []);
 
-    // Auth Listener
     useEffect(() => {
         if (!auth) return;
         const unsub = onAuthStateChanged(auth, (user) => {
@@ -426,7 +422,6 @@ const App = () => {
         return () => unsub();
     }, []);
 
-    // Profile Listener
     useEffect(() => {
         if (!db || !userId) return;
         const unsub = onSnapshot(getProfileDocRef(userId), (doc) => {
@@ -437,7 +432,6 @@ const App = () => {
         return () => unsub();
     }, [db, userId]);
 
-    // Load Global Config
     useEffect(() => {
         if (!db) return;
         const unsub = onSnapshot(getGlobalConfigDocRef(), (doc) => {
@@ -446,7 +440,6 @@ const App = () => {
         return () => unsub();
     }, [db]);
 
-    // --- Auth Handlers ---
     const handleLogin = async (email, password) => {
         try {
             await signInWithEmailAndPassword(auth, email, password);
@@ -457,30 +450,25 @@ const App = () => {
     };
 
     const handleRegister = async (email, password) => {
-        // 1. Check inputs
         if (password.length < 6) {
             showNotification('ពាក្យសម្ងាត់ត្រូវមានយ៉ាងតិច ៦ តួអក្សរ', 'error');
             return;
         }
         if (!auth) {
-            showNotification('បញ្ហា Firebase Auth (ពិនិត្យមើល config)', 'error');
+            showNotification('បញ្ហា Firebase Auth', 'error');
             return;
         }
-
         try {
-            // 2. Create User in Auth
             const cred = await createUserWithEmailAndPassword(auth, email, password);
             const uid = cred.user.uid;
             const shortId = getShortId(uid);
             
-            // 3. Check if Database is ready
             if (!db) {
                 console.error("Firestore DB is not initialized.");
                 showNotification('ចុះឈ្មោះបានតែគណនី (Database Error)', 'error');
                 return;
             }
 
-            // 4. Save User Profile
             try {
                 const profileRef = getProfileDocRef(uid);
                 if (profileRef) {
@@ -493,23 +481,17 @@ const App = () => {
                         createdAt: serverTimestamp(),
                         referredBy: null
                     });
-                } else {
-                     throw new Error("Profile Ref is null");
                 }
 
-                // 5. Save Short Code Mapping
                 const shortCodeRef = getShortCodeDocRef(shortId);
                 if (shortCodeRef) {
                     await setDoc(shortCodeRef, { fullUserId: uid, shortId });
                 }
-
                 showNotification('ចុះឈ្មោះជោគជ័យ!', 'success');
-
             } catch (dbError) {
                 console.error("Database write failed:", dbError);
                 showNotification('គណនីកើតហើយ ប៉ុន្តែទិន្នន័យមិនទាន់រក្សាទុក (Check Rules)', 'error');
             }
-            
         } catch (e) {
             console.error("Registration Error:", e);
             let msg = 'ចុះឈ្មោះបរាជ័យ';
@@ -538,7 +520,6 @@ const App = () => {
         }
     };
 
-    // --- Check Login Status ---
     if (!isAuthReady) return <Loading />;
 
     if (!userId) {
@@ -558,7 +539,6 @@ const App = () => {
         );
     }
 
-    // --- Page Routing ---
     let Content;
     switch (page) {
         case 'EARN_POINTS': Content = <EarnPage db={db} userId={userId} type="view" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
@@ -566,7 +546,7 @@ const App = () => {
         case 'EXPLORE_SUBSCRIPTION': Content = <EarnPage db={db} userId={userId} type="sub" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'MY_CAMPAIGNS': Content = <MyCampaignsPage db={db} userId={userId} userProfile={userProfile} setPage={setPage} showNotification={showNotification} />; break;
         case 'REFERRAL_PAGE': Content = <ReferralPage db={db} userId={userId} showNotification={showNotification} setPage={setPage} globalConfig={globalConfig} />; break;
-        default: // Dashboard
+        default: 
             Content = (
                 <div className="min-h-screen bg-blue-900 pb-16 pt-20">
                     <Header title="We4u App" className="z-20" />
@@ -575,7 +555,7 @@ const App = () => {
                     </div>
 
                     <div className="px-4 mb-6">
-                         <div className="bg-gradient-to-r from-teal-500 to-teal-700 rounded-xl p-6 text-white shadow-lg text-center relative overflow-hidden">
+                         <div className="bg-gradient-to-r from-green-500 to-green-700 rounded-xl p-6 text-white shadow-lg text-center relative overflow-hidden">
                             <div className="absolute -top-4 -left-4 w-16 h-16 bg-white opacity-10 rounded-full"></div>
                             <p className="text-sm opacity-80">សមតុល្យរបស់អ្នក</p>
                             <h1 className="text-4xl font-bold my-2 flex justify-center items-center gap-2">
@@ -591,7 +571,7 @@ const App = () => {
                             <IconButton icon={Film} title="មើលវីដេអូ" onClick={() => setPage('EARN_POINTS')} iconColor="text-red-500" />
                             <IconButton icon={Globe} title="មើល Website" onClick={() => setPage('EXPLORE_WEBSITE')} iconColor="text-indigo-500" />
                             <IconButton icon={UserCheck} title="Subscribe" onClick={() => setPage('EXPLORE_SUBSCRIPTION')} iconColor="text-pink-500" />
-                            <IconButton icon={Target} title="ដាក់យុទ្ធនាការ" onClick={() => setPage('MY_CAMPAIGNS')} iconColor="text-teal-600" />
+                            <IconButton icon={Target} title="ដាក់យុទ្ធនាការ" onClick={() => setPage('MY_CAMPAIGNS')} iconColor="text-green-600" />
                             <IconButton icon={UserPlus} title="ណែនាំមិត្ត" onClick={() => setPage('REFERRAL_PAGE')} iconColor="text-purple-500" />
                         </Card>
                     </div>
@@ -611,7 +591,6 @@ const App = () => {
     );
 };
 
-// Simple Auth Form Component
 const AuthForm = ({ onSubmit, btnText }) => {
     const [email, setEmail] = useState('');
     const [pass, setPass] = useState('');
@@ -619,7 +598,7 @@ const AuthForm = ({ onSubmit, btnText }) => {
         <form onSubmit={(e) => { e.preventDefault(); onSubmit(email, pass); }} className="space-y-3">
             <input className="w-full p-3 border rounded" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
             <input className="w-full p-3 border rounded" type="password" placeholder="Password" value={pass} onChange={e => setPass(e.target.value)} required />
-            <button className="w-full bg-teal-600 text-white p-3 rounded font-bold hover:bg-teal-700">{btnText}</button>
+            <button className="w-full bg-green-600 text-white p-3 rounded font-bold hover:bg-green-700">{btnText}</button>
         </form>
     );
 };
