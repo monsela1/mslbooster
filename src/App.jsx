@@ -1,23 +1,22 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
     getAuth,
-    signInWithCustomToken,
     onAuthStateChanged,
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     signOut
 } from 'firebase/auth';
 import {
-    getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot,
+    getFirestore, doc, setDoc, onSnapshot,
     collection, query, where, addDoc, serverTimestamp,
-    runTransaction, getDocs, increment
+    runTransaction, increment
 } from 'firebase/firestore';
 import {
-    Users, Coins, Video, Link, Globe, MonitorPlay, CheckSquare, Zap,
-    UserPlus, ChevronLeft, Trash2, Edit, BookOpen, ShoppingCart,
-    Gift, Info, X, CalendarCheck, Target, Wallet, Film, Calendar,
-    Settings, DollarSign, ShieldCheck, LogOut, Mail, Lock
+    Users, Coins, Video, Link, Globe, CheckSquare, Zap,
+    UserPlus, ChevronLeft, Trash2, ShoppingCart,
+    CalendarCheck, Target, Wallet, Film,
+    LogOut, Mail, Lock, UserCheck
 } from 'lucide-react';
 
 // --- Configuration ---
@@ -53,7 +52,11 @@ try {
 // Helper Functions
 const getTodayDateKey = () => new Date().toISOString().split('T')[0];
 const getShortId = (id) => id?.substring(0, 6).toUpperCase() || '------';
-const formatNumber = (num) => num?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') || '0';
+// FIX: Safe format number preventing crash on undefined
+const formatNumber = (num) => {
+    if (num === undefined || num === null || isNaN(num)) return '0';
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+};
 
 // Firestore Paths helpers
 const getProfileDocRef = (userId) => db && userId ? doc(db, 'artifacts', appId, 'users', userId, 'profile', 'user_data') : null;
@@ -397,7 +400,8 @@ const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) =
 const App = () => {
     const [page, setPage] = useState('DASHBOARD');
     const [userId, setUserId] = useState(null);
-    const [userProfile, setUserProfile] = useState({});
+    // FIX: Initialize with safe defaults to prevent crashes
+    const [userProfile, setUserProfile] = useState({ points: 0, userName: 'Loading...', shortId: '...' });
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [notification, setNotification] = useState(null);
     const [authPage, setAuthPage] = useState('LOGIN');
@@ -561,7 +565,7 @@ const App = () => {
                             <h1 className="text-4xl font-bold my-2 flex justify-center items-center gap-2">
                                 {formatNumber(userProfile.points)} <Coins className="w-6 h-6 text-yellow-300"/>
                             </h1>
-                            <p className="text-xs bg-white bg-opacity-20 inline-block px-3 py-1 rounded-full">ID: {userProfile.shortId}</p>
+                            <p className="text-xs bg-white bg-opacity-20 inline-block px-3 py-1 rounded-full">ID: {userProfile.shortId || '...'}</p>
                          </div>
                     </div>
 
