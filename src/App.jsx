@@ -16,7 +16,7 @@ import {
     Users, Coins, Video, Link, Globe, MonitorPlay, Zap,
     UserPlus, ChevronLeft, BookOpen, ShoppingCart,
     CalendarCheck, Target, Wallet, Film,
-    DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, Settings, Copy
+    DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, Settings, Copy, Save, Search, PlusCircle, MinusCircle
 } from 'lucide-react';
 
 // --- Configuration ---
@@ -59,9 +59,16 @@ const getDailyStatusDocRef = (userId) => db && userId ? doc(db, 'artifacts', app
 const getGlobalConfigDocRef = () => db ? doc(db, 'artifacts', appId, 'public', 'data', 'config', 'global_settings') : null;
 const getShortCodeDocRef = (shortId) => db && shortId ? doc(db, 'artifacts', appId, 'public', 'data', 'short_codes', shortId) : null;
 
+// --- Default Config (Will be overwritten by Admin Settings) ---
 const defaultGlobalConfig = {
     dailyCheckinReward: 200,
     referrerReward: 1000,
+    adsReward: 30, // Points for watching ads
+    adsSettings: {
+        bannerId: "ca-app-pub-xxxxxxxx/yyyyyy",
+        interstitialId: "ca-app-pub-xxxxxxxx/zzzzzz",
+        isEnabled: true
+    },
     coinPackages: [
         { id: 1, coins: 5000, price: '5,000 Riel', color: 'bg-green-500' },
         { id: 2, coins: 15000, price: '15,000 Riel', color: 'bg-blue-500' },
@@ -105,9 +112,221 @@ const Header = ({ title, onBack, rightContent, className = '' }) => (
     </header>
 );
 
-// --- PAGE COMPONENTS ---
+// --- ADMIN SUB-COMPONENTS ---
 
-// 1. Referral Page (FIXED UI)
+// 1. General Settings (Rewards & Ads)
+const AdminSettingsTab = ({ config, setConfig, onSave }) => {
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setConfig(prev => ({ ...prev, [name]: parseInt(value) || 0 }));
+    };
+
+    const handleAdsChange = (e) => {
+        const { name, value } = e.target;
+        setConfig(prev => ({
+            ...prev,
+            adsSettings: { ...prev.adsSettings, [name]: value }
+        }));
+    };
+
+    return (
+        <div className="space-y-4">
+            <Card className="p-4 border-l-4 border-blue-500">
+                <h3 className="font-bold text-lg mb-3 text-gray-800 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់ (Rewards)</h3>
+                <div className="grid grid-cols-1 gap-3">
+                    <div>
+                        <label className="text-xs font-bold text-gray-500">Daily Check-in Points</label>
+                        <input name="dailyCheckinReward" type="number" value={config.dailyCheckinReward} onChange={handleChange} className="w-full p-2 border rounded bg-gray-50" />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500">Referral Reward Points</label>
+                        <input name="referrerReward" type="number" value={config.referrerReward} onChange={handleChange} className="w-full p-2 border rounded bg-gray-50" />
+                    </div>
+                     <div>
+                        <label className="text-xs font-bold text-gray-500">Watch Ads Reward</label>
+                        <input name="adsReward" type="number" value={config.adsReward} onChange={handleChange} className="w-full p-2 border rounded bg-gray-50" />
+                    </div>
+                </div>
+            </Card>
+
+            <Card className="p-4 border-l-4 border-pink-500">
+                <h3 className="font-bold text-lg mb-3 text-gray-800 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ពាណិជ្ជកម្ម (Ads)</h3>
+                <div className="space-y-3">
+                     <div>
+                        <label className="text-xs font-bold text-gray-500">Banner ID</label>
+                        <input name="bannerId" type="text" value={config.adsSettings?.bannerId || ''} onChange={handleAdsChange} className="w-full p-2 border rounded bg-gray-50" />
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-500">Interstitial/Video ID</label>
+                        <input name="interstitialId" type="text" value={config.adsSettings?.interstitialId || ''} onChange={handleAdsChange} className="w-full p-2 border rounded bg-gray-50" />
+                    </div>
+                </div>
+            </Card>
+             <button onClick={onSave} className="w-full py-3 bg-green-600 text-white font-bold rounded-lg shadow-lg flex justify-center items-center">
+                <Save className="w-5 h-5 mr-2"/> រក្សាទុកការកំណត់
+            </button>
+        </div>
+    );
+};
+
+// 2. User Manager (Edit Points)
+const AdminUserManagerTab = ({ db, showNotification }) => {
+    const [searchId, setSearchId] = useState('');
+    const [foundUser, setFoundUser] = useState(null);
+    const [pointsToAdd, setPointsToAdd] = useState(0);
+
+    const handleSearch = async () => {
+        if(searchId.length !== 6) return showNotification('Please enter 6-digit Short ID', 'error');
+        try {
+            const shortCodeDoc = await getDoc(getShortCodeDocRef(searchId.toUpperCase()));
+            if(shortCodeDoc.exists()){
+                const uid = shortCodeDoc.data().fullUserId;
+                const profile = await getDoc(getProfileDocRef(uid));
+                if(profile.exists()){
+                    setFoundUser({ uid, ...profile.data() });
+                }
+            } else {
+                showNotification('User not found', 'error');
+                setFoundUser(null);
+            }
+        } catch(e) { console.error(e); }
+    };
+
+    const handleUpdatePoints = async () => {
+        if(!foundUser) return;
+        try {
+            await updateDoc(getProfileDocRef(foundUser.uid), { points: increment(parseInt(pointsToAdd)) });
+            showNotification('Points updated successfully', 'success');
+            setFoundUser(prev => ({...prev, points: prev.points + parseInt(pointsToAdd)}));
+            setPointsToAdd(0);
+        } catch(e) { showNotification('Update failed', 'error'); }
+    };
+
+    return (
+        <Card className="p-4">
+            <h3 className="font-bold text-lg mb-4 text-gray-800">ស្វែងរក & កែប្រែអ្នកប្រើប្រាស់</h3>
+            <div className="flex space-x-2 mb-4">
+                <input 
+                    value={searchId} 
+                    onChange={e => setSearchId(e.target.value.toUpperCase())} 
+                    placeholder="Enter User ID (e.g. A1B2C3)" 
+                    className="flex-1 p-2 border-2 border-blue-300 rounded bg-white text-black font-mono uppercase"
+                    maxLength={6}
+                />
+                <button onClick={handleSearch} className="bg-blue-600 text-white p-2 rounded"><Search/></button>
+            </div>
+            
+            {foundUser && (
+                <div className="bg-gray-100 p-4 rounded-lg border border-gray-300">
+                    <p className="font-bold text-lg text-gray-800">{foundUser.userName}</p>
+                    <p className="text-gray-600 text-sm">Email: {foundUser.email}</p>
+                    <p className="text-gray-600 text-sm mb-2">Current Points: <span className="font-bold text-green-600">{formatNumber(foundUser.points)}</span></p>
+                    
+                    <div className="flex items-center space-x-2 mt-4">
+                        <button onClick={() => setPointsToAdd(p => p - 100)} className="p-1 bg-red-200 rounded text-red-700"><MinusCircle/></button>
+                        <input 
+                            type="number" 
+                            value={pointsToAdd} 
+                            onChange={e => setPointsToAdd(e.target.value)} 
+                            className="w-24 text-center p-1 border rounded font-bold"
+                        />
+                        <button onClick={() => setPointsToAdd(p => p + 100)} className="p-1 bg-green-200 rounded text-green-700"><PlusCircle/></button>
+                        <button onClick={handleUpdatePoints} className="flex-1 bg-teal-600 text-white py-1 rounded font-bold">Update</button>
+                    </div>
+                </div>
+            )}
+        </Card>
+    );
+};
+
+// 7. Admin Dashboard Page (MAIN ADMIN CONTAINER)
+const AdminDashboardPage = ({ db, setPage, showNotification }) => {
+    const [activeTab, setActiveTab] = useState('SETTINGS');
+    const [config, setConfig] = useState(null);
+    const [campaigns, setCampaigns] = useState([]);
+
+    // Fetch Config
+    useEffect(() => {
+        const fetchConfig = async () => {
+            const docSnap = await getDoc(getGlobalConfigDocRef());
+            if (docSnap.exists()) setConfig(docSnap.data());
+            else setConfig(defaultGlobalConfig);
+        };
+        fetchConfig();
+    }, [db]);
+
+    // Fetch Campaigns for listing
+    useEffect(() => {
+        if(activeTab === 'CAMPAIGNS') {
+            const q = query(getCampaignsCollectionRef());
+            return onSnapshot(q, (snap) => {
+                setCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            });
+        }
+    }, [db, activeTab]);
+
+    const handleSaveConfig = async () => {
+        try {
+            await setDoc(getGlobalConfigDocRef(), config);
+            showNotification('Settings saved successfully!', 'success');
+        } catch(e) { showNotification('Failed to save', 'error'); }
+    };
+
+    const handleDeleteCampaign = async (id) => {
+        if(!window.confirm('Stop this campaign?')) return;
+        try { await updateDoc(doc(getCampaignsCollectionRef(), id), { remaining: 0, isActive: false }); } 
+        catch(e) {}
+    };
+
+    if (!config) return <Loading />;
+
+    return (
+        <div className="min-h-screen bg-gray-900 pb-16 pt-20">
+            <Header title="ADMIN PANEL" onBack={() => setPage('DASHBOARD')} className="bg-gray-800" />
+            <main className="p-4">
+                {/* Tabs */}
+                <div className="flex space-x-1 mb-4 bg-gray-700 p-1 rounded-lg">
+                    {['SETTINGS', 'USERS', 'CAMPAIGNS'].map(tab => (
+                        <button 
+                            key={tab}
+                            onClick={() => setActiveTab(tab)} 
+                            className={`flex-1 py-2 rounded font-bold text-xs ${activeTab === tab ? 'bg-blue-500 text-white shadow' : 'text-gray-300 hover:bg-gray-600'}`}
+                        >
+                            {tab}
+                        </button>
+                    ))}
+                </div>
+
+                {activeTab === 'SETTINGS' && <AdminSettingsTab config={config} setConfig={setConfig} onSave={handleSaveConfig} />}
+                {activeTab === 'USERS' && <AdminUserManagerTab db={db} showNotification={showNotification} />}
+                
+                {activeTab === 'CAMPAIGNS' && (
+                    <div className="space-y-2">
+                        {campaigns.map(c => (
+                             <div key={c.id} className={`bg-white p-3 rounded-lg shadow flex justify-between items-center border-l-4 ${c.remaining > 0 ? 'border-green-500' : 'border-red-500'}`}>
+                                <div className='overflow-hidden'>
+                                    <p className="font-bold text-sm truncate text-gray-800 w-48">{c.link}</p>
+                                    <div className='flex space-x-2 text-xs mt-1'>
+                                        <span className='bg-gray-200 px-2 py-0.5 rounded text-gray-700'>{c.type}</span>
+                                        <span className={`${c.remaining > 0 ? 'text-green-600' : 'text-red-600'} font-bold`}>
+                                            Rem: {c.remaining}
+                                        </span>
+                                    </div>
+                                </div>
+                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-100 text-red-600 rounded-full"><Trash2 size={18}/></button>
+                            </div>
+                        ))}
+                         {campaigns.length === 0 && <p className="text-white text-center opacity-50">No campaigns found.</p>}
+                    </div>
+                )}
+            </main>
+        </div>
+    );
+};
+
+// ... (Standard User Pages - No changes needed here but included for completeness) ...
+
+// 1. Referral Page
 const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) => {
     const [referrals, setReferrals] = useState([]);
     const shortId = getShortId(userId);
@@ -126,109 +345,27 @@ const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) =
             <main className="p-4 space-y-4">
                 <Card className="p-6 text-center bg-yellow-50 border-2 border-yellow-400">
                     <h3 className="font-bold text-gray-800 text-lg">កូដណែនាំរបស់អ្នក</h3>
-                    <div className="text-4xl font-mono font-extrabold text-red-600 my-4 tracking-widest bg-white p-2 rounded-lg shadow-inner">
-                        {shortId}
-                    </div>
-                    <p className="text-sm text-gray-700 font-medium">ចែករំលែកកូដនេះដើម្បីទទួលបាន <span className='text-green-600 font-bold'>{formatNumber(globalConfig.referrerReward)} ពិន្ទុ!</span></p>
-                    
-                    <button 
-                        onClick={() => {navigator.clipboard.writeText(shortId); showNotification('ចម្លងរួចរាល់!', 'success')}} 
-                        className="mt-5 bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-full text-sm font-bold flex items-center justify-center mx-auto shadow-lg active:scale-95 transition"
-                    >
+                    <div className="text-4xl font-mono font-extrabold text-red-600 my-4 tracking-widest bg-white p-2 rounded-lg shadow-inner">{shortId}</div>
+                    <p className="text-sm text-gray-700 font-medium">ទទួលបាន <span className='text-green-600 font-bold'>{formatNumber(globalConfig.referrerReward)} ពិន្ទុ!</span> ក្នុងម្នាក់</p>
+                    <button onClick={() => {navigator.clipboard.writeText(shortId); showNotification('ចម្លងរួចរាល់!', 'success')}} className="mt-5 bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-full text-sm font-bold flex items-center justify-center mx-auto shadow-lg active:scale-95 transition">
                         <Copy className='w-4 h-4 mr-2'/> ចម្លងកូដ
                     </button>
                 </Card>
-
                 <Card className="p-4">
                     <h3 className="font-bold mb-4 text-gray-800 border-b pb-2">បញ្ជីអ្នកដែលបានណែនាំ ({referrals.length})</h3>
                     <div className="max-h-80 overflow-y-auto space-y-2">
                         {referrals.length > 0 ? referrals.map((r, i) => (
                             <div key={i} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
-                                <div className='flex items-center'>
-                                    <div className='w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold mr-3'>{i+1}</div>
-                                    <span className="text-gray-800 font-semibold">{r.referredName || 'User'}</span>
-                                </div>
-                                <span className="text-green-600 font-bold flex items-center">+{formatNumber(r.reward)} <Coins className='w-3 h-3 ml-1'/></span>
+                                <span className="text-gray-800 font-semibold">{i+1}. {r.referredName || 'User'}</span>
+                                <span className="text-green-600 font-bold">+{formatNumber(r.reward)}</span>
                             </div>
-                        )) : (
-                            <div className="text-center py-8">
-                                <Users className='w-12 h-12 text-gray-300 mx-auto mb-2'/>
-                                <p className="text-gray-500 font-medium">មិនទាន់មានការណែនាំ</p>
-                            </div>
-                        )}
+                        )) : <div className="text-center py-8 text-gray-500">មិនទាន់មានការណែនាំ</div>}
                     </div>
                 </Card>
             </main>
         </div>
     );
 };
-
-// 7. Admin Dashboard Page (FIXED EMPTY STATE)
-const AdminDashboardPage = ({ db, setPage, showNotification }) => {
-    const [campaigns, setCampaigns] = useState([]);
-    const [activeTab, setActiveTab] = useState('CAMPAIGNS');
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const q = query(getCampaignsCollectionRef());
-        return onSnapshot(q, (snap) => {
-            const camps = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            // Filter only active campaigns if you want, or show all
-            setCampaigns(camps);
-            setLoading(false);
-        });
-    }, [db]);
-
-    const handleDeleteCampaign = async (id) => {
-        if(!window.confirm('Are you sure you want to stop this campaign?')) return;
-        try {
-            await updateDoc(doc(getCampaignsCollectionRef(), id), { remaining: 0, isActive: false });
-            showNotification('Campaign stopped successfully', 'success');
-        } catch(e) { showNotification(e.message, 'error'); }
-    };
-
-    return (
-        <div className="min-h-screen bg-blue-900 pb-16 pt-20">
-            <Header title="ADMIN PANEL" onBack={() => setPage('DASHBOARD')} />
-            <main className="p-4">
-                <div className="flex space-x-2 mb-4">
-                    <button className="flex-1 py-2 rounded-lg font-bold bg-teal-500 text-white shadow-md">Campaigns Management</button>
-                </div>
-
-                {loading ? (
-                    <div className='text-white text-center mt-10'>កំពុងផ្ទុកទិន្នន័យ...</div>
-                ) : campaigns.length === 0 ? (
-                     <div className="text-center mt-20 opacity-70">
-                        <MonitorPlay className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                        <p className="text-white text-lg font-semibold">មិនទាន់មានយុទ្ធនាការណាមួយទេ</p>
-                        <p className="text-gray-400 text-sm">សាកល្បងបង្កើតយុទ្ធនាការថ្មី</p>
-                    </div>
-                ) : (
-                    <div className="space-y-3">
-                        {campaigns.map(c => (
-                            <div key={c.id} className={`bg-white p-3 rounded-lg shadow-md flex justify-between items-center border-l-4 ${c.remaining > 0 ? 'border-green-500' : 'border-red-500'}`}>
-                                <div className='overflow-hidden'>
-                                    <p className="font-bold text-sm truncate text-gray-800 w-48">{c.link}</p>
-                                    <div className='flex space-x-2 text-xs mt-1'>
-                                        <span className='bg-gray-200 px-2 py-0.5 rounded text-gray-700'>{c.type.toUpperCase()}</span>
-                                        <span className={`${c.remaining > 0 ? 'text-green-600' : 'text-red-600'} font-bold`}>
-                                            {c.remaining > 0 ? `Active: ${c.remaining}` : 'Finished'}
-                                        </span>
-                                    </div>
-                                </div>
-                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition">
-                                    <Trash2 size={18}/>
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </main>
-        </div>
-    );
-};
-
-// ... (Other pages remain standard, listed below for completeness) ...
 
 const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification }) => {
     const [type, setType] = useState('view');
@@ -240,10 +377,9 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
 
     useEffect(() => {
         const q = query(getCampaignsCollectionRef(), where('userId', '==', userId));
-        const unsubscribe = onSnapshot(q, (snap) => {
+        return onSnapshot(q, (snap) => {
             setUserCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds));
         });
-        return () => unsubscribe();
     }, [db, userId]);
 
     const calculateCost = useCallback(() => {
@@ -267,24 +403,11 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                 if (!profileDoc.exists() || profileDoc.data().points < cost) throw new Error("Insufficient points");
                 transaction.update(profileRef, { points: increment(-cost) });
                 const newCampRef = doc(getCampaignsCollectionRef());
-                transaction.set(newCampRef, {
-                    userId, type, link: link.trim(),
-                    costPerUnit: type === 'sub' ? 50 : 1,
-                    requiredDuration: type === 'sub' ? 60 : (parseInt(time) || 60),
-                    initialCount: parseInt(count),
-                    remaining: parseInt(count),
-                    totalCost: cost,
-                    createdAt: serverTimestamp(),
-                    isActive: true
-                });
+                transaction.set(newCampRef, { userId, type, link: link.trim(), costPerUnit: type === 'sub' ? 50 : 1, requiredDuration: type === 'sub' ? 60 : (parseInt(time) || 60), initialCount: parseInt(count), remaining: parseInt(count), totalCost: cost, createdAt: serverTimestamp(), isActive: true });
             });
             showNotification('ដាក់យុទ្ធនាការជោគជ័យ!', 'success');
             setLink('');
-        } catch (error) {
-            showNotification(error.message, 'error');
-        } finally {
-            setIsSubmitting(false);
-        }
+        } catch (error) { showNotification(error.message, 'error'); } finally { setIsSubmitting(false); }
     };
 
     return (
@@ -295,44 +418,25 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                     <h2 className="font-bold text-lg mb-4 text-gray-800">បង្កើតយុទ្ធនាការថ្មី</h2>
                     <div className="flex space-x-2 mb-4">
                         {['view', 'sub', 'website'].map(t => (
-                            <button key={t} onClick={() => setType(t)} className={`flex-1 py-2 rounded font-bold ${type === t ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
-                                {t.toUpperCase()}
-                            </button>
+                            <button key={t} onClick={() => setType(t)} className={`flex-1 py-2 rounded font-bold ${type === t ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}>{t.toUpperCase()}</button>
                         ))}
                     </div>
                     <form onSubmit={handleSubmit} className="space-y-3">
                         <input type="url" value={link} onChange={e => setLink(e.target.value)} placeholder="Link URL..." className="w-full p-3 border-2 border-gray-300 rounded-lg bg-white text-black font-medium" required />
                         <div className="flex justify-between space-x-2">
-                            <div className="w-1/2">
-                                <label className="text-xs text-gray-500 font-bold">ចំនួន (Count)</label>
-                                <input type="number" value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value)))} className="w-full p-3 border-2 border-gray-300 rounded-lg bg-white text-black font-medium" />
-                            </div>
-                            {type !== 'sub' && (
-                                <div className="w-1/2">
-                                    <label className="text-xs text-gray-500 font-bold">ពេល (Sec)</label>
-                                    <input type="number" value={time} onChange={e => setTime(Math.max(10, parseInt(e.target.value)))} className="w-full p-3 border-2 border-gray-300 rounded-lg bg-white text-black font-medium" />
-                                </div>
-                            )}
+                            <div className="w-1/2"><label className="text-xs text-gray-500 font-bold">ចំនួន (Count)</label><input type="number" value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value)))} className="w-full p-3 border-2 border-gray-300 rounded-lg bg-white text-black font-medium" /></div>
+                            {type !== 'sub' && (<div className="w-1/2"><label className="text-xs text-gray-500 font-bold">ពេល (Sec)</label><input type="number" value={time} onChange={e => setTime(Math.max(10, parseInt(e.target.value)))} className="w-full p-3 border-2 border-gray-300 rounded-lg bg-white text-black font-medium" /></div>)}
                         </div>
-                        <div className="bg-yellow-100 p-3 rounded-lg text-center font-bold text-yellow-800 border border-yellow-400">
-                            តម្លៃ: {formatNumber(calculateCost())} Coins
-                        </div>
-                        <button type="submit" disabled={isSubmitting} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-teal-700">
-                            {isSubmitting ? 'កំពុងដាក់...' : 'ដាក់យុទ្ធនាការ'}
-                        </button>
+                        <div className="bg-yellow-100 p-3 rounded-lg text-center font-bold text-yellow-800 border border-yellow-400">តម្លៃ: {formatNumber(calculateCost())} Coins</div>
+                        <button type="submit" disabled={isSubmitting} className="w-full bg-teal-600 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-teal-700">{isSubmitting ? 'កំពុងដាក់...' : 'ដាក់យុទ្ធនាការ'}</button>
                     </form>
                 </Card>
                 <div className="space-y-2">
-                    <h3 className="text-white font-bold">ប្រវត្តិ ({userCampaigns.length})</h3>
+                     <h3 className="text-white font-bold">ប្រវត្តិ ({userCampaigns.length})</h3>
                     {userCampaigns.map(c => (
                         <div key={c.id} className="bg-white p-3 rounded-lg shadow flex justify-between items-center">
-                            <div className='w-2/3'>
-                                <p className="font-bold text-sm truncate text-gray-800">{c.link}</p>
-                                <p className="text-xs text-gray-500">{c.type.toUpperCase()} - នៅសល់: {c.remaining}</p>
-                            </div>
-                            <span className={`text-xs font-bold ${c.remaining > 0 ? 'text-green-600' : 'text-red-500'}`}>
-                                {c.remaining > 0 ? 'Active' : 'Finished'}
-                            </span>
+                            <div className='w-2/3'><p className="font-bold text-sm truncate text-gray-800">{c.link}</p><p className="text-xs text-gray-500">{c.type.toUpperCase()} - នៅសល់: {c.remaining}</p></div>
+                            <span className={`text-xs font-bold ${c.remaining > 0 ? 'text-green-600' : 'text-red-500'}`}>{c.remaining > 0 ? 'Active' : 'Finished'}</span>
                         </div>
                     ))}
                 </div>
@@ -341,33 +445,23 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     );
 };
 
-const EarnPage = ({ db, userId, type, setPage, showNotification }) => {
+const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
     const [timer, setTimer] = useState(0);
     const [claimed, setClaimed] = useState(false);
-    const pageTitle = type === 'view' ? 'មើលវីដេអូ' : type === 'website' ? 'មើល Website' : 'Subscribe';
 
     useEffect(() => {
         const q = query(getCampaignsCollectionRef(), where('type', '==', type));
-        const unsubscribe = onSnapshot(q, (snap) => {
+        return onSnapshot(q, (snap) => {
             const list = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.userId !== userId && c.remaining > 0);
             setCampaigns(list);
             if (!current && list.length > 0) setCurrent(list[0]);
         });
-        return () => unsubscribe();
     }, [db, userId, type, current]);
 
-    useEffect(() => {
-        if (current) { setTimer(current.requiredDuration || 30); setClaimed(false); }
-    }, [current]);
-
-    useEffect(() => {
-        if (timer > 0) {
-            const interval = setInterval(() => setTimer(t => t - 1), 1000);
-            return () => clearInterval(interval);
-        }
-    }, [timer]);
+    useEffect(() => { if (current) { setTimer(current.requiredDuration || 30); setClaimed(false); } }, [current]);
+    useEffect(() => { if (timer > 0) { const interval = setInterval(() => setTimer(t => t - 1), 1000); return () => clearInterval(interval); } }, [timer]);
 
     const handleClaim = async () => {
         if (timer > 0 || claimed) return;
@@ -389,7 +483,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification }) => {
 
     return (
         <div className="min-h-screen bg-blue-900 pb-16 pt-20">
-            <Header title={pageTitle} onBack={() => setPage('DASHBOARD')} />
+            <Header title={type === 'view' ? 'មើលវីដេអូ' : type === 'website' ? 'មើល Website' : 'Subscribe'} onBack={() => setPage('DASHBOARD')} />
             <main className="p-4">
                 {current ? (
                     <Card className="p-4 text-center">
@@ -413,15 +507,10 @@ const EarnPage = ({ db, userId, type, setPage, showNotification }) => {
 const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
     const handlePurchase = async (pkg) => {
         try {
-            await runTransaction(db, async (tx) => {
-                tx.update(getProfileDocRef(userId), { points: increment(pkg.coins) });
-            });
+            await runTransaction(db, async (tx) => { tx.update(getProfileDocRef(userId), { points: increment(pkg.coins) }); });
             showNotification(`ទិញបានជោគជ័យ! +${formatNumber(pkg.coins)} coins`, 'success');
-        } catch (error) {
-            showNotification(`បរាជ័យ: ${error.message}`, 'error');
-        }
+        } catch (error) { showNotification(`បរាជ័យ: ${error.message}`, 'error'); }
     };
-
     return (
         <div className="min-h-screen bg-blue-900 pb-16 pt-20">
             <Header title="BUY COINS" onBack={() => setPage('DASHBOARD')} />
@@ -440,58 +529,33 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
     );
 };
 
-const BalanceDetailsPage = ({ setPage, userProfile }) => {
-    return (
-        <div className="min-h-screen bg-blue-900 pb-16 pt-20">
-            <Header title="MY BALANCE" onBack={() => setPage('DASHBOARD')} />
-            <main className="p-4 space-y-4">
-                <Card className="bg-gradient-to-r from-teal-600 to-teal-800 text-center p-6 text-white">
-                    <p className="text-sm opacity-80">សមតុល្យបច្ចុប្បន្ន</p>
-                    <div className="flex justify-center items-center mt-2">
-                        <Coins className="w-8 h-8 text-yellow-400 mr-2" />
-                        <span className="text-4xl font-extrabold">{formatNumber(userProfile.points)}</span>
-                    </div>
-                </Card>
-                <h3 className="text-white font-bold">ប្រវត្តិប្រតិបត្តិការ (Mock Data)</h3>
-                <Card className="p-4">
-                    <div className="space-y-3">
-                        {[
-                            { title: 'Daily Check-in', amount: 200, color: 'text-green-600' },
-                            { title: 'Watch Video', amount: 50, color: 'text-green-600' },
-                            { title: 'Buy Coins', amount: 5000, color: 'text-purple-600' },
-                            { title: 'Create Campaign', amount: -1500, color: 'text-red-600' },
-                        ].map((item, i) => (
-                            <div key={i} className="flex justify-between border-b pb-2 last:border-0">
-                                <span className="text-gray-800 font-medium">{item.title}</span>
-                                <span className={`font-bold ${item.color}`}>{item.amount > 0 ? '+' : ''}{item.amount}</span>
-                            </div>
-                        ))}
-                    </div>
-                </Card>
-            </main>
-        </div>
-    );
-};
+const BalanceDetailsPage = ({ setPage, userProfile }) => (
+    <div className="min-h-screen bg-blue-900 pb-16 pt-20">
+        <Header title="MY BALANCE" onBack={() => setPage('DASHBOARD')} />
+        <main className="p-4 space-y-4">
+            <Card className="bg-gradient-to-r from-teal-600 to-teal-800 text-center p-6 text-white">
+                <p className="text-sm opacity-80">សមតុល្យបច្ចុប្បន្ន</p>
+                <div className="flex justify-center items-center mt-2"><Coins className="w-8 h-8 text-yellow-400 mr-2" /><span className="text-4xl font-extrabold">{formatNumber(userProfile.points)}</span></div>
+            </Card>
+             <div className="text-center text-white mt-10 opacity-50">ប្រវត្តិប្រតិបត្តិការនឹងបង្ហាញនៅទីនេះ</div>
+        </main>
+    </div>
+);
 
-const WatchAdsPage = ({ db, userId, setPage, showNotification }) => {
+const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
     const [timer, setTimer] = useState(15);
     const [finished, setFinished] = useState(false);
+    const reward = globalConfig.adsReward || 30;
 
     useEffect(() => {
-        if (timer > 0) {
-            const interval = setInterval(() => setTimer(t => t - 1), 1000);
-            return () => clearInterval(interval);
-        } else {
-            setFinished(true);
-        }
+        if (timer > 0) { const interval = setInterval(() => setTimer(t => t - 1), 1000); return () => clearInterval(interval); } 
+        else setFinished(true);
     }, [timer]);
 
     const claimReward = async () => {
         try {
-            await runTransaction(db, async (tx) => {
-                tx.update(getProfileDocRef(userId), { points: increment(30) });
-            });
-            showNotification('ទទួលបាន 30 Coins!', 'success');
+            await runTransaction(db, async (tx) => { tx.update(getProfileDocRef(userId), { points: increment(reward) }); });
+            showNotification(`ទទួលបាន ${reward} Coins!`, 'success');
             setPage('DASHBOARD');
         } catch (e) { showNotification(e.message, 'error'); }
     };
@@ -502,16 +566,10 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification }) => {
             <div className="w-full h-64 bg-gray-800 flex items-center justify-center rounded-lg mb-6 border-2 border-yellow-500">
                 <div className="text-center">
                     <MonitorPlay className="w-16 h-16 text-yellow-500 mx-auto mb-2" />
-                    <p className="text-white">ADS SPACE</p>
+                    <p className="text-white">ADS ID: {globalConfig.adsSettings?.interstitialId || 'N/A'}</p>
                 </div>
             </div>
-            {finished ? (
-                <button onClick={claimReward} className="bg-green-500 text-white font-bold py-3 px-8 rounded-full text-xl shadow-lg animate-bounce">
-                    ទទួលរង្វាន់ (Claim)
-                </button>
-            ) : (
-                <div className="text-white text-xl">រង់ចាំ: {timer} វិនាទី</div>
-            )}
+            {finished ? <button onClick={claimReward} className="bg-green-500 text-white font-bold py-3 px-8 rounded-full text-xl shadow-lg animate-bounce">ទទួលរង្វាន់ (Claim)</button> : <div className="text-white text-xl">រង់ចាំ: {timer} វិនាទី</div>}
         </div>
     );
 };
@@ -521,17 +579,13 @@ const MyPlanPage = ({ setPage }) => (
         <Header title="MY PLAN" onBack={() => setPage('DASHBOARD')} />
         <main className="p-4">
             <Card className="p-6 text-center">
-                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckSquare className="w-10 h-10 text-teal-600" />
-                </div>
+                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4"><CheckSquare className="w-10 h-10 text-teal-600" /></div>
                 <h2 className="text-2xl font-bold text-gray-800">FREE PLAN</h2>
                 <p className="text-gray-500 mt-2">បច្ចុប្បន្នអ្នកកំពុងប្រើប្រាស់គម្រោងឥតគិតថ្លៃ។</p>
-                <div className="mt-6 space-y-3 text-left">
+                 <div className="mt-6 space-y-3 text-left">
                     <p className="flex items-center text-gray-700"><span className="mr-2 text-green-500">✔</span> មើលវីដេអូបាន</p>
                     <p className="flex items-center text-gray-700"><span className="mr-2 text-green-500">✔</span> ដាក់យុទ្ធនាការបាន</p>
-                    <p className="flex items-center text-gray-700"><span className="mr-2 text-green-500">✔</span> ដកប្រាក់ (មិនទាន់ដំណើរការ)</p>
                 </div>
-                <button className="mt-8 w-full bg-gray-300 text-gray-600 py-3 rounded-lg font-bold cursor-not-allowed">Upgrade (Soon)</button>
             </Card>
         </main>
     </div>
@@ -547,7 +601,6 @@ const App = () => {
     const [authPage, setAuthPage] = useState('LOGIN');
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
 
-    // ADMIN CONFIG: កំណត់ Email របស់អ្នកជា Admin តែម្នាក់គត់
     const ADMIN_EMAIL = "admin@gmail.com";
     const isAdmin = userProfile.email === ADMIN_EMAIL; 
 
@@ -626,14 +679,14 @@ const App = () => {
 
     let Content;
     switch (page) {
-        case 'EARN_POINTS': Content = <EarnPage db={db} userId={userId} type="view" setPage={setPage} showNotification={showNotification} />; break;
-        case 'EXPLORE_WEBSITE': Content = <EarnPage db={db} userId={userId} type="website" setPage={setPage} showNotification={showNotification} />; break;
-        case 'EXPLORE_SUBSCRIPTION': Content = <EarnPage db={db} userId={userId} type="sub" setPage={setPage} showNotification={showNotification} />; break;
+        case 'EARN_POINTS': Content = <EarnPage db={db} userId={userId} type="view" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
+        case 'EXPLORE_WEBSITE': Content = <EarnPage db={db} userId={userId} type="website" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
+        case 'EXPLORE_SUBSCRIPTION': Content = <EarnPage db={db} userId={userId} type="sub" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'MY_CAMPAIGNS': Content = <MyCampaignsPage db={db} userId={userId} userProfile={userProfile} setPage={setPage} showNotification={showNotification} />; break;
         case 'REFERRAL_PAGE': Content = <ReferralPage db={db} userId={userId} showNotification={showNotification} setPage={setPage} globalConfig={globalConfig} />; break;
         case 'BUY_COINS': Content = <BuyCoinsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'BALANCE_DETAILS': Content = <BalanceDetailsPage setPage={setPage} userProfile={userProfile} />; break;
-        case 'WATCH_ADS': Content = <WatchAdsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} />; break;
+        case 'WATCH_ADS': Content = <WatchAdsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'MY_PLAN': Content = <MyPlanPage setPage={setPage} />; break;
         case 'ADMIN_DASHBOARD': Content = <AdminDashboardPage db={db} setPage={setPage} showNotification={showNotification} />; break;
         default:
