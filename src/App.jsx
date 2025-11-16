@@ -16,7 +16,7 @@ import {
     Users, Coins, Video, Link, Globe, MonitorPlay, Zap,
     UserPlus, ChevronLeft, BookOpen, ShoppingCart,
     CalendarCheck, Target, Wallet, Film,
-    DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, Settings, Copy, Save, Search, PlusCircle, MinusCircle, CheckCircle
+    DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, Settings, Copy, Save, Search, PlusCircle, MinusCircle, CheckCircle, XCircle
 } from 'lucide-react';
 
 // --- Configuration ---
@@ -143,7 +143,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
 
     return (
         <div className="space-y-4">
-            {/* Rewards */}
             <Card className="p-4 border-l-4 border-yellow-400">
                 <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់</h3>
                 <div className="grid grid-cols-1 gap-3">
@@ -153,7 +152,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                 </div>
             </Card>
 
-            {/* Coin Packages Settings */}
             <Card className="p-4 border-l-4 border-green-500">
                 <h3 className="font-bold text-lg mb-3 text-green-400 flex items-center"><ShoppingCart className="w-5 h-5 mr-2"/> កំណត់កញ្ចប់កាក់ (Sell Coins)</h3>
                 <div className="space-y-3">
@@ -173,7 +171,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                 </div>
             </Card>
 
-            {/* Ads Settings */}
             <Card className="p-4 border-l-4 border-pink-500">
                 <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ Ads IDs</h3>
                 <div className="space-y-3">
@@ -339,7 +336,7 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
     );
 };
 
-// ... (User Pages - PURPLE THEMED) ...
+// ... (User Pages) ...
 
 const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) => {
     const [referrals, setReferrals] = useState([]);
@@ -381,7 +378,6 @@ const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) =
     );
 };
 
-// MODIFIED: MyCampaignsPage with CHECK Button
 const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification }) => {
     const [type, setType] = useState('view');
     const [link, setLink] = useState('');
@@ -407,7 +403,6 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     const handleCheckLink = (e) => {
         e.preventDefault();
         if(!link.trim()) return showNotification('សូមបញ្ចូល Link ជាមុនសិន', 'error');
-        // Simple check simulation
         setIsLinkVerified(true);
         showNotification('Link ត្រឹមត្រូវ!', 'success');
     };
@@ -435,7 +430,6 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                 transaction.set(newCampRef, { userId, type, link: link.trim(), costPerUnit: type === 'sub' ? 50 : 1, requiredDuration: type === 'sub' ? 60 : (parseInt(time) || 60), initialCount: parseInt(count), remaining: parseInt(count), totalCost: cost, createdAt: serverTimestamp(), isActive: true });
             });
             showNotification('ដាក់យុទ្ធនាការជោគជ័យ!', 'success');
-            // Reset form
             setLink('');
             setIsLinkVerified(false);
             setCount(10);
@@ -448,63 +442,27 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
             <main className="p-4 space-y-4">
                 <Card className="p-4">
                     <h2 className="font-bold text-lg mb-4 text-white">បង្កើតយុទ្ធនាការថ្មី</h2>
-                    
-                    {/* Type Selector */}
                     <div className="flex space-x-2 mb-4">
                         {['view', 'sub', 'website'].map(t => (
                             <button key={t} onClick={() => {setType(t); setIsLinkVerified(false);}} className={`flex-1 py-2 rounded font-bold ${type === t ? 'bg-teal-600 text-white' : 'bg-purple-900 text-purple-300'}`}>{t.toUpperCase()}</button>
                         ))}
                     </div>
-
                     <form onSubmit={isLinkVerified ? handleSubmit : handleCheckLink} className="space-y-3">
-                        
-                        {/* Link Input Section */}
                         <div className="flex space-x-2">
-                             <InputField 
-                                value={link} 
-                                onChange={e => {setLink(e.target.value); setIsLinkVerified(false);}} 
-                                placeholder="Paste your link here..." 
-                                required 
-                                disabled={isLinkVerified}
-                            />
-                             <button 
-                                type={isLinkVerified ? 'button' : 'submit'}
-                                onClick={isLinkVerified ? handleResetLink : undefined}
-                                className={`px-4 rounded font-bold text-white ${isLinkVerified ? 'bg-red-500' : 'bg-red-600'}`}
-                            >
-                                {isLinkVerified ? 'X' : 'CHECK'}
-                            </button>
+                             <InputField value={link} onChange={e => {setLink(e.target.value); setIsLinkVerified(false);}} placeholder="Paste your link here..." required disabled={isLinkVerified} />
+                             <button type={isLinkVerified ? 'button' : 'submit'} onClick={isLinkVerified ? handleResetLink : undefined} className={`px-4 rounded font-bold text-white ${isLinkVerified ? 'bg-red-500' : 'bg-red-600'}`}>{isLinkVerified ? 'X' : 'CHECK'}</button>
                         </div>
-
-                        {/* Settings Section (Only shows after CHECK) */}
                         {isLinkVerified && (
                             <div className='animate-fade-in'>
                                 <h3 className='text-white font-bold mt-4 mb-2 border-b border-purple-600 pb-1'>Campaigns Setting</h3>
-                                <div className="flex justify-between items-center mb-2">
-                                    <label className="text-sm text-teal-400 font-bold">Number of view</label>
-                                    <InputField type="number" value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value)))} className="w-24 text-center !bg-teal-800 !border-teal-600" />
-                                </div>
-                                {type !== 'sub' && (
-                                    <div className="flex justify-between items-center mb-4">
-                                        <label className="text-sm text-teal-400 font-bold">Time Required (sec.)</label>
-                                        <InputField type="number" value={time} onChange={e => setTime(Math.max(10, parseInt(e.target.value)))} className="w-24 text-center !bg-teal-800 !border-teal-600" />
-                                    </div>
-                                )}
-                                
-                                <div className="flex justify-between items-center mb-4 pt-2 border-t border-purple-600">
-                                     <label className="text-sm text-teal-400 font-bold">Campaign Cost</label>
-                                     <span className='text-xl font-bold text-yellow-400'>{formatNumber(calculateCost())}</span>
-                                </div>
-
-                                <button type="submit" disabled={isSubmitting} className="w-full bg-yellow-600 text-white py-3 rounded-full font-bold shadow-lg hover:bg-yellow-700 transition">
-                                    {isSubmitting ? 'Processing...' : 'DONE'}
-                                </button>
+                                <div className="flex justify-between items-center mb-2"><label className="text-sm text-teal-400 font-bold">Number of view</label><InputField type="number" value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value)))} className="w-24 text-center !bg-teal-800 !border-teal-600" /></div>
+                                {type !== 'sub' && (<div className="flex justify-between items-center mb-4"><label className="text-sm text-teal-400 font-bold">Time Required (sec.)</label><InputField type="number" value={time} onChange={e => setTime(Math.max(10, parseInt(e.target.value)))} className="w-24 text-center !bg-teal-800 !border-teal-600" /></div>)}
+                                <div className="flex justify-between items-center mb-4 pt-2 border-t border-purple-600"><label className="text-sm text-teal-400 font-bold">Campaign Cost</label><span className='text-xl font-bold text-yellow-400'>{formatNumber(calculateCost())}</span></div>
+                                <button type="submit" disabled={isSubmitting} className="w-full bg-yellow-600 text-white py-3 rounded-full font-bold shadow-lg hover:bg-yellow-700 transition">{isSubmitting ? 'Processing...' : 'DONE'}</button>
                             </div>
                         )}
                     </form>
                 </Card>
-
-                {/* History List */}
                 <div className="space-y-2">
                      <h3 className="text-white font-bold">ប្រវត្តិ ({userCampaigns.length})</h3>
                     {userCampaigns.map(c => (
@@ -519,6 +477,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     );
 };
 
+// MODIFIED: EarnPage with Auto Claim + Auto Next + Banner Ad
 const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
@@ -537,18 +496,19 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
 
     useEffect(() => { if (current) { setTimer(current.requiredDuration || 30); setClaimed(false); } }, [current]);
     
+    // AUTO CLAIM LOGIC
     useEffect(() => { 
         if (timer > 0) { 
             const interval = setInterval(() => setTimer(t => t - 1), 1000); 
             return () => clearInterval(interval); 
-        } else if (timer === 0 && !claimed && autoPlay && type === 'view') {
-             // Optional: Auto claim? No, user usually has to click. But we can Auto Next.
-             // For now, standard flow.
+        } else if (timer === 0 && !claimed && current) {
+            // Automatically trigger claim when timer hits 0
+            handleClaim();
         }
-    }, [timer, claimed, autoPlay, type]);
+    }, [timer, claimed, current]);
 
     const handleClaim = async () => {
-        if (timer > 0 || claimed) return;
+        if (claimed) return; // Prevent double claim
         setClaimed(true);
         try {
             await runTransaction(db, async (transaction) => {
@@ -558,18 +518,17 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                 transaction.update(getProfileDocRef(userId), { points: increment(current.requiredDuration || 50) });
                 transaction.update(campRef, { remaining: increment(-1) });
             });
-            showNotification('ទទួលបានពិន្ទុ!', 'success');
+            showNotification('Auto Claimed: Points Added!', 'success');
+            
+            // Open external link if needed
             if (type === 'website' || type === 'sub') window.open(current.link, '_blank');
             
-            if(autoPlay) {
-                 setTimeout(() => {
-                    const next = campaigns.filter(c => c.id !== current?.id && c.remaining > 0)[0];
-                    setCurrent(next || null);
-                 }, 1500);
-            } else {
+            // Auto Next with small delay
+            setTimeout(() => {
                 const next = campaigns.filter(c => c.id !== current?.id && c.remaining > 0)[0];
                 setCurrent(next || null);
-            }
+            }, 1500);
+
         } catch (e) { showNotification('បរាជ័យ: ' + e.message, 'error'); }
     };
 
@@ -578,11 +537,9 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
          setCurrent(next || null);
     }
 
-    // Auto play URL construction
     const getEmbedUrl = (link) => {
         if (link.includes('youtu')) {
              const id = link.split('v=')[1]?.split('&')[0] || link.split('/').pop();
-             // MODIFIED: Autoplay=1 and Mute=1 (browsers block autoplay with sound)
              return `https://www.youtube.com/embed/${id}?autoplay=1&mute=0&controls=0`; 
         }
         return link;
@@ -591,25 +548,19 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
     return (
         <div className="min-h-screen bg-purple-900 pb-16 pt-20">
             <Header title={type === 'view' ? 'មើលវីដេអូ' : type === 'website' ? 'មើល Website' : 'Subscribe'} onBack={() => setPage('DASHBOARD')} />
-            <main className="p-0"> {/* Full width for video */}
+            <main className="p-0">
                 {current ? (
                     <div className='flex flex-col h-full'>
                         {type === 'view' ? (
                             <div className="aspect-video bg-black w-full">
-                                <iframe 
-                                    src={getEmbedUrl(current.link)} 
-                                    className="w-full h-full" 
-                                    frameBorder="0" 
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                    allowFullScreen 
-                                />
+                                <iframe src={getEmbedUrl(current.link)} className="w-full h-full" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
                             </div>
                         ) : (
                             <div className="bg-purple-900 h-40 flex items-center justify-center border-b border-purple-700"><Globe className="w-16 h-16 text-purple-400" /></div>
                         )}
                         
                         <div className='p-4 bg-white rounded-t-3xl mt-[-20px] relative z-10 min-h-[50vh]'>
-                             <div className="flex justify-between items-center mb-6 px-4">
+                             <div className="flex justify-between items-center mb-4 px-4">
                                 <div className="text-center flex items-center text-xl font-bold text-yellow-500"><Coins className="w-6 h-6 mr-2" /> {current.requiredDuration}</div>
                                 <div className="text-center flex items-center text-xl font-bold text-red-500"><Zap className="w-6 h-6 mr-2" /> {timer}s</div>
                             </div>
@@ -623,10 +574,12 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                                 </button>
                             </div>
 
-                            <button onClick={handleClaim} disabled={timer > 0 || claimed} className={`w-full py-3 rounded-full font-bold text-white shadow-lg mb-4 ${timer > 0 || claimed ? 'bg-gray-400' : 'bg-green-500'}`}>
-                                {timer > 0 ? `Please wait ${timer}s` : 'CLAIM REWARD'}
-                            </button>
-                            
+                            {/* MOCK AD BANNER */}
+                            <div className="w-full bg-gray-200 h-20 flex flex-col items-center justify-center mb-4 border border-gray-400 rounded">
+                                <p className="text-xs text-gray-500 font-bold">SPONSORED AD</p>
+                                <p className="text-xs text-gray-400">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p>
+                            </div>
+
                             <button className="w-full py-3 bg-teal-500 text-white font-bold rounded-full shadow-md">WATCH VIDEO ADS</button>
                         </div>
                     </div>
