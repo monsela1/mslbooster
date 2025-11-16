@@ -477,7 +477,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     );
 };
 
-// MODIFIED: EarnPage with Auto Claim + Auto Next + Banner Ad
+// MODIFIED: EarnPage with Video Support for Subscriptions
 const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
@@ -540,6 +540,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
     const getEmbedUrl = (link) => {
         if (link.includes('youtu')) {
              const id = link.split('v=')[1]?.split('&')[0] || link.split('/').pop();
+             // MODIFIED: Autoplay=1 and Mute=1 (browsers block autoplay with sound)
              return `https://www.youtube.com/embed/${id}?autoplay=1&mute=0&controls=0`; 
         }
         return link;
@@ -551,7 +552,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
             <main className="p-0">
                 {current ? (
                     <div className='flex flex-col h-full'>
-                        {type === 'view' ? (
+                        {(type === 'view' || type === 'sub') ? (
                             <div className="aspect-video bg-black w-full">
                                 <iframe src={getEmbedUrl(current.link)} className="w-full h-full" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
                             </div>
