@@ -8,15 +8,15 @@ import {
     signOut
 } from 'firebase/auth';
 import {
-    getFirestore, doc, getDoc, setDoc, onSnapshot,
-    collection, query, where, serverTimestamp,
+    getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc,
+    collection, query, where, serverTimestamp, getDocs,
     runTransaction, increment
 } from 'firebase/firestore';
 import {
     Users, Coins, Video, Link, Globe, MonitorPlay, Zap,
     UserPlus, ChevronLeft, BookOpen, ShoppingCart,
     CalendarCheck, Target, Wallet, Film,
-    DollarSign, LogOut, Mail, Lock, CheckSquare
+    DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, Settings
 } from 'lucide-react';
 
 // --- Configuration ---
@@ -79,11 +79,11 @@ const Loading = () => (
 );
 
 const IconButton = ({ icon: Icon, title, onClick, iconColor = 'text-gray-600', textColor = 'text-gray-800' }) => (
-    <button onClick={onClick} className="flex flex-col items-center justify-start p-2 rounded-xl transition transform hover:scale-105 active:scale-95 w-full h-32">
-        <div className={`p-3 rounded-xl bg-gray-100 shadow-sm`}>
+    <button onClick={onClick} className="flex flex-col items-center justify-start p-2 rounded-xl transition transform hover:scale-105 active:scale-95 w-full h-32 bg-white shadow-sm">
+        <div className={`p-3 rounded-xl bg-gray-100 shadow-inner`}>
             <Icon className={`w-8 h-8 ${iconColor}`} />
         </div>
-        <span className={`mt-2 text-xs font-semibold text-center ${textColor} break-words`}>{title}</span>
+        <span className={`mt-2 text-xs font-bold text-center ${textColor} break-words leading-tight`}>{title}</span>
     </button>
 );
 
@@ -91,8 +91,8 @@ const Card = ({ children, className = '' }) => (
     <div className={`bg-white rounded-xl shadow-xl ${className}`}>{children}</div>
 );
 
-const Header = ({ title, onBack, className = '' }) => (
-    <header className={`flex items-center justify-between p-4 bg-teal-700 shadow-md text-white fixed top-0 w-full z-10 ${className}`}>
+const Header = ({ title, onBack, rightContent, className = '' }) => (
+    <header className={`flex items-center justify-between p-4 bg-teal-700 shadow-md text-white fixed top-0 w-full z-20 ${className}`}>
         <div className="flex items-center">
             {onBack && (
                 <button onClick={onBack} className="p-1 mr-2 rounded-full hover:bg-teal-600 transition">
@@ -101,6 +101,7 @@ const Header = ({ title, onBack, className = '' }) => (
             )}
             <h1 className="text-xl font-bold">{title}</h1>
         </div>
+        {rightContent}
     </header>
 );
 
@@ -178,23 +179,23 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                         ))}
                     </div>
                     <form onSubmit={handleSubmit} className="space-y-3">
-                        <input type="url" value={link} onChange={e => setLink(e.target.value)} placeholder="Link URL..." className="w-full p-2 border rounded" required />
+                        <input type="url" value={link} onChange={e => setLink(e.target.value)} placeholder="Link URL..." className="w-full p-3 border border-gray-300 rounded bg-white text-black" required />
                         <div className="flex justify-between space-x-2">
                             <div className="w-1/2">
-                                <label className="text-xs text-gray-500">ចំនួន (Count)</label>
-                                <input type="number" value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value)))} className="w-full p-2 border rounded" />
+                                <label className="text-xs text-gray-500 font-bold">ចំនួន (Count)</label>
+                                <input type="number" value={count} onChange={e => setCount(Math.max(1, parseInt(e.target.value)))} className="w-full p-3 border border-gray-300 rounded bg-white text-black" />
                             </div>
                             {type !== 'sub' && (
                                 <div className="w-1/2">
-                                    <label className="text-xs text-gray-500">ពេល (Sec)</label>
-                                    <input type="number" value={time} onChange={e => setTime(Math.max(10, parseInt(e.target.value)))} className="w-full p-2 border rounded" />
+                                    <label className="text-xs text-gray-500 font-bold">ពេល (Sec)</label>
+                                    <input type="number" value={time} onChange={e => setTime(Math.max(10, parseInt(e.target.value)))} className="w-full p-3 border border-gray-300 rounded bg-white text-black" />
                                 </div>
                             )}
                         </div>
-                        <div className="bg-yellow-100 p-2 rounded text-center font-bold text-yellow-800">
+                        <div className="bg-yellow-100 p-3 rounded text-center font-bold text-yellow-800 border border-yellow-300">
                             តម្លៃ: {formatNumber(calculateCost())} Coins
                         </div>
-                        <button type="submit" disabled={isSubmitting} className="w-full bg-teal-600 text-white py-3 rounded font-bold">
+                        <button type="submit" disabled={isSubmitting} className="w-full bg-teal-600 text-white py-3 rounded font-bold shadow-lg">
                             {isSubmitting ? 'កំពុងដាក់...' : 'ដាក់យុទ្ធនាការ'}
                         </button>
                     </form>
@@ -204,7 +205,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                     {userCampaigns.map(c => (
                         <div key={c.id} className="bg-white p-3 rounded shadow flex justify-between items-center">
                             <div className='w-2/3'>
-                                <p className="font-bold text-sm truncate">{c.link}</p>
+                                <p className="font-bold text-sm truncate text-gray-800">{c.link}</p>
                                 <p className="text-xs text-gray-500">{c.type.toUpperCase()} - នៅសល់: {c.remaining}</p>
                             </div>
                             <span className={`text-xs font-bold ${c.remaining > 0 ? 'text-green-600' : 'text-red-500'}`}>
@@ -277,18 +278,18 @@ const EarnPage = ({ db, userId, type, setPage, showNotification }) => {
                             <div className="bg-gray-100 h-32 flex items-center justify-center mb-4 rounded"><Globe className="w-10 h-10 text-gray-400" /></div>
                         )}
                         <div className="flex justify-around mb-4">
-                            <div className="text-center"><Coins className="w-6 h-6 mx-auto text-yellow-500" /><span className="font-bold">{current.requiredDuration} Pts</span></div>
-                            <div className="text-center"><Zap className="w-6 h-6 mx-auto text-red-500" /><span className="font-bold">{timer}s</span></div>
+                            <div className="text-center"><Coins className="w-6 h-6 mx-auto text-yellow-500" /><span className="font-bold text-gray-800">{current.requiredDuration} Pts</span></div>
+                            <div className="text-center"><Zap className="w-6 h-6 mx-auto text-red-500" /><span className="font-bold text-gray-800">{timer}s</span></div>
                         </div>
                         <button onClick={handleClaim} disabled={timer > 0 || claimed} className={`w-full py-3 rounded font-bold text-white ${timer > 0 || claimed ? 'bg-gray-400' : 'bg-green-500'}`}>{timer > 0 ? `រង់ចាំ ${timer}s` : 'ទទួលពិន្ទុ (Claim)'}</button>
                     </Card>
-                ) : <div className="text-white text-center mt-10">មិនមានយុទ្ធនាការទេ</div>}
+                ) : <div className="text-white text-center mt-10 text-xl">មិនមានយុទ្ធនាការទេ</div>}
             </main>
         </div>
     );
 };
 
-// 3. Buy Coins Page (New)
+// 3. Buy Coins Page
 const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
     const handlePurchase = async (pkg) => {
         try {
@@ -319,7 +320,7 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
     );
 };
 
-// 4. Balance Details Page (New)
+// 4. Balance Details Page
 const BalanceDetailsPage = ({ setPage, userProfile }) => {
     return (
         <div className="min-h-screen bg-blue-900 pb-16 pt-20">
@@ -353,7 +354,7 @@ const BalanceDetailsPage = ({ setPage, userProfile }) => {
     );
 };
 
-// 5. Watch Ads Page (New)
+// 5. Watch Ads Page
 const WatchAdsPage = ({ db, userId, setPage, showNotification }) => {
     const [timer, setTimer] = useState(15);
     const [finished, setFinished] = useState(false);
@@ -378,7 +379,7 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification }) => {
     };
 
     return (
-        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 z-50">
             <div className="text-white text-2xl font-bold mb-4">កំពុងមើលពាណិជ្ជកម្ម...</div>
             <div className="w-full h-64 bg-gray-800 flex items-center justify-center rounded-lg mb-6 border-2 border-yellow-500">
                 <div className="text-center">
@@ -397,7 +398,7 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification }) => {
     );
 };
 
-// 6. My Plan Page (New)
+// 6. My Plan Page
 const MyPlanPage = ({ setPage }) => (
     <div className="min-h-screen bg-blue-900 pb-16 pt-20">
         <Header title="MY PLAN" onBack={() => setPage('DASHBOARD')} />
@@ -419,6 +420,67 @@ const MyPlanPage = ({ setPage }) => (
     </div>
 );
 
+// 7. Admin Dashboard Page (NEWLY RESTORED)
+const AdminDashboardPage = ({ db, setPage, showNotification }) => {
+    const [users, setUsers] = useState([]);
+    const [campaigns, setCampaigns] = useState([]);
+    const [activeTab, setActiveTab] = useState('USERS');
+
+    // Fetch Users
+    useEffect(() => {
+        const fetch = async () => {
+            // This is a simplified fetch. In production, use pagination.
+            // Since we don't have a clear 'users' collection iteration without admin SDK,
+            // we rely on campaigns or manually known IDs. 
+            // FOR NOW: We will fetch all campaigns and extract unique users.
+            // Ideally, you should store all users in a 'public/data/users' collection if you want to list them.
+            // But let's just show Campaigns for now as it's fully functional.
+        };
+    }, [db]);
+
+    // Fetch Campaigns (Real-time)
+    useEffect(() => {
+        const q = query(getCampaignsCollectionRef());
+        return onSnapshot(q, (snap) => {
+            setCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+    }, [db]);
+
+    const handleDeleteCampaign = async (id) => {
+        if(!window.confirm('Are you sure?')) return;
+        try {
+            await updateDoc(doc(getCampaignsCollectionRef(), id), { remaining: 0, isActive: false });
+            showNotification('Deleted successfully', 'success');
+        } catch(e) { showNotification(e.message, 'error'); }
+    };
+
+    return (
+        <div className="min-h-screen bg-blue-900 pb-16 pt-20">
+            <Header title="ADMIN PANEL" onBack={() => setPage('DASHBOARD')} />
+            <main className="p-4">
+                <div className="flex space-x-2 mb-4">
+                    <button onClick={() => setActiveTab('CAMPAIGNS')} className={`flex-1 py-2 rounded font-bold ${activeTab === 'CAMPAIGNS' ? 'bg-teal-500 text-white' : 'bg-gray-200'}`}>Campaigns</button>
+                    {/* Users tab placeholder */}
+                </div>
+
+                {activeTab === 'CAMPAIGNS' && (
+                    <div className="space-y-2">
+                        {campaigns.map(c => (
+                            <div key={c.id} className="bg-white p-3 rounded shadow flex justify-between items-center">
+                                <div className='overflow-hidden'>
+                                    <p className="font-bold text-sm truncate text-gray-800 w-48">{c.link}</p>
+                                    <p className="text-xs text-gray-500">Rem: {c.remaining} | Type: {c.type}</p>
+                                </div>
+                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-100 text-red-600 rounded-full"><Trash2 size={18}/></button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </main>
+        </div>
+    );
+};
+
 // --- Main App Component ---
 const App = () => {
     const [page, setPage] = useState('DASHBOARD');
@@ -428,6 +490,10 @@ const App = () => {
     const [notification, setNotification] = useState(null);
     const [authPage, setAuthPage] = useState('LOGIN');
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
+
+    // ADMIN LOGIC: For now, everyone is Admin so you can test.
+    // Change this later to: const isAdmin = userProfile.email === 'your-email@gmail.com';
+    const isAdmin = true; 
 
     const showNotification = useCallback((msg, type = 'info') => {
         setNotification({ message: msg, type });
@@ -513,13 +579,23 @@ const App = () => {
         case 'BALANCE_DETAILS': Content = <BalanceDetailsPage setPage={setPage} userProfile={userProfile} />; break;
         case 'WATCH_ADS': Content = <WatchAdsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} />; break;
         case 'MY_PLAN': Content = <MyPlanPage setPage={setPage} />; break;
+        case 'ADMIN_DASHBOARD': Content = <AdminDashboardPage db={db} setPage={setPage} showNotification={showNotification} />; break;
         default:
             Content = (
                 <div className="min-h-screen bg-blue-900 pb-16 pt-20">
-                    <Header title="We4u App" className="z-20" />
-                    <div className="absolute top-3 right-4 z-30">
-                        <button onClick={handleLogout} className="bg-red-500 text-white text-xs px-3 py-1 rounded shadow">Logout</button>
-                    </div>
+                    <Header 
+                        title="We4u App" 
+                        className="z-20" 
+                        rightContent={
+                            <div className="flex space-x-2">
+                                {isAdmin && (
+                                    <button onClick={() => setPage('ADMIN_DASHBOARD')} className="bg-red-500 text-white p-1 rounded shadow"><Settings size={20}/></button>
+                                )}
+                                <button onClick={handleLogout} className="bg-gray-600 text-white p-1 rounded shadow"><LogOut size={20}/></button>
+                            </div>
+                        }
+                    />
+                    
                     <div className="px-4 mb-6">
                         <div className="bg-gradient-to-r from-teal-500 to-teal-700 rounded-xl p-6 text-white shadow-lg text-center relative overflow-hidden">
                             <div className="absolute -top-4 -left-4 w-16 h-16 bg-white opacity-10 rounded-full"></div>
@@ -558,8 +634,8 @@ const AuthForm = ({ onSubmit, btnText }) => {
     const [pass, setPass] = useState('');
     return (
         <form onSubmit={(e) => { e.preventDefault(); onSubmit(email, pass); }} className="space-y-3">
-            <input className="w-full p-3 border rounded" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
-            <input className="w-full p-3 border rounded" type="password" placeholder="Password" value={pass} onChange={e => setPass(e.target.value)} required />
+            <input className="w-full p-3 border border-gray-300 rounded bg-white text-black" type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} required />
+            <input className="w-full p-3 border border-gray-300 rounded bg-white text-black" type="password" placeholder="Password" value={pass} onChange={e => setPass(e.target.value)} required />
             <button className="w-full bg-teal-600 text-white p-3 rounded font-bold hover:bg-teal-700">{btnText}</button>
         </form>
     );
