@@ -16,7 +16,7 @@ import {
     Users, Coins, Video, Link, Globe, MonitorPlay, Zap,
     UserPlus, ChevronLeft, BookOpen, ShoppingCart,
     CalendarCheck, Target, Wallet, Film,
-    DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, Settings
+    DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, Settings, Copy
 } from 'lucide-react';
 
 // --- Configuration ---
@@ -107,7 +107,129 @@ const Header = ({ title, onBack, rightContent, className = '' }) => (
 
 // --- PAGE COMPONENTS ---
 
-// 1. Campaigns Page
+// 1. Referral Page (FIXED UI)
+const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) => {
+    const [referrals, setReferrals] = useState([]);
+    const shortId = getShortId(userId);
+
+    useEffect(() => {
+        if (!db || !userId) return;
+        const q = query(getReferralCollectionRef(), where('referrerId', '==', userId));
+        onSnapshot(q, (snap) => {
+            setReferrals(snap.docs.map(d => d.data()));
+        });
+    }, [db, userId]);
+
+    return (
+        <div className="min-h-screen bg-blue-900 pb-16 pt-20">
+            <Header title="ណែនាំមិត្ត" onBack={() => setPage('DASHBOARD')} />
+            <main className="p-4 space-y-4">
+                <Card className="p-6 text-center bg-yellow-50 border-2 border-yellow-400">
+                    <h3 className="font-bold text-gray-800 text-lg">កូដណែនាំរបស់អ្នក</h3>
+                    <div className="text-4xl font-mono font-extrabold text-red-600 my-4 tracking-widest bg-white p-2 rounded-lg shadow-inner">
+                        {shortId}
+                    </div>
+                    <p className="text-sm text-gray-700 font-medium">ចែករំលែកកូដនេះដើម្បីទទួលបាន <span className='text-green-600 font-bold'>{formatNumber(globalConfig.referrerReward)} ពិន្ទុ!</span></p>
+                    
+                    <button 
+                        onClick={() => {navigator.clipboard.writeText(shortId); showNotification('ចម្លងរួចរាល់!', 'success')}} 
+                        className="mt-5 bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-full text-sm font-bold flex items-center justify-center mx-auto shadow-lg active:scale-95 transition"
+                    >
+                        <Copy className='w-4 h-4 mr-2'/> ចម្លងកូដ
+                    </button>
+                </Card>
+
+                <Card className="p-4">
+                    <h3 className="font-bold mb-4 text-gray-800 border-b pb-2">បញ្ជីអ្នកដែលបានណែនាំ ({referrals.length})</h3>
+                    <div className="max-h-80 overflow-y-auto space-y-2">
+                        {referrals.length > 0 ? referrals.map((r, i) => (
+                            <div key={i} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
+                                <div className='flex items-center'>
+                                    <div className='w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold mr-3'>{i+1}</div>
+                                    <span className="text-gray-800 font-semibold">{r.referredName || 'User'}</span>
+                                </div>
+                                <span className="text-green-600 font-bold flex items-center">+{formatNumber(r.reward)} <Coins className='w-3 h-3 ml-1'/></span>
+                            </div>
+                        )) : (
+                            <div className="text-center py-8">
+                                <Users className='w-12 h-12 text-gray-300 mx-auto mb-2'/>
+                                <p className="text-gray-500 font-medium">មិនទាន់មានការណែនាំ</p>
+                            </div>
+                        )}
+                    </div>
+                </Card>
+            </main>
+        </div>
+    );
+};
+
+// 7. Admin Dashboard Page (FIXED EMPTY STATE)
+const AdminDashboardPage = ({ db, setPage, showNotification }) => {
+    const [campaigns, setCampaigns] = useState([]);
+    const [activeTab, setActiveTab] = useState('CAMPAIGNS');
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        const q = query(getCampaignsCollectionRef());
+        return onSnapshot(q, (snap) => {
+            const camps = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            // Filter only active campaigns if you want, or show all
+            setCampaigns(camps);
+            setLoading(false);
+        });
+    }, [db]);
+
+    const handleDeleteCampaign = async (id) => {
+        if(!window.confirm('Are you sure you want to stop this campaign?')) return;
+        try {
+            await updateDoc(doc(getCampaignsCollectionRef(), id), { remaining: 0, isActive: false });
+            showNotification('Campaign stopped successfully', 'success');
+        } catch(e) { showNotification(e.message, 'error'); }
+    };
+
+    return (
+        <div className="min-h-screen bg-blue-900 pb-16 pt-20">
+            <Header title="ADMIN PANEL" onBack={() => setPage('DASHBOARD')} />
+            <main className="p-4">
+                <div className="flex space-x-2 mb-4">
+                    <button className="flex-1 py-2 rounded-lg font-bold bg-teal-500 text-white shadow-md">Campaigns Management</button>
+                </div>
+
+                {loading ? (
+                    <div className='text-white text-center mt-10'>កំពុងផ្ទុកទិន្នន័យ...</div>
+                ) : campaigns.length === 0 ? (
+                     <div className="text-center mt-20 opacity-70">
+                        <MonitorPlay className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                        <p className="text-white text-lg font-semibold">មិនទាន់មានយុទ្ធនាការណាមួយទេ</p>
+                        <p className="text-gray-400 text-sm">សាកល្បងបង្កើតយុទ្ធនាការថ្មី</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {campaigns.map(c => (
+                            <div key={c.id} className={`bg-white p-3 rounded-lg shadow-md flex justify-between items-center border-l-4 ${c.remaining > 0 ? 'border-green-500' : 'border-red-500'}`}>
+                                <div className='overflow-hidden'>
+                                    <p className="font-bold text-sm truncate text-gray-800 w-48">{c.link}</p>
+                                    <div className='flex space-x-2 text-xs mt-1'>
+                                        <span className='bg-gray-200 px-2 py-0.5 rounded text-gray-700'>{c.type.toUpperCase()}</span>
+                                        <span className={`${c.remaining > 0 ? 'text-green-600' : 'text-red-600'} font-bold`}>
+                                            {c.remaining > 0 ? `Active: ${c.remaining}` : 'Finished'}
+                                        </span>
+                                    </div>
+                                </div>
+                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition">
+                                    <Trash2 size={18}/>
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </main>
+        </div>
+    );
+};
+
+// ... (Other pages remain standard, listed below for completeness) ...
+
 const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification }) => {
     const [type, setType] = useState('view');
     const [link, setLink] = useState('');
@@ -219,7 +341,6 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     );
 };
 
-// 2. Earn Points Page
 const EarnPage = ({ db, userId, type, setPage, showNotification }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
@@ -289,7 +410,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification }) => {
     );
 };
 
-// 3. Buy Coins Page
 const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
     const handlePurchase = async (pkg) => {
         try {
@@ -320,7 +440,6 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
     );
 };
 
-// 4. Balance Details Page
 const BalanceDetailsPage = ({ setPage, userProfile }) => {
     return (
         <div className="min-h-screen bg-blue-900 pb-16 pt-20">
@@ -354,7 +473,6 @@ const BalanceDetailsPage = ({ setPage, userProfile }) => {
     );
 };
 
-// 5. Watch Ads Page
 const WatchAdsPage = ({ db, userId, setPage, showNotification }) => {
     const [timer, setTimer] = useState(15);
     const [finished, setFinished] = useState(false);
@@ -398,7 +516,6 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification }) => {
     );
 };
 
-// 6. My Plan Page
 const MyPlanPage = ({ setPage }) => (
     <div className="min-h-screen bg-blue-900 pb-16 pt-20">
         <Header title="MY PLAN" onBack={() => setPage('DASHBOARD')} />
@@ -419,52 +536,6 @@ const MyPlanPage = ({ setPage }) => (
         </main>
     </div>
 );
-
-// 7. Admin Dashboard Page (NEWLY RESTORED)
-const AdminDashboardPage = ({ db, setPage, showNotification }) => {
-    const [campaigns, setCampaigns] = useState([]);
-    const [activeTab, setActiveTab] = useState('CAMPAIGNS');
-
-    useEffect(() => {
-        const q = query(getCampaignsCollectionRef());
-        return onSnapshot(q, (snap) => {
-            setCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        });
-    }, [db]);
-
-    const handleDeleteCampaign = async (id) => {
-        if(!window.confirm('Are you sure?')) return;
-        try {
-            await updateDoc(doc(getCampaignsCollectionRef(), id), { remaining: 0, isActive: false });
-            showNotification('Deleted successfully', 'success');
-        } catch(e) { showNotification(e.message, 'error'); }
-    };
-
-    return (
-        <div className="min-h-screen bg-blue-900 pb-16 pt-20">
-            <Header title="ADMIN PANEL" onBack={() => setPage('DASHBOARD')} />
-            <main className="p-4">
-                <div className="flex space-x-2 mb-4">
-                    <button onClick={() => setActiveTab('CAMPAIGNS')} className={`flex-1 py-2 rounded font-bold ${activeTab === 'CAMPAIGNS' ? 'bg-teal-500 text-white' : 'bg-gray-200'}`}>Campaigns</button>
-                </div>
-
-                {activeTab === 'CAMPAIGNS' && (
-                    <div className="space-y-2">
-                        {campaigns.map(c => (
-                            <div key={c.id} className="bg-white p-3 rounded shadow flex justify-between items-center">
-                                <div className='overflow-hidden'>
-                                    <p className="font-bold text-sm truncate text-gray-800 w-48">{c.link}</p>
-                                    <p className="text-xs text-gray-500">Rem: {c.remaining} | Type: {c.type}</p>
-                                </div>
-                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-100 text-red-600 rounded-full"><Trash2 size={18}/></button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </main>
-        </div>
-    );
-};
 
 // --- Main App Component ---
 const App = () => {
