@@ -70,6 +70,7 @@ const getShortCodeDocRef = (shortId) => db && shortId ? doc(db, 'artifacts', app
 const defaultGlobalConfig = {
     dailyCheckinReward: 200,
     referrerReward: 1000,
+    referredBonus: 500,
     adsReward: 30,
     maxDailyAds: 15,
     adsSettings: {
@@ -160,6 +161,7 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                 <div className="grid grid-cols-1 gap-3">
                     <div><label className="text-xs font-bold text-purple-300">Daily Check-in Points</label><InputField name="dailyCheckinReward" type="number" value={config.dailyCheckinReward} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" value={config.referrerReward} onChange={handleChange} /></div>
+                     <div><label className="text-xs font-bold text-purple-300">Referred Bonus (New User)</label><InputField name="referredBonus" type="number" value={config.referredBonus} onChange={handleChange} /></div>
                      <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" value={config.adsReward} onChange={handleChange} /></div>
                 </div>
             </Card>
@@ -186,8 +188,9 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
             <Card className="p-4 border-l-4 border-pink-500">
                 <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ Ads IDs</h3>
                 <div className="space-y-3">
+                     <div><label className="text-xs font-bold text-purple-300">Max Ads Per Day</label><InputField name="maxDailyAds" type="number" value={config.maxDailyAds} onChange={handleChange} /></div>
                      <div><label className="text-xs font-bold text-purple-300">Banner ID</label><InputField name="bannerId" type="text" value={config.adsSettings?.bannerId || ''} onChange={handleAdsChange} /></div>
-                    <div><label className="text-xs font-bold text-purple-300">Interstitial/Video ID</label><InputField name="interstitialId" type="text" value={config.adsSettings?.interstitialId || ''} onChange={handleAdsChange} /></div>
+                     <div><label className="text-xs font-bold text-purple-300">Interstitial/Video ID</label><InputField name="interstitialId" type="text" value={config.adsSettings?.interstitialId || ''} onChange={handleAdsChange} /></div>
                 </div>
             </Card>
 
@@ -198,7 +201,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     );
 };
 
-// --- MODIFIED: USER MANAGER TAB WITH USER LIST ---
 const AdminUserManagerTab = ({ db, showNotification }) => {
     const [searchId, setSearchId] = useState('');
     const [foundUser, setFoundUser] = useState(null);
@@ -326,7 +328,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
 const AdminDashboardPage = ({ db, setPage, showNotification }) => {
     const [activeTab, setActiveTab] = useState('SETTINGS');
     const [config, setConfig] = useState(null);
-    const [campaigns, setCampaigns] = useState([]);
+    const [campaigns, setCampaigns] =useState([]);
 
     useEffect(() => {
         const fetchConfig = async () => {
@@ -408,6 +410,9 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
 
 const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) => {
     const [referrals, setReferrals] = useState([]);
+    const [referrer, setReferrer] = useState(null);
+    const [isEnteringCode, setIsEnteringCode] = useState(false);
+    const [inputCode, setInputCode] = useState('');
     const shortId = getShortId(userId);
 
     useEffect(() => {
@@ -416,12 +421,76 @@ const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) =
         onSnapshot(q, (snap) => {
             setReferrals(snap.docs.map(d => d.data()));
         });
+
+        // Check if user already has a referrer
+        getDoc(getProfileDocRef(userId)).then(doc => {
+            if (doc.exists() && doc.data().referredBy) {
+                setReferrer(doc.data().referredBy);
+            }
+        });
     }, [db, userId]);
+
+    const handleEnterCode = async () => {
+        if (inputCode.toUpperCase() === shortId) return showNotification('មិនអាចដាក់កូដខ្លួនឯងបានទេ', 'error');
+        if (inputCode.length !== 6) return showNotification('កូដត្រូវមាន ៦ ខ្ទង់', 'error');
+
+        try {
+            await runTransaction(db, async (tx) => {
+                // 1. Get Referrer ID
+                const shortCodeRef = getShortCodeDocRef(inputCode.toUpperCase());
+                const shortDoc = await tx.get(shortCodeRef);
+                if (!shortDoc.exists()) throw new Error("កូដមិនត្រឹមត្រូវ");
+                const referrerId = shortDoc.data().fullUserId;
+
+                // 2. Check if already referred (Double Check)
+                const myProfileRef = getProfileDocRef(userId);
+                const myProfile = await tx.get(myProfileRef);
+                if(myProfile.data().referredBy) throw new Error("អ្នកបានដាក់កូដរួចហើយ");
+
+                // 3. Reward Referrer
+                tx.update(getProfileDocRef(referrerId), { points: increment(globalConfig.referrerReward) });
+                
+                // 4. Reward User (Bonus)
+                tx.update(myProfileRef, { 
+                    points: increment(globalConfig.referredBonus),
+                    referredBy: inputCode.toUpperCase()
+                });
+
+                // 5. Record
+                const refRecord = doc(getReferralCollectionRef());
+                tx.set(refRecord, { referrerId, referredId: userId, referredName: myProfile.data().userName, reward: globalConfig.referrerReward, createdAt: serverTimestamp() });
+            });
+            showNotification(`ជោគជ័យ! ទទួលបាន ${globalConfig.referredBonus} ពិន្ទុ`, 'success');
+            setReferrer(inputCode.toUpperCase());
+            setIsEnteringCode(false);
+        } catch (e) { showNotification(e.message, 'error'); }
+    };
 
     return (
         <div className="min-h-screen bg-purple-900 pb-16 pt-20">
             <Header title="ណែនាំមិត្ត" onBack={() => setPage('DASHBOARD')} />
             <main className="p-4 space-y-4">
+                {/* Enter Code Section */}
+                {!referrer ? (
+                    <Card className="p-4 bg-teal-800 border-teal-600">
+                        <h3 className="font-bold text-white mb-2">បញ្ចូលកូដអ្នកណែនាំ</h3>
+                        {isEnteringCode ? (
+                            <div className="flex space-x-2">
+                                <InputField value={inputCode} onChange={e => setInputCode(e.target.value.toUpperCase())} placeholder="CODE (6 Digits)" maxLength={6} className="uppercase text-center" />
+                                <button onClick={handleEnterCode} className="bg-yellow-500 text-black font-bold px-4 rounded">OK</button>
+                            </div>
+                        ) : (
+                            <button onClick={() => setIsEnteringCode(true)} className="text-sm text-teal-200 underline">
+                                ចុចទីនេះដើម្បីដាក់កូដ និងទទួល {formatNumber(globalConfig.referredBonus)} ពិន្ទុ
+                            </button>
+                        )}
+                    </Card>
+                ) : (
+                    <div className="bg-green-800 p-3 rounded text-green-200 text-sm text-center border border-green-600">
+                        អ្នកត្រូវបានណែនាំដោយ: <span className="font-bold text-white">{referrer}</span>
+                    </div>
+                )}
+
                 <Card className="p-6 text-center bg-purple-800 border-2 border-yellow-500/50">
                     <h3 className="font-bold text-white text-lg">កូដណែនាំរបស់អ្នក</h3>
                     <div className="text-4xl font-mono font-extrabold text-yellow-400 my-4 tracking-widest bg-purple-900 p-2 rounded-lg shadow-inner">{shortId}</div>
@@ -902,8 +971,10 @@ const App = () => {
     const [authPage, setAuthPage] = useState('LOGIN');
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
 
-    const ADMIN_EMAIL = "admin@gmail.com";
-    const isAdmin = userProfile.email === ADMIN_EMAIL; 
+    // --- ADMIN SECURITY (USING UID) ---
+    // ដាក់ User ID របស់ Admin ជំនួស Email
+    const ADMIN_UID = "48wx8GPZbVYSxmfws1MxbuEOzsE3"; // <--- UID របស់អ្នកត្រូវបានដាក់នៅទីនេះ
+    const isAdmin = userId === ADMIN_UID; 
 
     const showNotification = useCallback((msg, type = 'info') => {
         setNotification({ message: msg, type });
@@ -913,8 +984,20 @@ const App = () => {
     useEffect(() => {
         if (!auth) return;
         return onAuthStateChanged(auth, (user) => {
-            if (user) setUserId(user.uid);
-            else { setUserId(null); setPage('DASHBOARD'); }
+            if (user) {
+                setUserId(user.uid);
+                // Check if daily status doc exists, if not, create it
+                (async () => {
+                    const dailyRef = getDailyStatusDocRef(user.uid);
+                    const docSnap = await getDoc(dailyRef);
+                    if (!docSnap.exists()) {
+                        await setDoc(dailyRef, { date: getTodayDateKey(), checkinDone: false, adsWatchedCount: 0 });
+                    }
+                })();
+            } else { 
+                setUserId(null); 
+                setPage('DASHBOARD'); 
+            }
             setIsAuthReady(true);
         });
     }, []);
@@ -922,7 +1005,23 @@ const App = () => {
     useEffect(() => {
         if (!db || !userId) return;
         return onSnapshot(getProfileDocRef(userId), (doc) => {
-            if (doc.exists()) setUserProfile({ ...doc.data(), id: userId });
+            if (doc.exists()) {
+                // Check daily status when profile loads
+                (async () => {
+                    const dailyRef = getDailyStatusDocRef(userId);
+                    const dailySnap = await getDoc(dailyRef);
+                    const today = getTodayDateKey();
+                    let dailyData = { checkinDone: false, adsWatchedCount: 0 };
+
+                    if (dailySnap.exists() && dailySnap.data().date === today) {
+                        dailyData = dailySnap.data();
+                    } else {
+                        // Reset for new day
+                        await setDoc(dailyRef, { date: today, checkinDone: false, adsWatchedCount: 0 });
+                    }
+                    setUserProfile({ ...doc.data(), id: userId, ...dailyData });
+                })();
+            }
         });
     }, [db, userId]);
 
@@ -954,10 +1053,18 @@ const App = () => {
                     const shortDoc = await getDoc(getShortCodeDocRef(referralCode));
                     if (shortDoc.exists()) {
                         referrerId = shortDoc.data().fullUserId;
-                        // Give bonus to referrer immediately (optional, or do it later)
-                        updateDoc(getProfileDocRef(referrerId), { points: increment(globalConfig.referrerReward) });
-                        // Increase bonus for new user
-                        bonusPoints += (globalConfig.referredBonus || 0);
+                        
+                        // Check for self-referral
+                        if (referrerId === uid) {
+                            showNotification("Cannot refer yourself", "error");
+                            referrerId = null; // Nullify if self-referral
+                        } else {
+                            // If valid, reward referrer and add bonus
+                            await updateDoc(getProfileDocRef(referrerId), { points: increment(globalConfig.referrerReward) });
+                            bonusPoints += (globalConfig.referredBonus || 0);
+                        }
+                    } else {
+                        showNotification("Referral code not found", "error");
                     }
                 } catch(e) { console.error("Referral error", e); }
             }
@@ -975,38 +1082,29 @@ const App = () => {
             await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
             showNotification('ចុះឈ្មោះជោគជ័យ!', 'success');
 
-        } catch (e) { showNotification('បរាជ័យ: ' + e.code, 'error'); }
+        } catch (e) { 
+            showNotification('បរាជ័យ: ' + e.code, 'error');
+            console.error(e);
+        }
     };
 
     const handleLogout = async () => { await signOut(auth); showNotification('បានចាកចេញ', 'success'); };
 
     const handleDailyCheckin = async () => {
-        // Check local status immediately to prevent multiple clicks
-        if (userProfile.dailyCheckin) {
-             showNotification('បាន Check-in រួចហើយ!', 'info');
-             return;
-        }
-
+        if (userProfile.dailyCheckin) return showNotification('បាន Check-in រួចហើយ!', 'info');
         try {
             await runTransaction(db, async (tx) => {
-                // Read inside transaction for consistency
                 const dailyRef = getDailyStatusDocRef(userId);
                 const dailyDoc = await tx.get(dailyRef);
-                
-                if (dailyDoc.exists() && dailyDoc.data().checkinDone) {
-                    throw new Error("Already checked in today");
-                }
+                if (dailyDoc.exists() && dailyDoc.data().checkinDone) throw new Error("Already checked in today");
 
                 tx.update(getProfileDocRef(userId), { points: increment(globalConfig.dailyCheckinReward) });
                 tx.set(dailyRef, { checkinDone: true, date: getTodayDateKey() }, { merge: true });
             });
             showNotification('Check-in ជោគជ័យ!', 'success');
         } catch (e) { 
-            console.error(e); 
-            // Only show error if it wasn't the "already checked in" one, or just show info
-            if (e.message === "Already checked in today") {
-                showNotification('បាន Check-in រួចហើយ!', 'info');
-            }
+            if (e.message === "Already checked in today") showNotification('បាន Check-in រួចហើយ!', 'info');
+            else console.error(e);
         }
     };
 
