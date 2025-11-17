@@ -5,7 +5,9 @@ import {
     onAuthStateChanged,
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
-    signOut
+    signOut,
+    GoogleAuthProvider, // <--- IMPORT ថ្មី
+    signInWithPopup     // <--- IMPORT ថ្មី
 } from 'firebase/auth';
 import {
     getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc,
@@ -153,7 +155,7 @@ const InputField = (props) => (
     />
 );
 
-// --- NEW COMPONENT: Selection Modal (Like the Screenshot) ---
+// --- COMPONENTS ---
 const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
     if (!isOpen) return null;
     return (
@@ -782,7 +784,6 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                                 <div className='mt-4 space-y-4'>
                                     <h3 className='text-white font-bold text-sm border-b border-gray-600 pb-2'>Campaigns Setting</h3>
                                    
-                                    {/* MODIFIED: Selection for Views */}
                                     <div className="flex justify-between items-center mb-2">
                                         <label className="text-white font-bold text-sm">Number of views</label>
                                         <div 
@@ -793,7 +794,6 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                                         </div>
                                     </div>
 
-                                    {/* MODIFIED: Selection for Seconds */}
                                     {type !== 'sub' && (
                                         <div className="flex justify-between items-center mb-4">
                                             <label className="text-white font-bold text-sm">Time Required (sec.)</label>
@@ -830,7 +830,6 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                     </div>
                 </div>
 
-                {/* PICKER MODALS */}
                 <SelectionModal 
                     isOpen={showViewPicker} 
                     onClose={() => setShowViewPicker(false)} 
@@ -873,7 +872,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
             setCampaigns(list);
             if (!current && list.length > 0) setCurrent(list[0]);
         });
-    }, [db, userId, type]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [db, userId, type]); 
 
     useEffect(() => {
         if (current) { setTimer(current.requiredDuration || 30); setClaimed(false); }
@@ -889,7 +888,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
             if (type !== 'sub') handleClaim();
         }
         return () => clearInterval(interval);
-    }, [timer, claimed, current, type]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [timer, claimed, current, type]);
 
     const handleClaim = async () => {
         if (claimed || !current) return;
@@ -1201,8 +1200,8 @@ const MyPlanPage = ({ setPage }) => (
     </div>
 );
 
-// --- 7. AUTH COMPONENT ---
-const AuthForm = ({ onSubmit, btnText, isRegister = false }) => {
+// --- 7. AUTH COMPONENT (Updated with Google Login) ---
+const AuthForm = ({ onSubmit, btnText, isRegister = false, onGoogleLogin }) => {
     const [email, setEmail] = useState('');
     const [pass, setPass] = useState('');
     const [username, setUsername] = useState('');
@@ -1214,29 +1213,52 @@ const AuthForm = ({ onSubmit, btnText, isRegister = false }) => {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-4">
-             {isRegister && (
-                 <div className="relative">
-                    <User className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input type="text" placeholder="ឈ្មោះ (Username)" value={username} onChange={e => setUsername(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" />
+        <div className="space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
+                 {isRegister && (
+                     <div className="relative">
+                        <User className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input type="text" placeholder="ឈ្មោះ (Username)" value={username} onChange={e => setUsername(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" />
+                    </div>
+                )}
+                <div className="relative">
+                    <Mail className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input type="email" placeholder="អ៊ីមែល (Email)" value={email} onChange={e => setEmail(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" />
                 </div>
-            )}
-            <div className="relative">
-                <Mail className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input type="email" placeholder="អ៊ីមែល (Email)" value={email} onChange={e => setEmail(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" />
-            </div>
-            <div className="relative">
-                <Lock className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input type="password" placeholder="ពាក្យសម្ងាត់ (Password)" value={pass} onChange={e => setPass(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" />
-            </div>
-             {isRegister && (
-                 <div className="relative">
-                    <UserPlus className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input type="text" placeholder="កូដអ្នកណែនាំ (Optional)" value={referralCode} onChange={e => setReferralCode(e.target.value.toUpperCase())} maxLength={6} className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400 uppercase" />
+                <div className="relative">
+                    <Lock className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input type="password" placeholder="ពាក្យសម្ងាត់ (Password)" value={pass} onChange={e => setPass(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" />
                 </div>
-            )}
-            <button type="submit" className="w-full bg-teal-500 text-white p-3 rounded font-bold hover:bg-teal-600 transition shadow-lg">{btnText}</button>
-        </form>
+                 {isRegister && (
+                     <div className="relative">
+                        <UserPlus className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input type="text" placeholder="កូដអ្នកណែនាំ (Optional)" value={referralCode} onChange={e => setReferralCode(e.target.value.toUpperCase())} maxLength={6} className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400 uppercase" />
+                    </div>
+                )}
+                <button type="submit" className="w-full bg-teal-500 text-white p-3 rounded font-bold hover:bg-teal-600 transition shadow-lg">{btnText}</button>
+            </form>
+
+            <div className="flex items-center justify-center space-x-2 my-4">
+                <div className="h-px bg-purple-600 flex-1"></div>
+                <span className="text-purple-300 text-xs">OR</span>
+                <div className="h-px bg-purple-600 flex-1"></div>
+            </div>
+            
+            {/* GOOGLE SIGN IN BUTTON */}
+            <button 
+                onClick={onGoogleLogin} 
+                className="w-full bg-white text-gray-800 p-3 rounded font-bold hover:bg-gray-100 transition shadow-lg flex items-center justify-center"
+            >
+                {/* Google SVG Icon */}
+                <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+                </svg>
+                បន្តជាមួយប្រើ Google
+            </button>
+        </div>
     );
 };
 
@@ -1329,6 +1351,46 @@ const App = () => {
         } catch (e) { showNotification('បរាជ័យ: ' + e.code, 'error'); }
     };
 
+    // --- NEW: GOOGLE LOGIN HANDLER ---
+    const handleGoogleLogin = async () => {
+        try {
+            const provider = new GoogleAuthProvider();
+            const result = await signInWithPopup(auth, provider);
+            const user = result.user;
+            const uid = user.uid;
+
+            // Check if user profile already exists in Firestore
+            const userDocRef = getProfileDocRef(uid);
+            const userDoc = await getDoc(userDocRef);
+
+            if (!userDoc.exists()) {
+                // New User via Google -> Create Profile
+                const shortId = getShortId(uid);
+                const bonusPoints = 5000; // Default bonus for new user
+
+                await setDoc(userDocRef, {
+                    userId: uid,
+                    email: user.email,
+                    userName: user.displayName || `User_${shortId}`,
+                    points: bonusPoints,
+                    totalEarned: bonusPoints,
+                    shortId,
+                    createdAt: serverTimestamp(),
+                    referredBy: null // Google sign-in skips manual referral input usually
+                });
+
+                await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
+                showNotification('គណនីថ្មីត្រូវបានបង្កើតដោយជោគជ័យ!', 'success');
+            } else {
+                showNotification('ចូលគណនីជោគជ័យ', 'success');
+            }
+
+        } catch (error) {
+            console.error(error);
+            showNotification('បរាជ័យ: ' + error.message, 'error');
+        }
+    };
+
     const handleLogout = async () => { await signOut(auth); showNotification('បានចាកចេញ', 'success'); };
 
     const handleDailyCheckin = async () => {
@@ -1378,6 +1440,7 @@ const App = () => {
                     onSubmit={authPage === 'LOGIN' ? handleLogin : handleRegister} 
                     btnText={authPage === 'LOGIN' ? 'ចូល' : 'ចុះឈ្មោះ'} 
                     isRegister={authPage === 'REGISTER'}
+                    onGoogleLogin={handleGoogleLogin} // <--- Pass Google Handler
                 />
                 <div className="text-center mt-6">
                     <button onClick={() => setAuthPage(authPage === 'LOGIN' ? 'REGISTER' : 'LOGIN')} className="text-teal-400 underline hover:text-teal-300">
@@ -1439,7 +1502,6 @@ const App = () => {
                             <IconButton icon={Film} title="PLAY VIDEO" onClick={() => setPage('EARN_POINTS')} iconColor="text-red-400" />
                             <IconButton icon={Wallet} title="MY BALANCE" onClick={() => setPage('BALANCE_DETAILS')} iconColor="text-orange-400" />
                             
-                            {/* BUTTON IS ALWAYS VISIBLE, BUT LOGIC HANDLES THE ACTION */}
                             <IconButton 
                                 icon={ShoppingCart} 
                                 title="BUY COINS" 
