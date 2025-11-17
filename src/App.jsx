@@ -18,7 +18,7 @@ import {
     CalendarCheck, Target, Wallet, Film, UserCheck,
     DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, 
     Settings, Copy, Save, Search, PlusCircle, MinusCircle, 
-    CheckCircle, XCircle, RefreshCw, User
+    CheckCircle, XCircle, RefreshCw, User, ExternalLink
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -418,7 +418,6 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
 
 // --- 6. USER PAGES ---
 
-// UPDATED: ReferralPage with "Enter Code" feature
 const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, globalConfig }) => {
     const [referrals, setReferrals] = useState([]);
     const [inputCode, setInputCode] = useState('');
@@ -709,6 +708,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     );
 };
 
+// UPDATED EARN PAGE: Embeds Website in IFRAME
 const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
@@ -761,8 +761,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
             });
             if(isMounted.current) showNotification('Success! Points Added.', 'success');
             
-            if (type === 'website') window.open(current.link, '_blank');
-            
             if(autoPlay && isMounted.current) {
                 setTimeout(() => {
                     if(!isMounted.current) return;
@@ -783,52 +781,80 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
         handleClaim();
     };
 
-    const embedSrc = current ? (type === 'view' || type === 'sub' ? getEmbedUrl(current.link) : null) : null;
+    // DETERMINE WHAT TO SHOW IN IFRAME
+    const isVideo = type === 'view' || type === 'sub';
+    const iframeSrc = current ? (isVideo ? getEmbedUrl(current.link) : current.link) : null;
 
     return (
-        <div className="min-h-screen bg-purple-900 pb-16 pt-20">
-            <Header title={type === 'view' ? 'មើលវីដេអូ' : type === 'website' ? 'មើល Website' : 'Subscribe'} onBack={() => setPage('DASHBOARD')} />
-            <main className="p-0">
+        <div className="h-screen bg-[#0f172a] flex flex-col">
+            <Header title={type === 'view' ? 'មើលវីដេអូ' : type === 'website' ? 'មើល Website' : 'Subscribe'} onBack={() => setPage('DASHBOARD')} className="relative" />
+            
+            <div className="flex-1 relative bg-black">
                 {current ? (
-                    <div className='flex flex-col h-full'>
-                        {(type === 'view' || type === 'sub') && embedSrc ? (
-                            <div className="aspect-video bg-black w-full sticky top-16 z-20">
-                                <iframe src={embedSrc} className="w-full h-full" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
-                            </div>
-                        ) : (
-                            <div className="bg-purple-900 h-40 flex items-center justify-center border-b border-purple-700"><Globe className="w-16 h-16 text-purple-400" /></div>
-                        )}
-                        
-                        <div className='p-4 bg-white rounded-t-3xl -mt-4 relative z-30 min-h-[60vh] shadow-inner'>
-                             <div className="flex justify-between items-center mb-4 px-4 pt-4">
-                                <div className="text-center flex items-center text-xl font-bold text-yellow-600 bg-yellow-100 px-3 py-1 rounded-full border border-yellow-300"><Coins className="w-5 h-5 mr-2" /> {current.requiredDuration}</div>
-                                <div className={`text-center flex items-center text-xl font-bold px-3 py-1 rounded-full border ${timer > 0 ? 'text-red-500 bg-red-100 border-red-300' : 'text-green-500 bg-green-100 border-green-300'}`}>
-                                    {timer > 0 ? <><Zap className="w-5 h-5 mr-2" /> {timer}s</> : <><CheckCircle className="w-5 h-5 mr-2"/> Ready</>}
-                                </div>
-                            </div>
-
-                            <div className="flex justify-center items-center space-x-3 mb-6 bg-gray-100 p-2 rounded-lg">
-                                <span className="text-gray-600 font-bold text-sm">Auto Play Next</span>
-                                <button onClick={() => setAutoPlay(!autoPlay)} className={`w-12 h-6 rounded-full p-1 transition duration-300 ease-in-out ${autoPlay ? 'bg-teal-500' : 'bg-gray-300'}`}>
-                                    <div className={`w-4 h-4 bg-white rounded-full shadow transform transition duration-300 ${autoPlay ? 'translate-x-6' : ''}`}></div>
-                                </button>
-                            </div>
-
-                             {type === 'sub' && timer === 0 && !claimed ? (
-                                <button onClick={handleSubscribeClick} className="w-full py-3 rounded-full font-bold text-white shadow-lg mb-4 bg-red-600 animate-bounce flex justify-center items-center">
-                                    <MonitorPlay className='mr-2'/> SUBSCRIBE & CLAIM
-                                </button>
-                            ) : (
-                                <button onClick={handleClaim} disabled={timer > 0 || claimed} className={`w-full py-3 rounded-full font-bold text-white shadow-lg mb-4 transition-all ${timer > 0 || claimed ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}>
-                                    {claimed ? 'CLAIMED' : timer > 0 ? `Please wait ${timer}s` : 'CLAIM REWARD'}
+                    iframeSrc ? (
+                        <>
+                            <iframe 
+                                src={iframeSrc} 
+                                className="w-full h-full absolute top-0 left-0" 
+                                frameBorder="0" 
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                allowFullScreen
+                                sandbox={!isVideo ? "allow-scripts allow-same-origin allow-forms" : undefined}
+                            />
+                            {/* Fallback button for websites that block iframes */}
+                            {!isVideo && (
+                                <button onClick={() => window.open(current.link)} className="absolute top-4 right-4 bg-black/60 hover:bg-black text-white px-3 py-1 rounded text-xs flex items-center backdrop-blur-sm border border-white/20">
+                                    <ExternalLink size={14} className="mr-1"/> Open External
                                 </button>
                             )}
+                        </>
+                    ) : (
+                        <div className="flex items-center justify-center h-full text-white"><p>Invalid Link</p></div>
+                    )
+                ) : (
+                     <div className="flex flex-col items-center justify-center h-full text-white"><RefreshCw className="animate-spin mb-4"/>កំពុងស្វែងរក...</div>
+                )}
+            </div>
+
+            {/* CONTROLS FOOTER */}
+            <div className="bg-white p-3 border-t border-gray-200 shadow-lg z-20">
+                 {current ? (
+                    <div className="flex flex-col space-y-2">
+                         <div className="flex justify-between items-center">
+                            <div className="flex items-center space-x-2">
+                                <span className="text-lg font-bold text-yellow-600 flex items-center"><Coins className="w-5 h-5 mr-1" /> {current.requiredDuration}</span>
+                                {timer > 0 ? (
+                                    <span className="text-red-500 font-bold flex items-center bg-red-100 px-2 py-0.5 rounded-full text-sm"><Zap className="w-4 h-4 mr-1" /> {timer}s</span>
+                                ) : (
+                                    <span className="text-green-500 font-bold flex items-center bg-green-100 px-2 py-0.5 rounded-full text-sm"><CheckCircle className="w-4 h-4 mr-1" /> Ready</span>
+                                )}
+                            </div>
                             
-                            <button onClick={handleNext} className="w-full py-3 mb-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-full shadow-md">SKIP / NEXT</button>
+                            <div className="flex items-center space-x-2">
+                                <span className="text-xs text-gray-500 font-medium">Auto Play</span>
+                                <button onClick={() => setAutoPlay(!autoPlay)} className={`w-8 h-4 rounded-full p-0.5 transition duration-300 ${autoPlay ? 'bg-teal-500' : 'bg-gray-300'}`}>
+                                    <div className={`w-3 h-3 bg-white rounded-full shadow transform transition duration-300 ${autoPlay ? 'translate-x-4' : ''}`}></div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex space-x-2">
+                            {type === 'sub' && timer === 0 && !claimed ? (
+                                <button onClick={handleSubscribeClick} className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold shadow hover:bg-red-700 active:scale-95 transition text-sm">
+                                    SUBSCRIBE & CLAIM
+                                </button>
+                            ) : (
+                                <button onClick={handleClaim} disabled={timer > 0 || claimed} className={`flex-1 py-3 rounded-lg font-bold shadow text-sm text-white transition ${timer > 0 || claimed ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}>
+                                    {claimed ? 'CLAIMED' : timer > 0 ? 'PLEASE WAIT...' : 'CLAIM REWARD'}
+                                </button>
+                            )}
+                            <button onClick={handleNext} className="px-4 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-lg shadow active:scale-95 transition">
+                                SKIP
+                            </button>
                         </div>
                     </div>
-                ) : <div className="flex flex-col items-center justify-center pt-20 text-white"><RefreshCw className="animate-spin mb-4"/>កំពុងស្វែងរកយុទ្ធនាការ...</div>}
-            </main>
+                 ) : <div className="text-center text-gray-400 text-sm py-2">No active campaigns</div>}
+            </div>
         </div>
     );
 };
