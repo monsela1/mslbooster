@@ -119,6 +119,7 @@ const InputField = (props) => <input {...props} className={`w-full p-3 border bo
 
 // --- 5. PAGES ---
 
+// --- ADMIN PAGES ---
 const AdminDashboardPage = ({ db, setPage, showNotification }) => {
     const [config, setConfig] = useState(defaultGlobalConfig);
     const [activeTab, setActiveTab] = useState('SETTINGS');
@@ -155,9 +156,18 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
 
     const handleSaveConfig = async () => {
         await setDoc(getGlobalConfigDocRef(), config);
-        showNotification('Saved!', 'success');
+        showNotification('Settings Saved!', 'success');
     };
     
+    // Config handlers
+    const handleRewardChange = (e) => setConfig({...config, [e.target.name]: parseInt(e.target.value)||0});
+    const handleAdsChange = (e) => setConfig({...config, adsSettings: {...config.adsSettings, [e.target.name]: e.target.value}});
+    const handlePkgChange = (i, f, v) => {
+        const pkgs = [...config.coinPackages];
+        pkgs[i][f] = f === 'coins' ? parseInt(v)||0 : v;
+        setConfig({...config, coinPackages: pkgs});
+    };
+
     // User Handlers
     const handleSearchUser = async () => {
         try {
@@ -172,7 +182,7 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
 
     const handleUpdatePoints = async () => {
         if(!foundUser) return;
-        // FIX: Ensure pointsToAdd is a Number
+        // FIX: Force Integer
         const amount = parseInt(pointsToAdd);
         if (isNaN(amount)) return showNotification('Invalid Amount', 'error');
 
@@ -183,19 +193,24 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
             setPointsToAdd(0);
             loadUserList();
         } catch (e) {
-            showNotification('Update Failed: Check Rules', 'error');
+            console.error(e);
+            showNotification('Update Failed (Check Rules)', 'error');
         }
     };
 
-    // Config Handlers
-    const handleRewardChange = (e) => setConfig({...config, [e.target.name]: parseInt(e.target.value)||0});
+    const handleDeleteCampaign = async (id) => {
+        if(window.confirm('Stop Campaign?')) await updateDoc(doc(getCampaignsCollectionRef(), id), { remaining: 0 });
+    };
+
+    if(!config) return <Loading/>;
 
     return (
         <div className="min-h-screen bg-purple-950 pb-16 pt-20 p-4">
             <Header title="ADMIN" onBack={() => setPage('DASHBOARD')} />
             <div className="flex gap-2 mb-4">
-                <button onClick={() => setActiveTab('SETTINGS')} className={`flex-1 py-2 rounded font-bold ${activeTab==='SETTINGS' ? 'bg-teal-500' : 'bg-gray-700'}`}>SETTINGS</button>
-                <button onClick={() => setActiveTab('USERS')} className={`flex-1 py-2 rounded font-bold ${activeTab==='USERS' ? 'bg-teal-500' : 'bg-gray-700'}`}>USERS</button>
+                {['SETTINGS', 'USERS', 'CAMPAIGNS'].map(t => (
+                    <button key={t} onClick={() => setActiveTab(t)} className={`flex-1 py-2 rounded font-bold ${activeTab===t ? 'bg-teal-500' : 'bg-gray-700'}`}>{t}</button>
+                ))}
             </div>
 
             {activeTab === 'SETTINGS' && (
@@ -205,9 +220,27 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
                         <div className="grid gap-2">
                             <label>Daily Reward: <InputField name="dailyCheckinReward" type="number" value={config.dailyCheckinReward} onChange={handleRewardChange}/></label>
                             <label>Referral Reward: <InputField name="referrerReward" type="number" value={config.referrerReward} onChange={handleRewardChange}/></label>
-                            <button onClick={handleSaveConfig} className="w-full bg-green-600 p-2 rounded mt-2 font-bold">SAVE ALL</button>
+                            <label>Ads Reward: <InputField name="adsReward" type="number" value={config.adsReward} onChange={handleRewardChange}/></label>
+                            <label>Max Daily Ads: <InputField name="maxDailyAds" type="number" value={config.maxDailyAds} onChange={handleRewardChange}/></label>
                         </div>
                     </Card>
+                    <Card className="p-4">
+                        <h3 className="font-bold mb-2">Ads IDs</h3>
+                        <div className="grid gap-2">
+                             <InputField name="bannerId" value={config.adsSettings.bannerId} onChange={handleAdsChange} placeholder="Banner ID"/>
+                             <InputField name="interstitialId" value={config.adsSettings.interstitialId} onChange={handleAdsChange} placeholder="Interstitial ID"/>
+                        </div>
+                    </Card>
+                    <Card className="p-4">
+                        <h3 className="font-bold mb-2">Coin Packages</h3>
+                        {config.coinPackages.map((p, i) => (
+                            <div key={i} className="flex gap-2 mb-2">
+                                <InputField type="number" value={p.coins} onChange={e=>handlePkgChange(i,'coins',e.target.value)} />
+                                <InputField value={p.price} onChange={e=>handlePkgChange(i,'price',e.target.value)} />
+                            </div>
+                        ))}
+                    </Card>
+                    <button onClick={handleSaveConfig} className="w-full bg-green-600 py-3 rounded font-bold text-white">SAVE ALL</button>
                 </div>
             )}
 
@@ -241,6 +274,20 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
                     </Card>
                 </div>
             )}
+
+            {activeTab === 'CAMPAIGNS' && (
+                <div className="space-y-2">
+                    {campaigns.map(c => (
+                        <div key={c.id} className="bg-white p-3 rounded shadow flex justify-between items-center text-black">
+                            <div className='w-2/3 truncate'>
+                                <p className="font-bold text-sm">{c.link}</p>
+                                <p className="text-xs">Rem: {c.remaining} | {c.type}</p>
+                            </div>
+                            <button onClick={() => handleDeleteCampaign(c.id)} className="text-red-600"><Trash2/></button>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };
@@ -260,7 +307,7 @@ const ReferralPage = ({ userId, showNotification, setPage, globalConfig }) => {
         if(inputCode.length !== 6 || inputCode === shortId) return showNotification('Invalid Code', 'error');
         try {
             await runTransaction(db, async (tx) => {
-                const codeDoc = await tx.get(getShortCodeDocRef(inputCode));
+                const codeDoc = await tx.get(getShortCodeDocRef(inputCode.toUpperCase()));
                 if(!codeDoc.exists()) throw "Code not found";
                 const referrerId = codeDoc.data().fullUserId;
                 
@@ -268,8 +315,9 @@ const ReferralPage = ({ userId, showNotification, setPage, globalConfig }) => {
                 const myProfile = await tx.get(myProfileRef);
                 if(myProfile.data().referredBy) throw "Already referred";
 
-                tx.update(getProfileDocRef(referrerId), { points: increment(globalConfig.referrerReward) });
-                tx.update(myProfileRef, { points: increment(globalConfig.referredBonus), referredBy: inputCode });
+                // Ensure integer increments
+                tx.update(getProfileDocRef(referrerId), { points: increment(parseInt(globalConfig.referrerReward)) });
+                tx.update(myProfileRef, { points: increment(parseInt(globalConfig.referredBonus)), referredBy: inputCode.toUpperCase() });
                 tx.set(doc(getReferralCollectionRef()), { referrerId, referredId: userId, referredName: myProfile.data().userName, reward: globalConfig.referrerReward, createdAt: serverTimestamp() });
             });
             showNotification('Success!', 'success');
@@ -322,7 +370,7 @@ const MyCampaignsPage = ({ userId, userProfile, setPage, showNotification }) => 
         if(cost > userProfile.points) return showNotification('Not enough points', 'error');
         try {
             await runTransaction(db, async (tx) => {
-                tx.update(getProfileDocRef(userId), { points: increment(-cost) });
+                tx.update(getProfileDocRef(userId), { points: increment(-parseInt(cost)) });
                 tx.set(doc(getCampaignsCollectionRef()), { userId, type, link, count, time, remaining: count, cost, createdAt: serverTimestamp(), isActive: true });
             });
             showNotification('Campaign Created!', 'success');
@@ -398,7 +446,9 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                 const ref = doc(getCampaignsCollectionRef(), current.id);
                 const docSnap = await tx.get(ref);
                 if(docSnap.data().remaining <= 0) throw "Finished";
-                tx.update(getProfileDocRef(userId), { points: increment(current.requiredDuration || 50) });
+                // Force int
+                const points = parseInt(current.requiredDuration || 50);
+                tx.update(getProfileDocRef(userId), { points: increment(points) });
                 tx.update(ref, { remaining: increment(-1) });
             });
             showNotification('Points Added!', 'success');
@@ -442,19 +492,22 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
     );
 };
 
+// FIX: BuyCoinsPage - Force parseInt
 const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
     const handlePurchase = async (pkg) => {
         try {
-            await runTransaction(db, async (tx) => { tx.update(getProfileDocRef(userId), { points: increment(pkg.coins) }); });
-            showNotification(`Success! +${formatNumber(pkg.coins)}`, 'success');
+            // FORCE INTEGER
+            const amount = parseInt(pkg.coins);
+            await runTransaction(db, async (tx) => { tx.update(getProfileDocRef(userId), { points: increment(amount) }); });
+            showNotification(`Success! +${formatNumber(amount)}`, 'success');
         } catch (error) { showNotification(`Error`, 'error'); }
     };
     return (
         <div className="min-h-screen bg-purple-900 pb-16 pt-20 p-4">
             <Header title="BUY COINS" onBack={() => setPage('DASHBOARD')} />
-            <div className="space-y-4">
+            <main className="p-4 space-y-4">
                 {globalConfig.coinPackages.map((pkg) => (
-                    <button key={pkg.id} onClick={() => handlePurchase(pkg)} className={`w-full flex justify-between p-4 rounded-xl shadow-lg text-white transform active:scale-95 transition ${pkg.color}`}>
+                    <button key={pkg.id} onClick={() => handlePurchase(pkg)} className={`w-full flex items-center justify-between p-4 rounded-xl shadow-lg text-white transform active:scale-95 transition ${pkg.color}`}>
                         <div className="flex items-center space-x-3">
                             <div className="bg-white bg-opacity-20 p-3 rounded-full"><Coins className="w-6 h-6 text-yellow-100" /></div>
                             <div className="text-left"><p className="text-xl font-bold">{formatNumber(pkg.coins)} Coins</p><p className="text-sm opacity-80">កញ្ចប់ពិន្ទុ</p></div>
@@ -462,7 +515,7 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
                         <div className="bg-white text-gray-800 font-bold px-4 py-2 rounded-lg">{pkg.price}</div>
                     </button>
                 ))}
-            </div>
+            </main>
         </div>
     );
 };
@@ -500,7 +553,8 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
         try {
             await runTransaction(db, async (tx) => { 
                 const dailyRef = getDailyStatusDocRef(userId);
-                tx.update(getProfileDocRef(userId), { points: increment(reward) });
+                // FORCE INTEGER
+                tx.update(getProfileDocRef(userId), { points: increment(parseInt(reward)) });
                 tx.set(dailyRef, { adsWatchedCount: increment(1), date: getTodayDateKey() }, { merge: true });
             });
             showNotification(`+${reward} Coins`, 'success');
@@ -583,7 +637,7 @@ const App = () => {
             const cred = await createUserWithEmailAndPassword(auth, email, pass);
             const uid = cred.user.uid;
             const shortId = getShortId(uid);
-            // Safe Creation: ensure points is a number
+            // Safe Creation
             await setDoc(getProfileDocRef(uid), { userId: uid, email, userName: username, points: 5000, shortId, referredBy: null });
             await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
             await setDoc(getDailyStatusDocRef(uid), { date: getTodayDateKey(), checkinDone: false, adsWatchedCount: 0 });
@@ -597,7 +651,8 @@ const App = () => {
                 const ref = getDailyStatusDocRef(userId);
                 const doc = await tx.get(ref);
                 if(doc.exists() && doc.data().checkinDone && doc.data().date === getTodayDateKey()) throw "Checked in already";
-                tx.update(getProfileDocRef(userId), { points: increment(globalConfig.dailyCheckinReward) });
+                // FORCE INT
+                tx.update(getProfileDocRef(userId), { points: increment(parseInt(globalConfig.dailyCheckinReward)) });
                 tx.set(ref, { checkinDone: true, date: getTodayDateKey() }, { merge: true });
             });
             showNotification("Claimed!", "success");
@@ -624,11 +679,11 @@ const App = () => {
         case 'EXPLORE_WEBSITE': Content = <EarnPage db={db} userId={userId} type="website" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'MY_CAMPAIGNS': Content = <MyCampaignsPage db={db} userId={userId} userProfile={userProfile} setPage={setPage} showNotification={showNotification} />; break;
         case 'REFERRAL_PAGE': Content = <ReferralPage db={db} userId={userId} showNotification={showNotification} setPage={setPage} globalConfig={globalConfig} />; break;
+        case 'BUY_COINS': Content = <BuyCoinsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
+        case 'BALANCE_DETAILS': Content = <BalanceDetailsPage setPage={setPage} userProfile={userProfile} />; break;
+        case 'WATCH_ADS': Content = <WatchAdsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
+        case 'MY_PLAN': Content = <MyPlanPage setPage={setPage} />; break;
         case 'ADMIN_DASHBOARD': Content = <AdminDashboardPage db={db} setPage={setPage} showNotification={showNotification} />; break;
-        case 'WATCH_ADS': Content = <WatchAdsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break; 
-        case 'BUY_COINS': Content = <BuyCoinsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break; 
-        case 'BALANCE_DETAILS': Content = <BalanceDetailsPage setPage={setPage} userProfile={userProfile} />; break; 
-        case 'MY_PLAN': Content = <MyPlanPage setPage={setPage} />; break; 
         default: Content = (
             <div className="min-h-screen bg-purple-900 pb-16 pt-20">
                 <Header title="We4u App" rightContent={isAdmin ? <button onClick={() => setPage('ADMIN_DASHBOARD')}><Settings/></button> : <button onClick={() => signOut(auth)}><LogOut/></button>} />
