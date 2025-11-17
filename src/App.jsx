@@ -19,7 +19,7 @@ import {
     DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, 
     Settings, Copy, Save, Search, PlusCircle, MinusCircle, 
     CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
-    ArrowUpRight, ArrowDownLeft, Clock, Loader
+    ArrowUpRight, ArrowDownLeft, Clock
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -34,13 +34,6 @@ const firebaseConfig = {
 };
 
 const appId = 'we4u_live_app';
-
-// *** BAKONG CONFIG ***
-const BAKONG_CONFIG = {
-    merchantId: 'monsela@aclb', 
-    merchantName: 'We4u App', // ឈ្មោះបង្ហាញពេលស្កេន
-    merchantCity: 'Phnom Penh'
-};
 
 // --- 2. FIREBASE INITIALIZATION ---
 let app, db, auth;
@@ -78,50 +71,10 @@ const getYouTubeID = (url) => {
 const getEmbedUrl = (url) => {
     const videoId = getYouTubeID(url);
     if (videoId) {
+        // mute=0 (Sound On), controls=1 (Show Controls)
         return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&rel=0`; 
     }
     return null;
-};
-
-// --- CRC16 Calculation for KHQR (សំខាន់សម្រាប់ការបង្កើត QR) ---
-const crc16 = (str) => {
-    let crc = 0xFFFF;
-    for (let c = 0; c < str.length; c++) {
-        crc ^= str.charCodeAt(c) << 8;
-        for (let i = 0; i < 8; i++) {
-            if (crc & 0x8000) crc = (crc << 1) ^ 0x1021;
-            else crc = crc << 1;
-        }
-    }
-    let hex = (crc & 0xFFFF).toString(16).toUpperCase();
-    return hex.length === 3 ? "0" + hex : hex.length === 2 ? "00" + hex : hex.length === 1 ? "000" + hex : hex;
-};
-
-// --- Generate KHQR String Locally (Offline) ---
-const generateLocalKHQR = (amount, currency = 'USD') => {
-    // Tags
-    // 00: Payload Format Indicator (01)
-    // 01: Point of Initiation Method (11=Static, 12=Dynamic)
-    // 29: Merchant Account Information (Bakong)
-    // 52: Merchant Category Code (5999)
-    // 53: Transaction Currency (840=USD, 116=KHR)
-    // 54: Transaction Amount
-    // 58: Country Code (KH)
-    // 59: Merchant Name
-    // 60: Merchant City
-    // 63: CRC
-
-    const merchantId = BAKONG_CONFIG.merchantId;
-    const accountInfo = `0009KHQR@DEV10108${merchantId}`; // Simplified Bakong Account Info
-    const tag29 = `29${accountInfo.length < 10 ? '0'+accountInfo.length : accountInfo.length}${accountInfo}`;
-    
-    const currencyCode = currency === 'USD' ? '840' : '116';
-    const amountStr = parseFloat(amount).toFixed(2);
-    
-    let rawData = `000201010212${tag29}520459995303${currencyCode}54${amountStr.length < 10 ? '0'+amountStr.length : amountStr.length}${amountStr}5802KH59${BAKONG_CONFIG.merchantName.length < 10 ? '0'+BAKONG_CONFIG.merchantName.length : BAKONG_CONFIG.merchantName.length}${BAKONG_CONFIG.merchantName}60${BAKONG_CONFIG.merchantCity.length < 10 ? '0'+BAKONG_CONFIG.merchantCity.length : BAKONG_CONFIG.merchantCity.length}${BAKONG_CONFIG.merchantCity}6304`;
-    
-    const checksum = crc16(rawData);
-    return rawData + checksum;
 };
 
 // Firestore Paths
@@ -133,113 +86,93 @@ const getGlobalConfigDocRef = () => db ? doc(db, 'artifacts', appId, 'public', '
 const getShortCodeDocRef = (shortId) => db && shortId ? doc(db, 'artifacts', appId, 'public', 'data', 'short_codes', shortId) : null;
 const getHistoryCollectionRef = (userId) => db && userId ? collection(db, 'artifacts', appId, 'users', userId, 'history') : null;
 
-// Default Config (USD)
+// Default Config
 const defaultGlobalConfig = {
     dailyCheckinReward: 200,
     referrerReward: 1000,
     referredBonus: 500,
     adsReward: 30,
     maxDailyAds: 15,
-    adsSettings: { bannerId: "ca-app-pub-xxx", interstitialId: "ca-app-pub-xxx", isEnabled: true },
+    adsSettings: {
+        bannerId: "ca-app-pub-xxxxxxxx/yyyyyy",
+        interstitialId: "ca-app-pub-xxxxxxxx/zzzzzz",
+        isEnabled: true
+    },
     coinPackages: [
-        { id: 1, coins: 5000, price: 1.00, priceLabel: '$1.00', color: 'bg-green-500' },
-        { id: 2, coins: 15000, price: 3.00, priceLabel: '$3.00', color: 'bg-blue-500' },
-        { id: 3, coins: 50000, price: 10.00, priceLabel: '$10.00', color: 'bg-purple-500' },
-        { id: 4, coins: 150000, price: 25.00, priceLabel: '$25.00', color: 'bg-red-500' },
+        { id: 1, coins: 5000, price: '5,000 Riel', color: 'bg-green-500' },
+        { id: 2, coins: 15000, price: '15,000 Riel', color: 'bg-blue-500' },
+        { id: 3, coins: 50000, price: '50,000 Riel', color: 'bg-purple-500' },
+        { id: 4, coins: 150000, price: '150,000 Riel', color: 'bg-red-500' },
     ]
 };
 
 // --- 4. SHARED UI COMPONENTS ---
-const Loading = () => <div className="flex justify-center items-center h-screen bg-purple-900"><div className="animate-spin rounded-full h-12 w-12 border-b-4 border-yellow-400"></div></div>;
-const IconButton = ({ icon: Icon, title, onClick, iconColor = 'text-purple-300', textColor = 'text-white', disabled = false }) => <button onClick={!disabled ? onClick : undefined} className={`flex flex-col items-center justify-start p-2 rounded-xl transition transform w-full h-32 border ${disabled ? 'bg-gray-800 border-gray-700 cursor-not-allowed opacity-70' : 'bg-purple-800 shadow-lg border-purple-700 hover:scale-105 active:scale-95'}`}><div className={`p-3 rounded-xl ${disabled ? 'bg-gray-700' : 'bg-purple-900 shadow-inner'}`}><Icon className={`w-8 h-8 ${disabled ? 'text-gray-500' : iconColor}`} /></div><span className={`mt-2 text-xs font-bold text-center ${disabled ? 'text-gray-500' : textColor} break-words leading-tight`}>{title}</span></button>;
-const Card = ({ children, className = '' }) => <div className={`bg-purple-800 rounded-xl shadow-xl border border-purple-700 text-white ${className}`}>{children}</div>;
-const Header = ({ title, onBack, rightContent, className = '' }) => <header className={`flex items-center justify-between p-4 bg-purple-950 shadow-md text-white fixed top-0 w-full z-20 border-b border-purple-800 ${className}`}><div className="flex items-center">{onBack && (<button onClick={onBack} className="p-1 mr-2 rounded-full hover:bg-purple-800 transition"><ChevronLeft className="w-6 h-6" /></button>)}<h1 className="text-xl font-bold">{title}</h1></div>{rightContent}</header>;
-const InputField = (props) => <input {...props} className={`w-full p-3 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-400 focus:outline-none focus:border-yellow-400 ${props.className || ''}`}/>;
+const Loading = () => (
+    <div className="flex justify-center items-center h-screen bg-purple-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-yellow-400"></div>
+        <span className="ml-3 text-white text-lg font-semibold">កំពុងផ្ទុក...</span>
+    </div>
+);
 
-// --- NEW COMPONENT: BAKONG KHQR PAYMENT MODAL (LOCAL GENERATION) ---
-const BakongPaymentModal = ({ pkg, onClose, onSuccess }) => {
-    const [qrString, setQrString] = useState('');
-    const [status, setStatus] = useState('ready'); 
-
-    useEffect(() => {
-        // Generate KHQR locally (No API Call needed)
-        try {
-            const qr = generateLocalKHQR(pkg.price, 'USD');
-            setQrString(qr);
-        } catch (e) {
-            console.error("QR Error", e);
-        }
-    }, [pkg]);
-
-    const handleVerifyManually = () => {
-        // Since we are offline/manual, we assume user paid. 
-        // Ideally, you check SMS or App notification.
-        if(window.confirm("តើអ្នកបានបង់ប្រាក់រួចរាល់ហើយឬនៅ?")) {
-            setStatus('success');
-            setTimeout(() => onSuccess(pkg), 1000);
-        }
-    }
-
-    return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl w-full max-w-sm p-6 text-center relative">
-                <button onClick={onClose} className="absolute top-2 right-2 text-gray-500 hover:text-red-500"><XCircle/></button>
-                
-                <h3 className="text-xl font-bold text-purple-900 mb-2">KHQR បង់ប្រាក់ ($)</h3>
-                <p className="text-gray-600 mb-4">ស្កេនដើម្បីទិញ {formatNumber(pkg.coins)} Coins</p>
-                
-                <div className="flex flex-col items-center justify-center min-h-[250px]">
-                    {qrString ? (
-                        <div className="space-y-3">
-                            <div className="p-2 border-4 border-purple-600 rounded-lg inline-block relative bg-white">
-                                {/* Display Real Scannable QR */}
-                                <img 
-                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrString)}`}
-                                    alt="KHQR Code"
-                                    className="w-56 h-56"
-                                />
-                            </div>
-                            <p className="text-xl font-bold text-green-600">${pkg.price.toFixed(2)}</p>
-                            
-                            <div className="bg-yellow-100 text-yellow-800 text-xs p-2 rounded">
-                                សូមស្កេនបង់ប្រាក់តាមរយៈ App ធនាគាររបស់អ្នក (ABA, ACLEDA, BAKONG...)
-                            </div>
-
-                            {status === 'success' ? (
-                                <div className="text-green-600 font-bold flex items-center justify-center"><CheckCircle className="mr-2"/> ជោគជ័យ!</div>
-                            ) : (
-                                <button 
-                                    onClick={handleVerifyManually}
-                                    className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg animate-pulse"
-                                >
-                                    ខ្ញុំបានបង់ប្រាក់រួចរាល់ (I Paid)
-                                </button>
-                            )}
-                        </div>
-                    ) : (
-                        <p className="text-red-500">Error creating QR</p>
-                    )}
-                </div>
-            </div>
+const IconButton = ({ icon: Icon, title, onClick, iconColor = 'text-purple-300', textColor = 'text-white', disabled = false }) => (
+    <button 
+        onClick={!disabled ? onClick : undefined} 
+        className={`flex flex-col items-center justify-start p-2 rounded-xl transition transform w-full h-32 border 
+        ${disabled ? 'bg-gray-800 border-gray-700 cursor-not-allowed opacity-70' : 'bg-purple-800 shadow-lg border-purple-700 hover:scale-105 active:scale-95'}`}
+    >
+        <div className={`p-3 rounded-xl ${disabled ? 'bg-gray-700' : 'bg-purple-900 shadow-inner'}`}>
+            <Icon className={`w-8 h-8 ${disabled ? 'text-gray-500' : iconColor}`} />
         </div>
-    );
-};
+        <span className={`mt-2 text-xs font-bold text-center ${disabled ? 'text-gray-500' : textColor} break-words leading-tight`}>{title}</span>
+    </button>
+);
 
-// --- 5. ADMIN PAGES ---
+const Card = ({ children, className = '' }) => (
+    <div className={`bg-purple-800 rounded-xl shadow-xl border border-purple-700 text-white ${className}`}>{children}</div>
+);
+
+const Header = ({ title, onBack, rightContent, className = '' }) => (
+    <header className={`flex items-center justify-between p-4 bg-purple-950 shadow-md text-white fixed top-0 w-full z-20 border-b border-purple-800 ${className}`}>
+        <div className="flex items-center">
+            {onBack && (
+                <button onClick={onBack} className="p-1 mr-2 rounded-full hover:bg-purple-800 transition">
+                    <ChevronLeft className="w-6 h-6" />
+                </button>
+            )}
+            <h1 className="text-xl font-bold">{title}</h1>
+        </div>
+        {rightContent}
+    </header>
+);
+
+const InputField = (props) => (
+    <input 
+        {...props}
+        className={`w-full p-3 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-400 focus:outline-none focus:border-yellow-400 ${props.className || ''}`}
+    />
+);
+
+// --- 5. ADMIN PAGES (FIXED WHITE SCREEN) ---
 
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     const handleChange = (e) => {
         const { name, value } = e.target;
         setConfig(prev => ({ ...prev, [name]: parseInt(value) || 0 }));
     };
+
     const handleAdsChange = (e) => {
         const { name, value } = e.target;
-        setConfig(prev => ({ ...prev, adsSettings: { ...prev.adsSettings, [name]: value } }));
+        setConfig(prev => ({
+            ...prev,
+            adsSettings: { ...prev.adsSettings, [name]: value }
+        }));
     };
+
     const handlePackageChange = (index, field, value) => {
+        // Use ?. and fallback to empty array to prevent crash
         const newPackages = config.coinPackages ? [...config.coinPackages] : [];
         if (newPackages[index]) {
-            newPackages[index][field] = field === 'price' ? parseFloat(value) : (field === 'coins' ? parseInt(value) : value);
+            newPackages[index][field] = field === 'coins' ? (parseInt(value) || 0) : value;
             setConfig(prev => ({ ...prev, coinPackages: newPackages }));
         }
     };
@@ -255,20 +188,38 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                     <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" value={config.adsReward || 0} onChange={handleChange} /></div>
                 </div>
             </Card>
+
             <Card className="p-4 border-l-4 border-green-500">
                 <h3 className="font-bold text-lg mb-3 text-green-400 flex items-center"><ShoppingCart className="w-5 h-5 mr-2"/> កំណត់កញ្ចប់កាក់ (Sell Coins)</h3>
                 <div className="space-y-3">
+                    {/* Safety Check added here */}
                     {config.coinPackages?.map((pkg, idx) => (
                         <div key={pkg.id || idx} className="flex space-x-2 items-center bg-purple-900 p-2 rounded">
                             <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold">{idx + 1}</div>
-                            <div className="flex-1"><label className="text-xs text-purple-300">ចំនួនកាក់</label><InputField type="number" value={pkg.coins} onChange={(e) => handlePackageChange(idx, 'coins', e.target.value)} /></div>
-                            <div className="flex-1"><label className="text-xs text-purple-300">តម្លៃ ($ USD)</label><InputField type="number" step="0.01" value={pkg.price} onChange={(e) => handlePackageChange(idx, 'price', e.target.value)} /></div>
-                            <div className="flex-1"><label className="text-xs text-purple-300">Label</label><InputField type="text" value={pkg.priceLabel} onChange={(e) => handlePackageChange(idx, 'priceLabel', e.target.value)} /></div>
+                            <div className="flex-1">
+                                <label className="text-xs text-purple-300">ចំនួនកាក់</label>
+                                <InputField type="number" value={pkg.coins} onChange={(e) => handlePackageChange(idx, 'coins', e.target.value)} />
+                            </div>
+                            <div className="flex-1">
+                                <label className="text-xs text-purple-300">តម្លៃលក់</label>
+                                <InputField type="text" value={pkg.price} onChange={(e) => handlePackageChange(idx, 'price', e.target.value)} />
+                            </div>
                         </div>
-                    )) || <p className="text-red-300 text-sm">No packages found.</p>}
+                    )) || <p className="text-red-300 text-sm">No packages found. Please save first.</p>}
                 </div>
             </Card>
-             <button onClick={onSave} className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-lg flex justify-center items-center transition"><Save className="w-5 h-5 mr-2"/> រក្សាទុកការកំណត់ (SAVE ALL)</button>
+
+            <Card className="p-4 border-l-4 border-pink-500">
+                <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ Ads IDs</h3>
+                <div className="space-y-3">
+                    <div><label className="text-xs font-bold text-purple-300">Banner ID</label><InputField name="bannerId" type="text" value={config.adsSettings?.bannerId || ''} onChange={handleAdsChange} /></div>
+                    <div><label className="text-xs font-bold text-purple-300">Interstitial/Video ID</label><InputField name="interstitialId" type="text" value={config.adsSettings?.interstitialId || ''} onChange={handleAdsChange} /></div>
+                </div>
+            </Card>
+
+             <button onClick={onSave} className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-lg flex justify-center items-center transition">
+                <Save className="w-5 h-5 mr-2"/> រក្សាទុកការកំណត់ (SAVE ALL)
+            </button>
         </div>
     );
 };
@@ -279,22 +230,30 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
     const [pointsToAdd, setPointsToAdd] = useState(0);
     const [allUsers, setAllUsers] = useState([]);
     const [loadingList, setLoadingList] = useState(false);
+
     const loadUserList = async () => {
         setLoadingList(true);
         try {
             const shortCodesRef = collection(db, 'artifacts', appId, 'public', 'data', 'short_codes');
             const q = query(shortCodesRef, limit(20)); 
             const snap = await getDocs(q);
+            
             const usersData = await Promise.all(snap.docs.map(async (docSnap) => {
                 const { fullUserId } = docSnap.data();
                 const profileSnap = await getDoc(getProfileDocRef(fullUserId));
-                return profileSnap.exists() ? { ...profileSnap.data(), uid: fullUserId } : null;
+                if (profileSnap.exists()) {
+                    return { ...profileSnap.data(), uid: fullUserId };
+                }
+                return null;
             }));
+            
             setAllUsers(usersData.filter(u => u !== null));
         } catch (e) { console.error(e); }
         setLoadingList(false);
     };
+
     useEffect(() => { loadUserList(); }, []);
+
     const handleSearch = async () => {
         if(searchId.length !== 6) return showNotification('Please enter 6-digit Short ID', 'error');
         try {
@@ -302,10 +261,16 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
             if(shortCodeDoc.exists()){
                 const uid = shortCodeDoc.data().fullUserId;
                 const profile = await getDoc(getProfileDocRef(uid));
-                if(profile.exists()) setFoundUser({ uid, ...profile.data() });
-            } else { showNotification('User not found', 'error'); setFoundUser(null); }
+                if(profile.exists()){
+                    setFoundUser({ uid, ...profile.data() });
+                }
+            } else {
+                showNotification('User not found', 'error');
+                setFoundUser(null);
+            }
         } catch(e) { console.error(e); }
     };
+
     const handleUpdatePoints = async () => {
         if(!foundUser) return;
         try {
@@ -316,23 +281,60 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
             loadUserList();
         } catch(e) { showNotification('Update failed', 'error'); }
     };
+
     return (
         <div className='space-y-4 pb-10'>
             <Card className="p-4">
+                <h3 className="font-bold text-lg mb-4 text-white">ស្វែងរក & កែប្រែ</h3>
                 <div className="flex space-x-2 mb-4">
-                    <InputField value={searchId} onChange={e => setSearchId(e.target.value.toUpperCase())} placeholder="Enter ID (e.g. A1B2C3)" className="uppercase font-mono" maxLength={6}/>
+                    <InputField 
+                        value={searchId} 
+                        onChange={e => setSearchId(e.target.value.toUpperCase())} 
+                        placeholder="Enter ID (e.g. A1B2C3)" 
+                        className="uppercase font-mono"
+                        maxLength={6}
+                    />
                     <button onClick={handleSearch} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"><Search/></button>
                 </div>
+               
                 {foundUser && (
                     <div className="bg-purple-900 p-4 rounded-lg border border-purple-600">
                         <p className="font-bold text-lg text-white">{foundUser.userName}</p>
-                        <p className="text-purple-300 text-sm mb-2">Points: <span className="font-bold text-yellow-400">{formatNumber(foundUser.points)}</span></p>
+                        <p className="text-purple-300 text-sm">Email: {foundUser.email}</p>
+                        <p className="text-purple-300 text-sm mb-2">Current Points: <span className="font-bold text-yellow-400">{formatNumber(foundUser.points)}</span></p>
+                        
                         <div className="flex items-center space-x-2 mt-4">
                             <button onClick={() => setPointsToAdd(p => p - 100)} className="p-2 bg-red-600 rounded text-white"><MinusCircle size={20}/></button>
-                            <InputField type="number" value={pointsToAdd} onChange={e => setPointsToAdd(e.target.value)} className="text-center font-bold"/>
+                            <InputField 
+                                type="number" 
+                                value={pointsToAdd} 
+                                onChange={e => setPointsToAdd(e.target.value)} 
+                                className="text-center font-bold"
+                            />
                             <button onClick={() => setPointsToAdd(p => p + 100)} className="p-2 bg-green-600 rounded text-white"><PlusCircle size={20}/></button>
                         </div>
-                        <button onClick={handleUpdatePoints} className="w-full mt-3 bg-teal-600 text-white py-2 rounded font-bold hover:bg-teal-700">Update</button>
+                        <button onClick={handleUpdatePoints} className="w-full mt-3 bg-teal-600 text-white py-2 rounded font-bold hover:bg-teal-700">Update Points</button>
+                    </div>
+                )}
+            </Card>
+
+            <Card className="p-4">
+                <div className='flex justify-between items-center mb-3'>
+                    <h3 className="font-bold text-lg text-white">បញ្ជីអ្នកប្រើប្រាស់ ({allUsers.length})</h3>
+                    <button onClick={loadUserList} className='p-2 bg-purple-600 rounded hover:bg-purple-500'><RefreshCw size={18} className='text-white'/></button>
+                </div>
+                
+                {loadingList ? <div className='text-center text-purple-300'>Loading users...</div> : (
+                    <div className='overflow-y-auto max-h-64 space-y-2'>
+                        {allUsers.map((u, i) => (
+                            <div key={i} onClick={() => {setFoundUser(u); setSearchId(u.shortId);}} className='flex justify-between items-center bg-purple-900 p-3 rounded border border-purple-700 cursor-pointer hover:bg-purple-700 transition'>
+                                <div>
+                                    <p className='font-bold text-white text-sm'>{u.userName}</p>
+                                    <p className='text-xs text-purple-400 font-mono'>{u.shortId} | {u.email}</p>
+                                </div>
+                                <div className='font-bold text-yellow-400'>{formatNumber(u.points)}</div>
+                            </div>
+                        ))}
                     </div>
                 )}
             </Card>
@@ -349,6 +351,7 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
         const fetchConfig = async () => {
             const docSnap = await getDoc(getGlobalConfigDocRef());
             if (docSnap.exists()) {
+                // CRITICAL FIX: Merge with defaultGlobalConfig to ensure missing fields (like coinPackages) exist
                 setConfig({ ...defaultGlobalConfig, ...docSnap.data() });
             } else {
                 setConfig(defaultGlobalConfig);
@@ -360,19 +363,23 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
     useEffect(() => {
         if(activeTab === 'CAMPAIGNS') {
             const q = query(getCampaignsCollectionRef(), limit(50));
-            return onSnapshot(q, (snap) => setCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+            return onSnapshot(q, (snap) => {
+                setCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            });
         }
     }, [db, activeTab]);
 
     const handleSaveConfig = async () => {
-        try { await setDoc(getGlobalConfigDocRef(), config); showNotification('Saved!', 'success'); } 
-        catch(e) { showNotification('Failed', 'error'); }
+        try {
+            await setDoc(getGlobalConfigDocRef(), config);
+            showNotification('Settings saved successfully!', 'success');
+        } catch(e) { showNotification('Failed to save', 'error'); }
     };
 
     const handleDeleteCampaign = async (id) => {
-        if(window.confirm('Delete?')) {
-             try { await updateDoc(doc(getCampaignsCollectionRef(), id), { remaining: 0, isActive: false }); } catch(e){}
-        }
+        if(!window.confirm('Stop this campaign?')) return;
+        try { await updateDoc(doc(getCampaignsCollectionRef(), id), { remaining: 0, isActive: false }); } 
+        catch(e) {}
     };
 
     if (!config) return <Loading />;
@@ -383,19 +390,36 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
             <main className="p-4">
                 <div className="flex space-x-1 mb-4 bg-purple-800 p-1 rounded-lg">
                     {['SETTINGS', 'USERS', 'CAMPAIGNS'].map(tab => (
-                        <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 py-2 rounded-lg font-bold text-xs ${activeTab === tab ? 'bg-teal-600' : 'text-purple-300'}`}>{tab}</button>
+                        <button 
+                            key={tab}
+                            onClick={() => setActiveTab(tab)} 
+                            className={`flex-1 py-2 rounded-lg font-bold text-xs transition ${activeTab === tab ? 'bg-teal-600 text-white shadow' : 'text-purple-300 hover:bg-purple-700'}`}
+                        >
+                            {tab}
+                        </button>
                     ))}
                 </div>
+
                 {activeTab === 'SETTINGS' && <AdminSettingsTab config={config} setConfig={setConfig} onSave={handleSaveConfig} />}
                 {activeTab === 'USERS' && <AdminUserManagerTab db={db} showNotification={showNotification} />}
+               
                 {activeTab === 'CAMPAIGNS' && (
                     <div className="space-y-2 pb-10">
                         {campaigns.map(c => (
-                            <div key={c.id} className="bg-purple-800 p-3 rounded flex justify-between">
-                                <div className='w-2/3 truncate text-white font-bold'>{c.link} <br/><span className='text-xs text-gray-400'>Rem: {c.remaining}</span></div>
-                                <button onClick={() => handleDeleteCampaign(c.id)}><Trash2 size={18} className='text-red-400'/></button>
+                            <div key={c.id} className={`bg-purple-800 p-3 rounded-lg shadow flex justify-between items-center border-l-4 ${c.remaining > 0 ? 'border-green-500' : 'border-red-500'}`}>
+                                <div className='overflow-hidden'>
+                                    <p className="font-bold text-sm truncate text-white w-48">{c.link}</p>
+                                    <div className='flex space-x-2 text-xs mt-1'>
+                                        <span className='bg-purple-900 px-2 py-0.5 rounded text-purple-200'>{c.type}</span>
+                                        <span className={`${c.remaining > 0 ? 'text-green-400' : 'text-red-400'} font-bold`}>
+                                            Rem: {c.remaining}
+                                        </span>
+                                    </div>
+                                </div>
+                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-900 text-red-200 rounded-full hover:bg-red-800"><Trash2 size={18}/></button>
                             </div>
                         ))}
+                        {campaigns.length === 0 && <p className="text-purple-300 text-center opacity-50">No campaigns found.</p>}
                     </div>
                 )}
             </main>
@@ -404,6 +428,7 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
 };
 
 // --- 6. USER PAGES ---
+
 const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, globalConfig }) => {
     const [referrals, setReferrals] = useState([]);
     const [inputCode, setInputCode] = useState('');
@@ -413,12 +438,15 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
     useEffect(() => {
         if (!db || !userId) return;
         const q = query(getReferralCollectionRef(), where('referrerId', '==', userId));
-        const unsub = onSnapshot(q, (snap) => setReferrals(snap.docs.map(d => d.data())));
+        const unsub = onSnapshot(q, (snap) => {
+            setReferrals(snap.docs.map(d => d.data()));
+        });
         return () => unsub();
     }, [db, userId]);
 
     const handleSubmitCode = async () => {
         const code = inputCode.toUpperCase().trim();
+        
         if (code.length !== 6) return showNotification('កូដត្រូវតែមាន ៦ ខ្ទង់', 'error');
         if (code === shortId) return showNotification('មិនអាចដាក់កូដខ្លួនឯងបានទេ!', 'error');
         if (userProfile.referredBy) return showNotification('អ្នកមានអ្នកណែនាំរួចហើយ', 'error');
@@ -429,25 +457,57 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
                 const shortCodeRef = getShortCodeDocRef(code);
                 const shortCodeDoc = await transaction.get(shortCodeRef);
                 if (!shortCodeDoc.exists()) throw new Error("កូដអ្នកណែនាំមិនត្រឹមត្រូវ");
+
                 const referrerId = shortCodeDoc.data().fullUserId;
+                
                 const userRef = getProfileDocRef(userId);
                 const userDoc = await transaction.get(userRef);
                 if (userDoc.data().referredBy) throw new Error("អ្នកមានអ្នកណែនាំរួចហើយ");
+
                 const referrerRef = getProfileDocRef(referrerId);
-                transaction.update(referrerRef, { points: increment(globalConfig.referrerReward), totalEarned: increment(globalConfig.referrerReward) });
+                // UPDATE TOTAL EARNED FOR REFERRER
+                transaction.update(referrerRef, { 
+                    points: increment(globalConfig.referrerReward),
+                    totalEarned: increment(globalConfig.referrerReward)
+                });
                 const referrerHistoryRef = doc(collection(db, 'artifacts', appId, 'users', referrerId, 'history'));
-                transaction.set(referrerHistoryRef, { title: 'Referral Reward', amount: globalConfig.referrerReward, date: serverTimestamp(), type: 'referral' });
+                transaction.set(referrerHistoryRef, {
+                    title: 'Referral Reward',
+                    amount: globalConfig.referrerReward,
+                    date: serverTimestamp(),
+                    type: 'referral'
+                });
 
                 const bonus = globalConfig.referredBonus || 500;
-                transaction.update(userRef, { referredBy: code, points: increment(bonus), totalEarned: increment(bonus) });
+                // UPDATE TOTAL EARNED FOR CURRENT USER
+                transaction.update(userRef, { 
+                    referredBy: code,
+                    points: increment(bonus),
+                    totalEarned: increment(bonus)
+                });
                 const myHistoryRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
-                transaction.set(myHistoryRef, { title: 'Entered Code Bonus', amount: bonus, date: serverTimestamp(), type: 'referral_code' });
+                transaction.set(myHistoryRef, {
+                    title: 'Entered Code Bonus',
+                    amount: bonus,
+                    date: serverTimestamp(),
+                    type: 'referral_code'
+                });
 
                 const newReferralRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'referrals'));
-                transaction.set(newReferralRef, { referrerId: referrerId, referredUserId: userId, referredName: userProfile.userName || 'Unknown', reward: globalConfig.referrerReward, timestamp: serverTimestamp() });
+                transaction.set(newReferralRef, {
+                    referrerId: referrerId,
+                    referredUserId: userId,
+                    referredName: userProfile.userName || 'Unknown',
+                    reward: globalConfig.referrerReward,
+                    timestamp: serverTimestamp()
+                });
             });
-            showNotification('ជោគជ័យ!', 'success'); setInputCode('');
-        } catch (e) { showNotification(e.message, 'error'); }
+            
+            showNotification(`ជោគជ័យ! ទទួលបាន +${formatNumber(globalConfig.referredBonus || 500)} Points`, 'success');
+            setInputCode('');
+        } catch (e) {
+            showNotification(e.message, 'error');
+        }
         setIsSubmitting(false);
     };
 
@@ -455,22 +515,62 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
         <div className="min-h-screen bg-purple-900 pb-16 pt-20">
             <Header title="ណែនាំមិត្ត" onBack={() => setPage('DASHBOARD')} />
             <main className="p-4 space-y-4">
+                
+                {/* YOUR CODE */}
                 <Card className="p-6 text-center bg-purple-800 border-2 border-yellow-500/50">
                     <h3 className="font-bold text-white text-lg">កូដណែនាំរបស់អ្នក</h3>
                     <div className="text-4xl font-mono font-extrabold text-yellow-400 my-4 tracking-widest bg-purple-900 p-2 rounded-lg shadow-inner">{shortId}</div>
-                    <p className="text-sm text-purple-200 font-medium">ទទួលបាន <span className='text-green-400 font-bold'>{formatNumber(globalConfig.referrerReward)}</span> Points</p>
-                    <button onClick={() => {navigator.clipboard.writeText(shortId); showNotification('Copied!', 'success')}} className="mt-5 bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-full font-bold mx-auto block">Copy</button>
+                    <p className="text-sm text-purple-200 font-medium">ទទួលបាន <span className='text-green-400 font-bold'>{formatNumber(globalConfig.referrerReward)} ពិន្ទុ!</span> ក្នុងម្នាក់</p>
+                    <button onClick={() => {navigator.clipboard.writeText(shortId); showNotification('ចម្លងរួចរាល់!', 'success')}} className="mt-5 bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-full text-sm font-bold flex items-center justify-center mx-auto shadow-lg active:scale-95 transition">
+                        <Copy className='w-4 h-4 mr-2'/> ចម្លងកូដ
+                    </button>
                 </Card>
+
+                {/* INPUT REFERRER CODE */}
                 <Card className="p-4 border border-teal-500/30 bg-gradient-to-br from-purple-800 to-purple-900">
-                    <h3 className="font-bold text-white mb-2">ដាក់កូដអ្នកណែនាំ</h3>
+                    <h3 className="font-bold text-white mb-2 flex items-center"><UserPlus className="w-4 h-4 mr-2"/> ដាក់កូដអ្នកណែនាំ</h3>
+                    
                     {userProfile.referredBy ? (
-                        <div className="text-center text-green-400">Ref: {userProfile.referredBy} (Success)</div>
+                        <div className="bg-purple-950/50 p-3 rounded border border-purple-700 text-center">
+                            <p className="text-purple-300 text-sm">អ្នកត្រូវបានណែនាំដោយ៖</p>
+                            <p className="text-xl font-mono font-bold text-yellow-400 mt-1">{userProfile.referredBy}</p>
+                            <p className="text-xs text-green-400 mt-1 flex justify-center items-center"><CheckCircle size={12} className="mr-1"/> បានទទួលរង្វាន់រួចរាល់</p>
+                        </div>
                     ) : (
-                        <div className="flex space-x-2">
-                            <input value={inputCode} onChange={(e) => setInputCode(e.target.value.toUpperCase())} placeholder="CODE" maxLength={6} className="flex-1 p-2 bg-purple-950 border border-purple-600 rounded text-white text-center uppercase" />
-                            <button onClick={handleSubmitCode} className="px-4 bg-yellow-600 hover:bg-yellow-700 text-white rounded font-bold">OK</button>
+                        <div>
+                            <p className="text-xs text-purple-200 mb-3">ដាក់កូដដើម្បីទទួលបាន <span className="text-yellow-400 font-bold">+{formatNumber(globalConfig.referredBonus || 500)} Points</span> បន្ថែម!</p>
+                            <div className="flex space-x-2">
+                                <input 
+                                    value={inputCode}
+                                    onChange={(e) => setInputCode(e.target.value.toUpperCase())}
+                                    placeholder="បញ្ចូលកូដ ៦ ខ្ទង់"
+                                    maxLength={6}
+                                    disabled={isSubmitting}
+                                    className="flex-1 p-2 bg-purple-950 border border-purple-600 rounded text-white font-mono text-center uppercase focus:border-yellow-400 outline-none"
+                                />
+                                <button 
+                                    onClick={handleSubmitCode}
+                                    disabled={isSubmitting || inputCode.length !== 6}
+                                    className={`px-4 rounded font-bold text-white transition ${isSubmitting || inputCode.length !== 6 ? 'bg-gray-600' : 'bg-yellow-600 hover:bg-yellow-700'}`}
+                                >
+                                    {isSubmitting ? '...' : 'OK'}
+                                </button>
+                            </div>
                         </div>
                     )}
+                </Card>
+
+                {/* REFERRAL LIST */}
+                <Card className="p-4">
+                    <h3 className="font-bold mb-4 text-white border-b border-purple-600 pb-2">បញ្ជីអ្នកដែលបានណែនាំ ({referrals.length})</h3>
+                    <div className="max-h-60 overflow-y-auto space-y-2">
+                        {referrals.length > 0 ? referrals.map((r, i) => (
+                            <div key={i} className="flex justify-between items-center bg-purple-700 p-3 rounded-lg border border-purple-600">
+                                <span className="text-white font-semibold text-sm">{i+1}. {r.referredName || 'User'}</span>
+                                <span className="text-green-400 font-bold text-sm">+{formatNumber(r.reward)}</span>
+                            </div>
+                        )) : <div className="text-center py-8 text-purple-400 text-sm">មិនទាន់មានការណែនាំ</div>}
+                    </div>
                 </Card>
             </main>
         </div>
@@ -486,198 +586,340 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLinkVerified, setIsLinkVerified] = useState(false);
     const [previewUrl, setPreviewUrl] = useState(null);
+
     useEffect(() => {
         const q = query(getCampaignsCollectionRef(), where('userId', '==', userId));
-        return onSnapshot(q, (snap) => setUserCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds)));
+        return onSnapshot(q, (snap) => {
+            setUserCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds));
+        });
     }, [db, userId]);
+
+    const calculateCost = useCallback(() => {
+        const c = parseInt(count) || 0;
+        const t = parseInt(time) || 0;
+        return type === 'sub' ? c * 50 : c * t * 1;
+    }, [type, count, time]);
+
     const handleCheckLink = (e) => {
         e.preventDefault();
-        if(!link) return;
+        if(!link.trim()) return showNotification('សូមបញ្ចូល Link ជាមុនសិន', 'error');
+        
         if (type === 'view' || type === 'sub') {
             const embed = getEmbedUrl(link);
-            if(!embed) return showNotification('Invalid YouTube Link', 'error');
+            if(!embed) return showNotification('Link YouTube មិនត្រឹមត្រូវ', 'error');
             setPreviewUrl(embed);
+        } else {
+            if(!link.startsWith('http')) return showNotification('Link ត្រូវតែមាន http:// ឬ https://', 'error');
+            setPreviewUrl(null);
         }
+        
         setIsLinkVerified(true);
+        showNotification('Link ត្រឹមត្រូវ!', 'success');
     };
+
+    const handleResetLink = () => {
+        setLink('');
+        setIsLinkVerified(false);
+        setPreviewUrl(null);
+    }
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        const cost = (type === 'sub' ? 50 : 1) * (type === 'sub' ? count : count * time);
-        if (cost > userProfile.points) return showNotification('Not enough points', 'error');
+        const cost = calculateCost();
+        if (!link.trim() || count < 1 || cost > userProfile.points) {
+            showNotification('សូមពិនិត្យ Link ឬពិន្ទុរបស់អ្នក!', 'error');
+            return;
+        }
         setIsSubmitting(true);
         try {
-            await runTransaction(db, async (tx) => {
-                const pRef = getProfileDocRef(userId);
-                tx.update(pRef, { points: increment(-cost) });
-                const newRef = doc(getCampaignsCollectionRef());
-                tx.set(newRef, { userId, type, link, costPerUnit: type === 'sub' ? 50 : 1, requiredDuration: type === 'sub' ? 60 : time, initialCount: parseInt(count), remaining: parseInt(count), totalCost: cost, createdAt: serverTimestamp(), isActive: true });
-                const hRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
-                tx.set(hRef, { title: `Create Campaign`, amount: -cost, date: serverTimestamp(), type: 'campaign' });
+            await runTransaction(db, async (transaction) => {
+                const profileRef = getProfileDocRef(userId);
+                const profileDoc = await transaction.get(profileRef);
+                if (!profileDoc.exists() || profileDoc.data().points < cost) throw new Error("Insufficient points");
+                transaction.update(profileRef, { points: increment(-cost) });
+                const newCampRef = doc(getCampaignsCollectionRef());
+                transaction.set(newCampRef, { userId, type, link: link.trim(), costPerUnit: type === 'sub' ? 50 : 1, requiredDuration: type === 'sub' ? 60 : (parseInt(time) || 60), initialCount: parseInt(count), remaining: parseInt(count), totalCost: cost, createdAt: serverTimestamp(), isActive: true });
+                
+                // SAVE HISTORY
+                const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                transaction.set(historyRef, {
+                    title: `Create ${type.toUpperCase()} Campaign`,
+                    amount: -cost,
+                    date: serverTimestamp(),
+                    type: 'campaign'
+                });
             });
-            showNotification('Created!', 'success'); setLink(''); setIsLinkVerified(false);
-        } catch(e) { showNotification(e.message, 'error'); }
-        setIsSubmitting(false);
+            showNotification('ដាក់យុទ្ធនាការជោគជ័យ!', 'success');
+            setLink('');
+            setIsLinkVerified(false);
+            setPreviewUrl(null);
+            setCount(10);
+        } catch (error) { showNotification(error.message, 'error'); } finally { setIsSubmitting(false); }
     };
+
     return (
         <div className="min-h-screen bg-[#0f172a] pb-16 pt-20">
-             <Header title="MY CAMPAIGNS" onBack={() => setPage('DASHBOARD')} />
-             <div className="px-4">
-                <div className="bg-[#0f172a] p-2 mb-4">
-                     <div className="flex space-x-2 mb-4">
-                        {['view', 'sub', 'website'].map(t => <button key={t} onClick={() => {setType(t); setIsLinkVerified(false);}} className={`flex-1 py-2 rounded font-bold text-xs ${type===t?'bg-[#4c1d95] text-white':'bg-gray-800 text-gray-400'}`}>{t.toUpperCase()}</button>)}
+            <Header title="យុទ្ធនាការខ្ញុំ" onBack={() => setPage('DASHBOARD')} />
+            <main className="p-0">
+                {isLinkVerified && previewUrl && (
+                    <div className="w-full aspect-video bg-black mb-4">
+                        <iframe src={previewUrl} className="w-full h-full" frameBorder="0" allowFullScreen />
                     </div>
-                    <form onSubmit={isLinkVerified ? handleSubmit : handleCheckLink} className="space-y-3">
-                        <input value={link} onChange={e => {setLink(e.target.value); setIsLinkVerified(false);}} placeholder="Link..." className="w-full p-3 rounded bg-white text-black" required disabled={isLinkVerified}/>
-                        {isLinkVerified && (
-                            <>
-                                <div className='flex justify-between text-white text-sm'><label>Count</label><input type="number" value={count} onChange={e=>setCount(e.target.value)} className='w-20 text-black text-center rounded'/></div>
-                                {type!=='sub' && <div className='flex justify-between text-white text-sm'><label>Seconds</label><input type="number" value={time} onChange={e=>setTime(e.target.value)} className='w-20 text-black text-center rounded'/></div>}
-                                <button type="submit" disabled={isSubmitting} className="w-full bg-yellow-600 text-white py-3 rounded font-bold mt-2">{isSubmitting ? '...' : `PAY ${(type === 'sub' ? 50 : 1) * (type === 'sub' ? count : count * time)}`}</button>
-                            </>
-                        )}
-                        {!isLinkVerified && <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded">CHECK LINK</button>}
-                    </form>
-                </div>
-                <div className="space-y-2">
-                    {userCampaigns.map(c => (
-                        <div key={c.id} className="bg-gray-800 p-3 rounded border-l-4 border-teal-500 text-white text-xs">
-                            <div className='truncate font-bold'>{c.link}</div>
-                            <div className='flex justify-between mt-1'><span>{c.type.toUpperCase()}</span><span>Rem: {c.remaining}</span></div>
+                )}
+
+                <div className="px-4 space-y-4">
+                    <div className="bg-[#0f172a] p-2">
+                        <div className="flex space-x-2 mb-4">
+                            {['view', 'sub', 'website'].map(t => (
+                                <button key={t} onClick={() => {setType(t); setIsLinkVerified(false); setPreviewUrl(null);}} className={`flex-1 py-2 rounded font-bold text-xs ${type === t ? 'bg-[#4c1d95] text-white border-b-2 border-teal-400' : 'bg-gray-800 text-gray-400'}`}>{t.toUpperCase()}</button>
+                            ))}
                         </div>
-                    ))}
-                </div>
-             </div>
-        </div>
-    );
-};
 
-const EarnPage = ({ db, userId, type, setPage, showNotification }) => {
-    const [campaigns, setCampaigns] = useState([]);
-    const [current, setCurrent] = useState(null);
-    const [timer, setTimer] = useState(0);
-    const [claimed, setClaimed] = useState(false);
-    const isMounted = useRef(true);
+                        <form onSubmit={isLinkVerified ? handleSubmit : handleCheckLink} className="space-y-3">
+                            <div className="flex">
+                                <input 
+                                    value={link} 
+                                    onChange={e => {setLink(e.target.value); setIsLinkVerified(false);}} 
+                                    placeholder={type === 'website' ? "https://yoursite.com" : "https://youtu.be/..."}
+                                    required 
+                                    disabled={isLinkVerified}
+                                    className="flex-1 p-3 bg-white text-black placeholder-gray-500 border-none rounded-l-md focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                />
+                                <button 
+                                    type={isLinkVerified ? 'button' : 'submit'}
+                                    onClick={isLinkVerified ? handleResetLink : undefined}
+                                    className={`px-6 font-bold text-white rounded-r-md transition ${isLinkVerified ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 hover:bg-red-700'}`}
+                                >
+                                    {isLinkVerified ? 'X' : 'CHECK'}
+                                </button>
+                            </div>
 
-    useEffect(() => { isMounted.current = true; return () => { isMounted.current = false; }; }, []);
-    useEffect(() => {
-        const q = query(getCampaignsCollectionRef(), where('type', '==', type), limit(50));
-        const unsub = onSnapshot(q, (snap) => {
-            if(!isMounted.current) return;
-            const list = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.userId !== userId && c.remaining > 0 && c.isActive !== false);
-            setCampaigns(list);
-            if (!current && list.length > 0) setCurrent(list[0]);
-        });
-        return () => unsub();
-    }, [db, userId, type]);
+                            {isLinkVerified && (
+                                <div className='mt-4 space-y-4'>
+                                    <h3 className='text-white font-bold text-sm border-b border-gray-600 pb-2'>Campaigns Setting</h3>
+                                   
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="text-white font-bold text-sm">Number of view</label>
+                                        <input 
+                                            type="number" 
+                                            value={count} 
+                                            onChange={e => setCount(Math.max(1, parseInt(e.target.value)))} 
+                                            className="w-32 p-2 bg-white text-black text-center font-bold rounded-full border-none" 
+                                        />
+                                    </div>
 
-    useEffect(() => { if (current) { setTimer(current.requiredDuration || 30); setClaimed(false); } }, [current]);
-    useEffect(() => { 
-        let interval; 
-        if (timer > 0 && !claimed) interval = setInterval(() => setTimer(t => t - 1), 1000);
-        return () => clearInterval(interval); 
-    }, [timer, claimed]);
+                                    {type !== 'sub' && (
+                                        <div className="flex justify-between items-center mb-4">
+                                            <label className="text-white font-bold text-sm">Time Required (sec.)</label>
+                                            <input 
+                                                type="number" 
+                                                value={time} 
+                                                onChange={e => setTime(Math.max(10, parseInt(e.target.value)))} 
+                                                className="w-32 p-2 bg-white text-black text-center font-bold rounded-full border-none" 
+                                            />
+                                        </div>
+                                    )}
+                                   
+                                    <div className="flex justify-between items-center mb-4 pt-2 border-t border-gray-600">
+                                         <label className="text-white font-bold text-sm">Campaign Cost</label>
+                                         <span className='text-xl font-bold text-yellow-500'>{formatNumber(calculateCost())}</span>
+                                    </div>
 
-    const handleClaim = async () => {
-        if (claimed || !current) return;
-        setClaimed(true);
-        try {
-            await runTransaction(db, async (tx) => {
-                const campRef = doc(getCampaignsCollectionRef(), current.id);
-                const campDoc = await tx.get(campRef);
-                if (!campDoc.exists() || campDoc.data().remaining <= 0) throw new Error("Ended");
-                tx.update(getProfileDocRef(userId), { points: increment(current.requiredDuration || 50), totalEarned: increment(current.requiredDuration || 50) });
-                tx.update(campRef, { remaining: increment(-1) });
-                const hRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
-                tx.set(hRef, { title: 'Earned Points', amount: current.requiredDuration || 50, date: serverTimestamp(), type: 'earn' });
-            });
-            if(isMounted.current) showNotification('Points Added!', 'success');
-        } catch(e) {}
-    };
-
-    const embedSrc = current ? (type === 'website' ? current.link : getEmbedUrl(current.link)) : null;
-
-    return (
-        <div className="h-screen bg-black flex flex-col">
-            <Header title="EARN" onBack={() => setPage('DASHBOARD')} className="relative" />
-            <div className="flex-1 relative">
-                {current && embedSrc ? (
-                    <iframe src={embedSrc} className="w-full h-full" frameBorder="0" allowFullScreen sandbox={type==='website'?"allow-scripts allow-same-origin":undefined}/>
-                ) : <div className='text-white flex items-center justify-center h-full'>Loading...</div>}
-            </div>
-            <div className="bg-white p-4 z-20">
-                {current ? (
-                    <div className="flex justify-between items-center">
-                         <div className="font-bold text-yellow-600">{current.requiredDuration} Points</div>
-                         <button onClick={handleClaim} disabled={timer > 0 || claimed} className={`px-6 py-2 rounded font-bold text-white ${timer>0||claimed?'bg-gray-400':'bg-green-600'}`}>{claimed?'CLAIMED':timer>0?timer+'s':'CLAIM'}</button>
-                         <button onClick={() => { const next = campaigns.filter(c=>c.id!==current.id)[0]; setCurrent(next||null); }} className="bg-yellow-500 text-white px-4 py-2 rounded">SKIP</button>
+                                    <button type="submit" disabled={isSubmitting} className="w-full bg-yellow-600 text-white py-3 rounded-full font-bold shadow-lg hover:bg-yellow-700 transition mt-4">
+                                         {isSubmitting ? 'Processing...' : 'DONE'}
+                                    </button>
+                                </div>
+                            )}
+                        </form>
                     </div>
-                ) : <p className='text-center'>No Data</p>}
-            </div>
-        </div>
-    );
-};
 
-const BalanceDetailsPage = ({ db, userId, setPage, userProfile }) => {
-    const [history, setHistory] = useState([]);
-    useEffect(() => {
-        if (!db || !userId) return;
-        const q = query(getHistoryCollectionRef(userId), orderBy('date', 'desc'), limit(30));
-        const unsub = onSnapshot(q, (snap) => setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
-        return () => unsub();
-    }, [db, userId]);
-    return (
-        <div className="min-h-screen bg-purple-900 pb-16 pt-20">
-            <Header title="MY BALANCE" onBack={() => setPage('DASHBOARD')} />
-            <main className="p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                    <Card className="text-center p-4 text-white bg-purple-800"><p className="text-xs">Current</p><p className="text-xl font-bold text-yellow-400">{formatNumber(userProfile.points)}</p></Card>
-                    <Card className="text-center p-4 text-white bg-teal-800"><p className="text-xs">Total Earned</p><p className="text-xl font-bold">{formatNumber(userProfile.totalEarned || 0)}</p></Card>
-                </div>
-                <Card className="p-4">
-                    <h3 className="font-bold text-white mb-3 border-b border-purple-600 pb-2">History</h3>
-                    <div className="space-y-3 max-h-[60vh] overflow-y-auto">
-                        {history.map((item) => (
-                            <div key={item.id} className="flex justify-between items-center bg-purple-800 p-2 rounded border border-purple-700">
-                                <div><p className="text-white text-sm">{item.title}</p><p className="text-[10px] text-purple-300">{item.date?.toDate().toLocaleDateString()}</p></div>
-                                <span className={`font-bold ${item.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>{item.amount > 0 ? '+' : ''}{formatNumber(item.amount)}</span>
+                    <div className="space-y-2 mt-6">
+                        <h3 className="text-gray-400 font-bold text-xs uppercase">Recent Campaigns</h3>
+                        {userCampaigns.map(c => (
+                            <div key={c.id} className="bg-gray-800 p-3 rounded shadow flex justify-between items-center border-l-4 border-teal-500">
+                                <div className='w-2/3'><p className="font-bold text-xs truncate text-gray-300">{c.link}</p><p className="text-[10px] text-gray-500">{c.type.toUpperCase()} - Rem: {c.remaining}</p></div>
+                                <span className={`text-xs font-bold ${c.remaining > 0 ? 'text-green-400' : 'text-red-400'}`}>{c.remaining > 0 ? 'Active' : 'Finished'}</span>
                             </div>
                         ))}
                     </div>
-                </Card>
+                </div>
             </main>
         </div>
     );
 };
 
-const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
-    const [timer, setTimer] = useState(15);
-    useEffect(() => { if(timer > 0) setTimeout(()=>setTimer(t=>t-1), 1000); }, [timer]);
-    const claim = async () => {
-         await runTransaction(db, async(tx)=>{
-             tx.update(getProfileDocRef(userId), { points: increment(globalConfig.adsReward), totalEarned: increment(globalConfig.adsReward) });
-             const hRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
-             tx.set(hRef, { title: 'Watched Ad', amount: globalConfig.adsReward, date: serverTimestamp(), type: 'ads' });
-         });
-         showNotification('Claimed!', 'success'); setPage('DASHBOARD');
+const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig }) => {
+    const [campaigns, setCampaigns] = useState([]);
+    const [current, setCurrent] = useState(null);
+    const [timer, setTimer] = useState(0);
+    const [claimed, setClaimed] = useState(false);
+    const [autoPlay, setAutoPlay] = useState(true);
+    const isMounted = useRef(true);
+
+    useEffect(() => {
+        isMounted.current = true;
+        return () => { isMounted.current = false; };
+    }, []);
+
+    useEffect(() => {
+        const q = query(getCampaignsCollectionRef(), where('type', '==', type), limit(50));
+        return onSnapshot(q, (snap) => {
+            if(!isMounted.current) return;
+            const list = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.userId !== userId && c.remaining > 0 && c.isActive !== false);
+            setCampaigns(list);
+            if (!current && list.length > 0) setCurrent(list[0]);
+        });
+    }, [db, userId, type]);
+
+    useEffect(() => { 
+        if (current) { setTimer(current.requiredDuration || 30); setClaimed(false); } 
+    }, [current]);
+    
+    useEffect(() => { 
+        let interval = null;
+        if (timer > 0 && !claimed) { 
+            interval = setInterval(() => {
+                setTimer(t => Math.max(0, t - 1));
+            }, 1000); 
+        } else if (timer === 0 && !claimed && current) {
+            if (type !== 'sub') handleClaim();
+        }
+        return () => clearInterval(interval); 
+    }, [timer, claimed, current, type]);
+
+    const handleClaim = async () => {
+        if (claimed || !current) return;
+        setClaimed(true);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const campRef = doc(getCampaignsCollectionRef(), current.id);
+                const campDoc = await transaction.get(campRef);
+                if (!campDoc.exists() || campDoc.data().remaining <= 0) throw new Error("Campaign finished");
+                
+                transaction.update(getProfileDocRef(userId), { 
+                    points: increment(current.requiredDuration || 50),
+                    totalEarned: increment(current.requiredDuration || 50)
+                });
+                transaction.update(campRef, { remaining: increment(-1) });
+
+                // SAVE HISTORY
+                const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                transaction.set(historyRef, {
+                    title: type === 'view' ? 'Watched Video' : type === 'sub' ? 'Subscribed Channel' : 'Visited Website',
+                    amount: current.requiredDuration || 50,
+                    date: serverTimestamp(),
+                    type: 'earn'
+                });
+            });
+            if(isMounted.current) showNotification('Success! Points Added.', 'success');
+            
+            if(autoPlay && isMounted.current) {
+                setTimeout(() => {
+                    if(!isMounted.current) return;
+                    handleNext();
+                }, 1500);
+            }
+        } catch (e) { if(isMounted.current) showNotification('បរាជ័យ: ' + e.message, 'error'); }
     };
-    return <div className="h-screen bg-black flex items-center justify-center text-white flex-col"><div className="mb-4 text-2xl">ADS PLAYING...</div>{timer>0?timer+'s':<button onClick={claim} className="bg-green-600 px-6 py-3 rounded font-bold">CLAIM</button>}</div>
+
+    const handleNext = () => {
+        const next = campaigns.filter(c => c.id !== current?.id && c.remaining > 0)[0];
+        setCurrent(next || null);
+    }
+
+    const handleSubscribeClick = () => {
+        if(!current) return;
+        window.open(current.link, '_blank');
+        handleClaim();
+    };
+
+    const isVideo = type === 'view' || type === 'sub';
+    const iframeSrc = current ? (isVideo ? getEmbedUrl(current.link) : current.link) : null;
+
+    return (
+        <div className="h-screen bg-[#0f172a] flex flex-col">
+            <Header title={type === 'view' ? 'មើលវីដេអូ' : type === 'website' ? 'មើល Website' : 'Subscribe'} onBack={() => setPage('DASHBOARD')} className="relative" />
+            
+            <div className="flex-1 relative bg-black">
+                {current ? (
+                    iframeSrc ? (
+                        <>
+                            <iframe 
+                                src={iframeSrc} 
+                                className="w-full h-full absolute top-0 left-0" 
+                                frameBorder="0" 
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                allowFullScreen
+                                sandbox={!isVideo ? "allow-scripts allow-same-origin allow-forms" : undefined}
+                            />
+                            {!isVideo && (
+                                <button onClick={() => window.open(current.link)} className="absolute top-4 right-4 bg-black/60 hover:bg-black text-white px-3 py-1 rounded text-xs flex items-center backdrop-blur-sm border border-white/20">
+                                    <ExternalLink size={14} className="mr-1"/> Open External
+                                </button>
+                            )}
+                        </>
+                    ) : (
+                        <div className="flex items-center justify-center h-full text-white"><p>Invalid Link</p></div>
+                    )
+                ) : (
+                     <div className="flex flex-col items-center justify-center h-full text-white"><RefreshCw className="animate-spin mb-4"/>កំពុងស្វែងរក...</div>
+                )}
+            </div>
+
+            <div className="bg-white p-3 border-t border-gray-200 shadow-lg z-20">
+                 {current ? (
+                    <div className="flex flex-col space-y-2">
+                         <div className="flex justify-between items-center">
+                            <div className="flex items-center space-x-2">
+                                <span className="text-lg font-bold text-yellow-600 flex items-center"><Coins className="w-5 h-5 mr-1" /> {current.requiredDuration}</span>
+                                {timer > 0 ? (
+                                    <span className="text-red-500 font-bold flex items-center bg-red-100 px-2 py-0.5 rounded-full text-sm"><Zap className="w-4 h-4 mr-1" /> {timer}s</span>
+                                ) : (
+                                    <span className="text-green-500 font-bold flex items-center bg-green-100 px-2 py-0.5 rounded-full text-sm"><CheckCircle className="w-4 h-4 mr-1" /> Ready</span>
+                                )}
+                            </div>
+                            
+                            <div className="flex items-center space-x-2">
+                                <span className="text-xs text-gray-500 font-medium">Auto Play</span>
+                                <button onClick={() => setAutoPlay(!autoPlay)} className={`w-8 h-4 rounded-full p-0.5 transition duration-300 ${autoPlay ? 'bg-teal-500' : 'bg-gray-300'}`}>
+                                    <div className={`w-3 h-3 bg-white rounded-full shadow transform transition duration-300 ${autoPlay ? 'translate-x-4' : ''}`}></div>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex space-x-2">
+                            {type === 'sub' && timer === 0 && !claimed ? (
+                                <button onClick={handleSubscribeClick} className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold shadow hover:bg-red-700 active:scale-95 transition text-sm">
+                                    SUBSCRIBE & CLAIM
+                                </button>
+                            ) : (
+                                <button onClick={handleClaim} disabled={timer > 0 || claimed} className={`flex-1 py-3 rounded-lg font-bold shadow text-sm text-white transition ${timer > 0 || claimed ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}>
+                                    {claimed ? 'CLAIMED' : timer > 0 ? 'PLEASE WAIT...' : 'CLAIM REWARD'}
+                                </button>
+                            )}
+                            <button onClick={handleNext} className="px-4 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-lg shadow active:scale-95 transition">
+                                SKIP
+                            </button>
+                        </div>
+                    </div>
+                 ) : <div className="text-center text-gray-400 text-sm py-2">No active campaigns</div>}
+            </div>
+        </div>
+    );
 };
 
-// --- 6. USER PAGES ---
 const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
-    const [selectedPkg, setSelectedPkg] = useState(null);
-
-    const handlePurchaseSuccess = async (pkg) => {
+    const handlePurchase = async (pkg) => {
         try {
-            setSelectedPkg(null); // Close Modal
             await runTransaction(db, async (tx) => { 
                 tx.update(getProfileDocRef(userId), { 
                     points: increment(pkg.coins),
                     totalEarned: increment(pkg.coins)
                 }); 
+                // SAVE HISTORY
                 const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
                 tx.set(historyRef, {
-                    title: 'Purchased Coins (KHQR)',
+                    title: 'Purchased Coins',
                     amount: pkg.coins,
                     date: serverTimestamp(),
                     type: 'buy'
@@ -686,44 +928,209 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
             showNotification(`ទិញបានជោគជ័យ! +${formatNumber(pkg.coins)} coins`, 'success');
         } catch (error) { showNotification(`បរាជ័យ: ${error.message}`, 'error'); }
     };
-
     return (
         <div className="min-h-screen bg-purple-900 pb-16 pt-20">
             <Header title="BUY COINS" onBack={() => setPage('DASHBOARD')} />
             <main className="p-4 space-y-4">
                 {globalConfig.coinPackages.map((pkg) => (
-                    <button key={pkg.id} onClick={() => setSelectedPkg(pkg)} className={`w-full flex items-center justify-between p-4 rounded-xl shadow-lg text-white transform active:scale-95 transition ${pkg.color}`}>
+                    <button key={pkg.id} onClick={() => handlePurchase(pkg)} className={`w-full flex items-center justify-between p-4 rounded-xl shadow-lg text-white transform active:scale-95 transition ${pkg.color}`}>
                         <div className="flex items-center space-x-3">
                             <div className="bg-white bg-opacity-20 p-3 rounded-full"><Coins className="w-6 h-6 text-yellow-100" /></div>
                             <div className="text-left"><p className="text-xl font-bold">{formatNumber(pkg.coins)} Coins</p><p className="text-sm opacity-80">កញ្ចប់ពិន្ទុ</p></div>
                         </div>
-                        <div className="bg-white text-gray-800 font-bold px-4 py-2 rounded-lg">{pkg.priceLabel || '$'+pkg.price.toFixed(2)}</div>
+                        <div className="bg-white text-gray-800 font-bold px-4 py-2 rounded-lg">{pkg.price}</div>
                     </button>
                 ))}
             </main>
+        </div>
+    );
+};
 
-            {/* Payment Modal */}
-            {selectedPkg && (
-                <BakongPaymentModal 
-                    pkg={selectedPkg} 
-                    onClose={() => setSelectedPkg(null)} 
-                    onSuccess={handlePurchaseSuccess} 
-                />
+const BalanceDetailsPage = ({ db, userId, setPage, userProfile }) => {
+    const [history, setHistory] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!db || !userId) return;
+        const q = query(getHistoryCollectionRef(userId), orderBy('date', 'desc'), limit(30));
+        
+        const unsub = onSnapshot(q, (snap) => {
+            setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setLoading(false);
+        });
+        return () => unsub();
+    }, [db, userId]);
+
+    return (
+        <div className="min-h-screen bg-purple-900 pb-16 pt-20">
+            <Header title="MY BALANCE" onBack={() => setPage('DASHBOARD')} />
+            <main className="p-4 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                    <Card className="bg-gradient-to-br from-purple-700 to-purple-900 text-center p-4 text-white border-purple-500">
+                        <p className="text-xs opacity-70 mb-1">Current Balance</p>
+                        <div className="flex justify-center items-center"><Coins className="w-5 h-5 text-yellow-400 mr-1" /><span className="text-xl font-bold">{formatNumber(userProfile.points)}</span></div>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-teal-600 to-teal-800 text-center p-4 text-white border-teal-500">
+                        <p className="text-xs opacity-70 mb-1">Total Earned</p>
+                        <div className="flex justify-center items-center"><TrendingUp className="w-5 h-5 text-white mr-1" /><span className="text-xl font-bold">{formatNumber(userProfile.totalEarned || 0)}</span></div>
+                    </Card>
+                </div>
+
+                <Card className="p-4">
+                    <h3 className="font-bold text-white mb-3 border-b border-purple-600 pb-2 flex items-center"><Clock className="w-4 h-4 mr-2"/> ប្រវត្តិពិន្ទុ (History)</h3>
+                    {loading ? (
+                        <div className="text-center text-purple-300 py-4">Loading...</div>
+                    ) : history.length > 0 ? (
+                        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                            {history.map((item) => (
+                                <div key={item.id} className="flex justify-between items-center bg-purple-800 p-3 rounded-lg border border-purple-700">
+                                    <div className="flex items-center">
+                                        <div className={`p-2 rounded-full mr-3 ${item.amount > 0 ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`}>
+                                            {item.amount > 0 ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                                        </div>
+                                        <div>
+                                            <p className="text-white text-sm font-bold">{item.title || 'Unknown'}</p>
+                                            <p className="text-[10px] text-purple-300 opacity-70">{item.date?.toDate().toLocaleDateString()} {item.date?.toDate().toLocaleTimeString()}</p>
+                                        </div>
+                                    </div>
+                                    <span className={`font-bold ${item.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                        {item.amount > 0 ? '+' : ''}{formatNumber(item.amount)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center text-purple-400 py-8 opacity-50">មិនទាន់មានប្រវត្តិ</div>
+                    )}
+                </Card>
+            </main>
+        </div>
+    );
+};
+
+const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
+    const [adsWatched, setAdsWatched] = useState(0);
+    const [timer, setTimer] = useState(15);
+    const [finished, setFinished] = useState(false);
+    const reward = globalConfig.adsReward || 30;
+    const maxDaily = globalConfig.maxDailyAds || 15;
+
+    useEffect(() => {
+        const unsub = onSnapshot(getDailyStatusDocRef(userId), (doc) => {
+            if(doc.exists()) setAdsWatched(doc.data().adsWatchedCount || 0);
+        });
+        return () => unsub();
+    }, [userId]);
+
+    useEffect(() => {
+        let interval;
+        if (timer > 0) { interval = setInterval(() => setTimer(t => t - 1), 1000); } 
+        else setFinished(true);
+        return () => clearInterval(interval);
+    }, [timer]);
+
+    const claimReward = async () => {
+        if (adsWatched >= maxDaily) return showNotification('អស់សិទ្ធិមើលសម្រាប់ថ្ងៃនេះហើយ!', 'error');
+        try {
+            await runTransaction(db, async (tx) => { 
+                const dailyRef = getDailyStatusDocRef(userId);
+                tx.update(getProfileDocRef(userId), { 
+                    points: increment(reward),
+                    totalEarned: increment(reward)
+                });
+                tx.set(dailyRef, { adsWatchedCount: increment(1), date: getTodayDateKey() }, { merge: true });
+                
+                // SAVE HISTORY
+                const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                tx.set(historyRef, {
+                    title: 'Watched Ad',
+                    amount: reward,
+                    date: serverTimestamp(),
+                    type: 'ads'
+                });
+            });
+            showNotification(`ទទួលបាន ${reward} Coins!`, 'success');
+            setPage('DASHBOARD');
+        } catch (e) { showNotification(e.message, 'error'); }
+    };
+
+    const isLimitReached = adsWatched >= maxDaily;
+
+    return (
+        <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 z-50">
+            <div className="text-white text-2xl font-bold mb-4">កំពុងមើលពាណិជ្ជកម្ម...</div>
+            <div className="w-full h-64 bg-gray-800 flex items-center justify-center rounded-lg mb-6 border-2 border-yellow-500 relative">
+                <div className="absolute top-2 right-2 bg-red-600 text-white text-xs px-2 py-1 rounded">
+                    Watched: {adsWatched} / {maxDaily}
+                </div>
+                <div className="text-center">
+                    <MonitorPlay className="w-16 h-16 text-yellow-500 mx-auto mb-2" />
+                    <p className="text-white">ADS ID: {globalConfig.adsSettings?.interstitialId || 'N/A'}</p>
+                </div>
+            </div>
+            {isLimitReached ? (
+                 <div className="text-red-500 font-bold text-xl bg-white p-3 rounded">អស់សិទ្ធិមើលសម្រាប់ថ្ងៃនេះហើយ</div>
+            ) : (
+                finished ? 
+                <button onClick={claimReward} className="bg-green-500 text-white font-bold py-3 px-8 rounded-full text-xl shadow-lg animate-bounce">ទទួលរង្វាន់ (Claim)</button> 
+                : <div className="text-white text-xl">រង់ចាំ: {timer} វិនាទី</div>
             )}
         </div>
     );
 };
 
-// --- 7. AUTH COMPONENT (Same) ---
+const MyPlanPage = ({ setPage }) => (
+    <div className="min-h-screen bg-purple-900 pb-16 pt-20">
+        <Header title="MY PLAN" onBack={() => setPage('DASHBOARD')} />
+        <main className="p-4">
+            <Card className="p-6 text-center">
+                <div className="w-20 h-20 bg-purple-700 rounded-full flex items-center justify-center mx-auto mb-4"><CheckSquare className="w-10 h-10 text-teal-400" /></div>
+                <h2 className="text-2xl font-bold text-white">FREE PLAN</h2>
+                <p className="text-purple-300 mt-2">បច្ចុប្បន្នអ្នកកំពុងប្រើប្រាស់គម្រោងឥតគិតថ្លៃ។</p>
+                 <div className="mt-6 space-y-3 text-left">
+                    <p className="flex items-center text-purple-200"><span className="mr-2 text-green-400">✔</span> មើលវីដេអូបាន</p>
+                    <p className="flex items-center text-purple-200"><span className="mr-2 text-green-400">✔</span> ដាក់យុទ្ធនាការបាន</p>
+                </div>
+            </Card>
+        </main>
+    </div>
+);
+
+// --- 7. AUTH COMPONENT ---
 const AuthForm = ({ onSubmit, btnText, isRegister = false }) => {
-    const [email, setEmail] = useState(''); const [pass, setPass] = useState(''); const [username, setUsername] = useState(''); const [refCode, setRefCode] = useState('');
+    const [email, setEmail] = useState('');
+    const [pass, setPass] = useState('');
+    const [username, setUsername] = useState('');
+    const [referralCode, setReferralCode] = useState('');
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onSubmit(email, pass, username, referralCode);
+    };
+
     return (
-        <form onSubmit={(e)=>{e.preventDefault(); onSubmit(email, pass, username, refCode)}} className="space-y-4">
-            {isRegister && <input placeholder="Username" value={username} onChange={e=>setUsername(e.target.value)} className="w-full p-3 rounded" required/>}
-            <input placeholder="Email" type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full p-3 rounded" required/>
-            <input placeholder="Password" type="password" value={pass} onChange={e=>setPass(e.target.value)} className="w-full p-3 rounded" required/>
-            {isRegister && <input placeholder="Ref Code (Optional)" value={refCode} onChange={e=>setRefCode(e.target.value)} className="w-full p-3 rounded"/>}
-            <button className="w-full bg-teal-500 text-white p-3 rounded font-bold">{btnText}</button>
+        <form onSubmit={handleSubmit} className="space-y-4">
+             {isRegister && (
+                 <div className="relative">
+                    <User className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input type="text" placeholder="ឈ្មោះ (Username)" value={username} onChange={e => setUsername(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" />
+                </div>
+            )}
+            <div className="relative">
+                <Mail className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input type="email" placeholder="អ៊ីមែល (Email)" value={email} onChange={e => setEmail(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" />
+            </div>
+            <div className="relative">
+                <Lock className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input type="password" placeholder="ពាក្យសម្ងាត់ (Password)" value={pass} onChange={e => setPass(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" />
+            </div>
+             {isRegister && (
+                 <div className="relative">
+                    <UserPlus className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input type="text" placeholder="កូដអ្នកណែនាំ (Optional)" value={referralCode} onChange={e => setReferralCode(e.target.value.toUpperCase())} maxLength={6} className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400 uppercase" />
+                </div>
+            )}
+            <button className="w-full bg-teal-500 text-white p-3 rounded font-bold hover:bg-teal-600 transition shadow-lg">{btnText}</button>
         </form>
     );
 };
@@ -737,37 +1144,137 @@ const App = () => {
     const [notification, setNotification] = useState(null);
     const [authPage, setAuthPage] = useState('LOGIN');
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
+
+    // ADMIN CONFIGURATION
     const ADMIN_EMAILS = ["admin@gmail.com"]; 
     const isAdmin = userProfile.email && ADMIN_EMAILS.includes(userProfile.email);
 
-    const showNotification = useCallback((msg, type = 'info') => { setNotification({ message: msg, type }); setTimeout(() => setNotification(null), 3000); }, []);
-    useEffect(() => { return onAuthStateChanged(auth, (user) => { if (user) setUserId(user.uid); else { setUserId(null); setPage('DASHBOARD'); } setIsAuthReady(true); }); }, []);
-    useEffect(() => { if (db && userId) return onSnapshot(getProfileDocRef(userId), (doc) => { if (doc.exists()) setUserProfile({ ...doc.data(), id: userId }); }); }, [db, userId]);
-    useEffect(() => { if (db) return onSnapshot(getGlobalConfigDocRef(), (doc) => { if (doc.exists()) setGlobalConfig({ ...defaultGlobalConfig, ...doc.data() }); }); }, [db]);
+    const showNotification = useCallback((msg, type = 'info') => {
+        setNotification({ message: msg, type });
+        setTimeout(() => setNotification(null), 3000);
+    }, []);
 
-    const handleLogin = async (email, password) => { try { await signInWithEmailAndPassword(auth, email, password); } catch (e) { showNotification(e.code, 'error'); } };
-    const handleRegister = async (email, password, username, refCode) => {
+    useEffect(() => {
+        if (!auth) return;
+        return onAuthStateChanged(auth, (user) => {
+            if (user) setUserId(user.uid);
+            else { setUserId(null); setPage('DASHBOARD'); }
+            setIsAuthReady(true);
+        });
+    }, []);
+
+    useEffect(() => {
+        if (!db || !userId) return;
+        return onSnapshot(getProfileDocRef(userId), (doc) => {
+            if (doc.exists()) setUserProfile({ ...doc.data(), id: userId });
+        });
+    }, [db, userId]);
+
+    useEffect(() => {
+        if (!db) return;
+        return onSnapshot(getGlobalConfigDocRef(), (doc) => {
+            if (doc.exists()) setGlobalConfig({ ...defaultGlobalConfig, ...doc.data() });
+        });
+    }, [db]);
+
+    const handleLogin = async (email, password) => {
+        try { await signInWithEmailAndPassword(auth, email, password); showNotification('ចូលគណនីជោគជ័យ', 'success'); }
+        catch (e) { showNotification('បរាជ័យ: ' + e.code, 'error'); }
+    };
+
+    const handleRegister = async (email, password, username, referralCode) => {
+        if (password.length < 6) return showNotification('Password must be 6+ chars', 'error');
         try {
             const cred = await createUserWithEmailAndPassword(auth, email, password);
             const uid = cred.user.uid;
             const shortId = getShortId(uid);
-            await setDoc(getProfileDocRef(uid), { userId: uid, email, userName: username || `User_${shortId}`, points: 5000, totalEarned: 5000, shortId, createdAt: serverTimestamp() });
+            
+            let bonusPoints = 5000;
+            let referrerId = null;
+
+            // Process Referral Code
+            if (referralCode && referralCode.length === 6) {
+                try {
+                    const shortDoc = await getDoc(getShortCodeDocRef(referralCode));
+                    if (shortDoc.exists()) {
+                        referrerId = shortDoc.data().fullUserId;
+                        updateDoc(getProfileDocRef(referrerId), { 
+                            points: increment(globalConfig.referrerReward),
+                            totalEarned: increment(globalConfig.referrerReward) // Update Total Earned for Referrer
+                        });
+                        bonusPoints += (globalConfig.referredBonus || 0);
+                    }
+                } catch(e) { console.error("Referral error", e); }
+            }
+
+            await setDoc(getProfileDocRef(uid), { 
+                userId: uid, 
+                email, 
+                userName: username || `User_${shortId}`, 
+                points: bonusPoints, 
+                totalEarned: bonusPoints, // Initialize Total Earned
+                shortId, 
+                createdAt: serverTimestamp(), 
+                referredBy: referrerId ? referralCode : null 
+            });
+            
             await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
-        } catch (e) { showNotification(e.code, 'error'); }
+            showNotification('ចុះឈ្មោះជោគជ័យ!', 'success');
+
+        } catch (e) { showNotification('បរាជ័យ: ' + e.code, 'error'); }
     };
+
+    const handleLogout = async () => { await signOut(auth); showNotification('បានចាកចេញ', 'success'); };
+
     const handleDailyCheckin = async () => {
-        try { await runTransaction(db, async (tx) => { tx.update(getProfileDocRef(userId), { points: increment(globalConfig.dailyCheckinReward), totalEarned: increment(globalConfig.dailyCheckinReward) }); tx.set(getDailyStatusDocRef(userId), { checkinDone: true }, { merge: true }); const hRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history')); tx.set(hRef, { title: 'Daily Check-in', amount: globalConfig.dailyCheckinReward, date: serverTimestamp(), type: 'checkin' }); }); showNotification('Success!', 'success'); } catch(e){}
+        if (userProfile.dailyCheckin) return showNotification('បាន Check-in រួចហើយ!', 'info');
+        try {
+            await runTransaction(db, async (tx) => {
+                const dailyRef = getDailyStatusDocRef(userId);
+                const dailyDoc = await tx.get(dailyRef);
+                if (dailyDoc.exists() && dailyDoc.data().checkinDone) throw new Error("Already checked in today");
+                
+                // UPDATE TOTAL EARNED
+                tx.update(getProfileDocRef(userId), { 
+                    points: increment(globalConfig.dailyCheckinReward),
+                    totalEarned: increment(globalConfig.dailyCheckinReward) 
+                });
+                tx.set(dailyRef, { checkinDone: true, date: getTodayDateKey() }, { merge: true });
+
+                // SAVE HISTORY
+                const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                tx.set(historyRef, {
+                    title: 'Daily Check-in',
+                    amount: globalConfig.dailyCheckinReward,
+                    date: serverTimestamp(),
+                    type: 'checkin'
+                });
+            });
+            showNotification('Check-in ជោគជ័យ!', 'success');
+        } catch (e) { 
+             if (e.message === "Already checked in today") showNotification('បាន Check-in រួចហើយ!', 'info');
+             else console.error(e);
+        }
     };
 
     if (!isAuthReady) return <Loading />;
+
     if (!userId) return (
         <div className="min-h-screen bg-purple-900 flex items-center justify-center p-4">
             <Card className="w-full max-w-sm p-6">
-                <h2 className="text-2xl font-bold text-center mb-6 text-white">{authPage}</h2>
-                <AuthForm onSubmit={authPage === 'LOGIN' ? handleLogin : handleRegister} btnText={authPage} isRegister={authPage === 'REGISTER'}/>
-                <button onClick={() => setAuthPage(authPage === 'LOGIN' ? 'REGISTER' : 'LOGIN')} className="w-full mt-4 text-teal-400">Switch to {authPage === 'LOGIN' ? 'Register' : 'Login'}</button>
+                <h2 className="text-2xl font-bold text-center mb-6 text-white">{authPage === 'LOGIN' ? 'ចូលគណនី' : 'បង្កើតគណនី'}</h2>
+                <AuthForm 
+                    onSubmit={authPage === 'LOGIN' ? handleLogin : handleRegister} 
+                    btnText={authPage === 'LOGIN' ? 'ចូល' : 'ចុះឈ្មោះ'} 
+                    isRegister={authPage === 'REGISTER'}
+                />
+                <div className="text-center mt-6">
+                    <button onClick={() => setAuthPage(authPage === 'LOGIN' ? 'REGISTER' : 'LOGIN')} className="text-teal-400 underline hover:text-teal-300">
+                        {authPage === 'LOGIN' ? 'មិនទាន់មានគណនី? ចុះឈ្មោះ' : 'មានគណនីហើយ? ចូល'}
+                    </button>
+                </div>
             </Card>
-            {notification && <div className="fixed top-4 bg-red-500 text-white p-2 rounded">{notification.message}</div>}
+            {notification && <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 p-2 rounded text-white bg-red-500`}>{notification.message}</div>}
         </div>
     );
 
@@ -786,9 +1293,55 @@ const App = () => {
         default:
             Content = (
                 <div className="min-h-screen bg-purple-900 pb-16 pt-20">
-                    <Header title="We4u App" className="z-20" rightContent={<div className="flex space-x-2">{isAdmin && <button onClick={() => setPage('ADMIN_DASHBOARD')}><Settings className='text-white'/></button>}<button onClick={() => signOut(auth)}><LogOut className='text-white'/></button></div>}/>
-                    <div className="px-4 mb-6"><div className="bg-gradient-to-r from-teal-500 to-teal-700 rounded-xl p-6 text-white shadow-lg text-center relative overflow-hidden border border-teal-400/30"><p className="text-sm opacity-80">Balance</p><h1 className="text-4xl font-bold my-2 flex justify-center items-center gap-2">{formatNumber(userProfile.points)} <Coins className="w-6 h-6 text-yellow-300" /></h1><p className="text-xs bg-white bg-opacity-20 inline-block px-3 py-1 rounded-full">ID: {userProfile.shortId}</p></div></div>
-                    <div className="px-4"><Card className="p-4 grid grid-cols-3 gap-3"><IconButton icon={CalendarCheck} title="DAILY TASK" onClick={handleDailyCheckin} disabled={userProfile.dailyCheckin}/><IconButton icon={UserCheck} title="SUBSCRIBE" onClick={() => setPage('EXPLORE_SUBSCRIPTION')} iconColor="text-pink-400" /><IconButton icon={Film} title="PLAY VIDEO" onClick={() => setPage('EARN_POINTS')} iconColor="text-red-400" /><IconButton icon={Wallet} title="MY BALANCE" onClick={() => setPage('BALANCE_DETAILS')} iconColor="text-orange-400" /><IconButton icon={ShoppingCart} title="BUY COINS" onClick={() => setPage('BUY_COINS')} iconColor="text-purple-400" /><IconButton icon={Target} title="CAMPAIGNS" onClick={() => setPage('MY_CAMPAIGNS')} iconColor="text-teal-400" /><IconButton icon={UserPlus} title="REFERRAL" onClick={() => setPage('REFERRAL_PAGE')} iconColor="text-blue-400" /><IconButton icon={Globe} title="WEBSITE" onClick={() => setPage('EXPLORE_WEBSITE')} iconColor="text-indigo-400" /><IconButton icon={MonitorPlay} title="ADS" onClick={() => setPage('WATCH_ADS')} iconColor="text-pink-400" /></Card></div>
+                    <Header 
+                        title="We4u App" 
+                        className="z-20" 
+                        rightContent={
+                            <div className="flex space-x-2">
+                                {isAdmin && (
+                                    <button onClick={() => setPage('ADMIN_DASHBOARD')} className="bg-red-500 text-white p-1 rounded shadow"><Settings size={20}/></button>
+                                )}
+                                <button onClick={handleLogout} className="bg-gray-600 text-white p-1 rounded shadow"><LogOut size={20}/></button>
+                            </div>
+                        }
+                    />
+                    
+                    <div className="px-4 mb-6">
+                        <div className="bg-gradient-to-r from-teal-500 to-teal-700 rounded-xl p-6 text-white shadow-lg text-center relative overflow-hidden border border-teal-400/30">
+                            <div className="absolute -top-4 -left-4 w-16 h-16 bg-white opacity-10 rounded-full"></div>
+                            <p className="text-sm opacity-80">សមតុល្យរបស់អ្នក</p>
+                            <h1 className="text-4xl font-bold my-2 flex justify-center items-center gap-2">{formatNumber(userProfile.points)} <Coins className="w-6 h-6 text-yellow-300" /></h1>
+                            <p className="text-xs bg-white bg-opacity-20 inline-block px-3 py-1 rounded-full">ID: {userProfile.shortId}</p>
+                        </div>
+                    </div>
+                    <div className="px-4">
+                        <Card className="p-4 grid grid-cols-3 gap-3">
+                            <IconButton 
+                                icon={CalendarCheck} 
+                                title="DAILY TASK" 
+                                onClick={handleDailyCheckin} 
+                                iconColor={userProfile.dailyCheckin ? 'text-gray-500' : 'text-blue-400'} 
+                                textColor={userProfile.dailyCheckin ? 'text-gray-400' : 'text-white'} 
+                                disabled={userProfile.dailyCheckin}
+                            />
+                            <IconButton icon={UserCheck} title="SUBSCRIBE" onClick={() => setPage('EXPLORE_SUBSCRIPTION')} iconColor="text-pink-400" />
+                            <IconButton icon={Film} title="PLAY VIDEO" onClick={() => setPage('EARN_POINTS')} iconColor="text-red-400" />
+                            <IconButton icon={Wallet} title="MY BALANCE" onClick={() => setPage('BALANCE_DETAILS')} iconColor="text-orange-400" />
+                            <IconButton icon={ShoppingCart} title="BUY COINS" onClick={() => setPage('BUY_COINS')} iconColor="text-purple-400" />
+                            <IconButton icon={Target} title="CAMPAIGNS" onClick={() => setPage('MY_CAMPAIGNS')} iconColor="text-teal-400" />
+                            <IconButton icon={UserPlus} title="ណែនាំមិត្ត" onClick={() => setPage('REFERRAL_PAGE')} iconColor="text-blue-400" />
+                            <IconButton icon={Globe} title="មើល WEBSITE" onClick={() => setPage('EXPLORE_WEBSITE')} iconColor="text-indigo-400" />
+                            <IconButton icon={MonitorPlay} title="មើល ADS" onClick={() => setPage('WATCH_ADS')} iconColor="text-pink-400" />
+                        </Card>
+                    </div>
+
+                    <div className="px-4 mt-6">
+                        <div className="w-full bg-white h-20 flex flex-col items-center justify-center rounded-lg border-2 border-yellow-500/50 shadow-lg relative overflow-hidden">
+                             <div className="absolute top-0 right-0 bg-yellow-500 text-purple-900 text-[10px] px-2 font-bold">AD</div>
+                            <MonitorPlay className="w-6 h-6 text-gray-400 mb-1" />
+                            <p className="text-xs text-gray-500 font-mono">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p>
+                        </div>
+                    </div>
                 </div>
             );
     }
@@ -796,7 +1349,7 @@ const App = () => {
     return (
         <div className="font-sans bg-purple-900 min-h-screen relative">
             {Content}
-            {notification && <div className={`fixed bottom-10 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-2xl z-50 text-white font-bold ${notification.type === 'success' ? 'bg-green-600' : 'bg-red-600'}`}>{notification.message}</div>}
+            {notification && <div className={`fixed bottom-10 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-2xl z-50 text-white font-bold transition-all ${notification.type === 'success' ? 'bg-green-600' : notification.type === 'error' ? 'bg-red-600' : 'bg-gray-800'}`}>{notification.message}</div>}
         </div>
     );
 };
