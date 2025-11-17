@@ -854,7 +854,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
     
-    // UPDATE: Start timer at -1 to prevent instant claim on video switch
+    // UPDATE: Start timer at -1 to prevent instant claim
     const [timer, setTimer] = useState(-1); 
     const [claimed, setClaimed] = useState(false);
     const [autoPlay, setAutoPlay] = useState(true);
@@ -890,7 +890,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                 setTimer(t => Math.max(0, t - 1));
             }, 1000);
         } else if (timer === 0 && !claimed && current) {
-            // Auto Claim Logic (Only for View/Website)
+            // AUTO CLAIM: when timer hits 0
             if (type !== 'sub') handleClaim();
         }
         
@@ -900,9 +900,8 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     const handleClaim = async () => {
         if (claimed || !current) return;
         
-        // Prevent claim if timer is not 0 (or if it's -1 loading state)
-        if (timer !== 0) {
-            return; 
+        if (timer > 0) {
+            return; // Silent return for auto-claim
         }
 
         setClaimed(true);
@@ -929,18 +928,15 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
             });
             if(isMounted.current) showNotification('Success! Points Added.', 'success');
            
+            // AUTO NEXT: Immediately go to next video if Auto Play is ON
             if(autoPlay && isMounted.current) {
-                setTimeout(() => {
-                    if(!isMounted.current) return;
-                    handleNext();
-                }, 1500);
+                handleNext();
             }
         } catch (e) { if(isMounted.current) showNotification('បរាជ័យ: ' + e.message, 'error'); }
     };
 
     const handleNext = () => {
-        // Reset Timer to -1 immediately to prevent race condition
-        setTimer(-1);
+        setTimer(-1); // Reset Timer immediately
         setClaimed(false);
         
         const next = campaigns.filter(c => c.id !== current?.id && c.remaining > 0)[0];
@@ -1039,21 +1035,28 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                          <div className="flex justify-between items-center">
                             <div className="flex items-center space-x-2">
                                 <span className="text-lg font-bold text-yellow-600 flex items-center"><Coins className="w-5 h-5 mr-1" /> {current.requiredDuration}</span>
+                                
+                                {/* --- UPDATED: Better looking Timer Button --- */}
                                 {timer > 0 ? (
-                                    <span className="text-red-500 font-bold flex items-center bg-red-100 px-2 py-0.5 rounded-full text-sm"><Zap className="w-4 h-4 mr-1" /> {timer}s</span>
+                                    <div className="flex items-center bg-gradient-to-r from-red-100 to-pink-100 px-3 py-1 rounded-full border border-red-200">
+                                        <Zap className="w-4 h-4 mr-1 text-red-500 animate-pulse" /> 
+                                        <span className="text-red-600 font-bold text-sm">{timer}s</span>
+                                    </div>
                                 ) : (
-                                    // Show Loading if timer is -1, otherwise show Ready
                                     timer === -1 ? 
                                     <span className="text-gray-500 font-bold flex items-center bg-gray-200 px-2 py-0.5 rounded-full text-sm">...</span> :
-                                    <span className="text-green-500 font-bold flex items-center bg-green-100 px-2 py-0.5 rounded-full text-sm"><CheckCircle className="w-4 h-4 mr-1" /> Ready</span>
+                                    <span className="text-green-600 font-bold flex items-center bg-green-100 px-3 py-1 rounded-full text-sm border border-green-200"><CheckCircle className="w-4 h-4 mr-1" /> Ready</span>
                                 )}
                             </div>
                            
-                            <div className="flex items-center space-x-2">
-                                <span className="text-xs text-gray-500 font-medium">Auto Play</span>
-                                <button onClick={() => setAutoPlay(!autoPlay)} className={`w-8 h-4 rounded-full p-0.5 transition duration-300 ${autoPlay ? 'bg-teal-500' : 'bg-gray-300'}`}>
-                                    <div className={`w-3 h-3 bg-white rounded-full shadow transform transition duration-300 ${autoPlay ? 'translate-x-4' : ''}`}></div>
-                                </button>
+                            {/* --- UPDATED: Better Toggle Button --- */}
+                            <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setAutoPlay(!autoPlay)}>
+                                <span className={`text-xs font-bold ${autoPlay ? 'text-green-600' : 'text-gray-400'}`}>
+                                    Auto Play {autoPlay ? 'ON' : 'OFF'}
+                                </span>
+                                <div className={`w-10 h-5 rounded-full p-1 transition-colors duration-300 flex items-center ${autoPlay ? 'bg-green-500' : 'bg-gray-300'}`}>
+                                    <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300 ${autoPlay ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                                </div>
                             </div>
                         </div>
 
@@ -1074,7 +1077,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                                         ${(timer > 0 || timer === -1) ? 'bg-gradient-to-r from-indigo-500 to-purple-600 cursor-not-allowed' : 
                                           claimed ? 'bg-green-500' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}
                                 >
-                                    {/* NEW UI: Better Text */}
+                                    {/* NEW UI: Text updates */}
                                     {claimed ? 'SUCCESS' : timer > 0 ? `WAIT ${timer}s` : timer === -1 ? 'LOADING...' : 'CLAIM REWARD'}
                                 </button>
                             )}
@@ -1096,6 +1099,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     );
 };
 
+// ... (BuyCoinsPage, BalanceDetailsPage, WatchAdsPage, MyPlanPage, AuthForm, App components remain unchanged)
 const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
     const handlePurchase = async (pkg) => {
         try {
@@ -1339,7 +1343,7 @@ const App = () => {
     const [userProfile, setUserProfile] = useState({});
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [notification, setNotification] = useState(null);
-    const [authPage, setAuthPage] = useState('LOGIN');
+    // Removed authPage state as we only show one view now
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
     const [googleAccessToken, setGoogleAccessToken] = useState(null);
 
@@ -1379,6 +1383,8 @@ const App = () => {
         try { await signInWithEmailAndPassword(auth, email, password); showNotification('ចូលគណនីជោគជ័យ', 'success'); }
         catch (e) { showNotification('បរាជ័យ: ' + e.code, 'error'); }
     };
+
+    // handleRegister Removed from usage, keeping logic minimal just in case, but not exposed in UI
 
     const handleGoogleLogin = async () => {
         try {
