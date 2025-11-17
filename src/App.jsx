@@ -21,7 +21,7 @@ import {
     DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2,
     Settings, Copy, Save, Search, PlusCircle, MinusCircle,
     CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
-    ArrowUpRight, ArrowDownLeft, Clock, ChevronDown, PlayCircle
+    ArrowUpRight, ArrowDownLeft, Clock, ChevronDown
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -183,6 +183,7 @@ const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
 };
 
 // --- 5. ADMIN PAGES ---
+
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -852,7 +853,9 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
 const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, googleAccessToken }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
-    const [timer, setTimer] = useState(0);
+    
+    // UPDATE: Start timer at -1 to prevent instant claim on video switch
+    const [timer, setTimer] = useState(-1); 
     const [claimed, setClaimed] = useState(false);
     const [autoPlay, setAutoPlay] = useState(true);
     const isMounted = useRef(true);
@@ -873,11 +876,15 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     }, [db, userId, type]); 
 
     useEffect(() => {
-        if (current) { setTimer(current.requiredDuration || 30); setClaimed(false); }
+        if (current) { 
+            setTimer(current.requiredDuration || 30); 
+            setClaimed(false); 
+        }
     }, [current]);
    
     useEffect(() => {
         let interval = null;
+        // Only countdown if timer > 0
         if (timer > 0 && !claimed) {
             interval = setInterval(() => {
                 setTimer(t => Math.max(0, t - 1));
@@ -893,8 +900,9 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     const handleClaim = async () => {
         if (claimed || !current) return;
         
-        if (timer > 0) {
-            return; // Silent return for auto-claim
+        // Prevent claim if timer is not 0 (or if it's -1 loading state)
+        if (timer !== 0) {
+            return; 
         }
 
         setClaimed(true);
@@ -931,6 +939,10 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     };
 
     const handleNext = () => {
+        // Reset Timer to -1 immediately to prevent race condition
+        setTimer(-1);
+        setClaimed(false);
+        
         const next = campaigns.filter(c => c.id !== current?.id && c.remaining > 0)[0];
         setCurrent(next || null);
     }
@@ -1030,6 +1042,9 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                                 {timer > 0 ? (
                                     <span className="text-red-500 font-bold flex items-center bg-red-100 px-2 py-0.5 rounded-full text-sm"><Zap className="w-4 h-4 mr-1" /> {timer}s</span>
                                 ) : (
+                                    // Show Loading if timer is -1, otherwise show Ready
+                                    timer === -1 ? 
+                                    <span className="text-gray-500 font-bold flex items-center bg-gray-200 px-2 py-0.5 rounded-full text-sm">...</span> :
                                     <span className="text-green-500 font-bold flex items-center bg-green-100 px-2 py-0.5 rounded-full text-sm"><CheckCircle className="w-4 h-4 mr-1" /> Ready</span>
                                 )}
                             </div>
@@ -1043,24 +1058,24 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                         </div>
 
                         <div className="flex space-x-2">
-                            {/* UI UPDATE: Gradient Bar for Waiting */}
                             {type === 'sub' ? (
                                 <button 
                                     onClick={handleSubscribeClick} 
-                                    className={`flex-1 text-white py-3 rounded-lg font-bold shadow active:scale-95 transition text-sm ${timer > 0 || claimed ? 'bg-gradient-to-r from-purple-600 to-blue-600 cursor-not-allowed opacity-80' : 'bg-red-600 hover:bg-red-700'}`}
-                                    disabled={timer > 0 || claimed}
+                                    className={`flex-1 text-white py-3 rounded-lg font-bold shadow active:scale-95 transition text-sm ${timer > 0 || claimed || timer === -1 ? 'bg-gradient-to-r from-slate-500 to-slate-600 cursor-not-allowed opacity-80' : 'bg-red-600 hover:bg-red-700'}`}
+                                    disabled={timer > 0 || claimed || timer === -1}
                                 >
                                     {claimed ? 'CLAIMED' : timer > 0 ? `WAIT ${timer}s` : 'SUBSCRIBE & CLAIM'}
                                 </button>
                             ) : (
                                 <button 
                                     onClick={handleClaim} 
-                                    disabled={timer > 0 || claimed} 
+                                    disabled={timer > 0 || claimed || timer === -1} 
                                     className={`flex-1 py-3 rounded-lg font-bold shadow text-sm text-white transition 
-                                        ${timer > 0 ? 'bg-gradient-to-r from-purple-600 to-blue-600 animate-pulse cursor-not-allowed' : 
+                                        ${(timer > 0 || timer === -1) ? 'bg-gradient-to-r from-indigo-500 to-purple-600 cursor-not-allowed' : 
                                           claimed ? 'bg-green-500' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}
                                 >
-                                    {claimed ? 'SUCCESS' : timer > 0 ? `WAIT ${timer}s` : 'CLAIMING...'}
+                                    {/* NEW UI: Better Text */}
+                                    {claimed ? 'SUCCESS' : timer > 0 ? `WAIT ${timer}s` : timer === -1 ? 'LOADING...' : 'CLAIM REWARD'}
                                 </button>
                             )}
                             <button onClick={handleNext} className="px-4 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-lg shadow active:scale-95 transition">
@@ -1269,7 +1284,7 @@ const MyPlanPage = ({ setPage }) => (
     </div>
 );
 
-// --- 7. AUTH COMPONENT ---
+// --- 7. AUTH COMPONENT (Google + Email Login Only) ---
 const AuthForm = ({ onSubmit, btnText, isRegister = false, onGoogleLogin }) => {
     const [email, setEmail] = useState('');
     const [pass, setPass] = useState('');
@@ -1324,12 +1339,11 @@ const App = () => {
     const [userProfile, setUserProfile] = useState({});
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [notification, setNotification] = useState(null);
-    // Removed authPage state as we only show one view now
+    const [authPage, setAuthPage] = useState('LOGIN');
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
     const [googleAccessToken, setGoogleAccessToken] = useState(null);
 
-    // --- UPDATED ADMIN CONFIGURATION (UID CHECK) ---
-    // Replace this with your specific UID: 48wx8GPZbVYSxmfws1MxbuEOzsE3
+    // --- ADMIN CONFIGURATION (UID CHECK) ---
     const ADMIN_UIDS = ["48wx8GPZbVYSxmfws1MxbuEOzsE3"]; 
     const isAdmin = userId && ADMIN_UIDS.includes(userId);
 
@@ -1365,8 +1379,6 @@ const App = () => {
         try { await signInWithEmailAndPassword(auth, email, password); showNotification('ចូលគណនីជោគជ័យ', 'success'); }
         catch (e) { showNotification('បរាជ័យ: ' + e.code, 'error'); }
     };
-
-    // handleRegister Removed from usage, keeping logic minimal just in case, but not exposed in UI
 
     const handleGoogleLogin = async () => {
         try {
