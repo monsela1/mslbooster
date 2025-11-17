@@ -6,8 +6,8 @@ import {
     createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     signOut,
-    GoogleAuthProvider, // <--- IMPORT ថ្មី
-    signInWithPopup     // <--- IMPORT ថ្មី
+    GoogleAuthProvider,
+    signInWithPopup
 } from 'firebase/auth';
 import {
     getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc,
@@ -155,7 +155,7 @@ const InputField = (props) => (
     />
 );
 
-// --- COMPONENTS ---
+// --- NEW COMPONENT: Selection Modal ---
 const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
     if (!isOpen) return null;
     return (
@@ -213,8 +213,10 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
 
     return (
         <div className="space-y-4 pb-10">
+            
             <Card className="p-4 border-l-4 border-blue-500">
                 <h3 className="font-bold text-lg mb-3 text-blue-400 flex items-center"><Settings className="w-5 h-5 mr-2"/> ការកំណត់ទូទៅ (Features)</h3>
+                
                 <div className="flex items-center justify-between bg-purple-900/50 p-4 rounded-lg border border-purple-600">
                     <div className="flex flex-col">
                         <span className="text-white font-bold text-base">បើកមុខងារទិញកាក់ (Enable Buy Coins)</span>
@@ -222,6 +224,7 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                             ស្ថានភាព: {config.enableBuyCoins ? 'កំពុងបើក (ON)' : 'កំពុងបិទ (OFF)'}
                         </span>
                     </div>
+                    
                     <button 
                         onClick={handleToggleChange}
                         className={`relative w-16 h-8 rounded-full transition-colors duration-300 focus:outline-none shadow-inner ${
@@ -242,7 +245,8 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                     <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" min="0" value={config.referrerReward || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referred User Bonus</label><InputField name="referredBonus" type="number" min="0" value={config.referredBonus || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" min="0" value={config.adsReward || 0} onChange={handleChange} /></div>
-                    <div className="pt-2 border-t border-purple-600 mt-2">
+                    
+                    <div className="pt-3 border-t border-purple-600 mt-2">
                         <label className="text-xs font-bold text-yellow-300">ចំនួនមើលពាណិជ្ជកម្មក្នុងមួយថ្ងៃ (Max Daily Ads)</label>
                         <InputField name="maxDailyAds" type="number" min="1" value={config.maxDailyAds || 15} onChange={handleChange} />
                     </div>
@@ -851,7 +855,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     );
 };
 
-const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig }) => {
+const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, googleAccessToken }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
     const [timer, setTimer] = useState(0);
@@ -930,10 +934,63 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
         setCurrent(next || null);
     }
 
-    const handleSubscribeClick = () => {
+    const handleSubscribeClick = async () => {
         if(!current) return;
-        window.open(current.link, '_blank');
-        handleClaim();
+
+        // Check if Google Token Exists
+        if (!googleAccessToken) {
+            showNotification('សូម Login តាម Google ម្តងទៀតដើម្បីផ្តល់សិទ្ធិ!', 'error');
+            return;
+        }
+
+        try {
+            // 1. Find Video ID
+            const videoId = getYouTubeID(current.link);
+            if (!videoId) throw new Error("Invalid Video Link");
+
+            // 2. Fetch Channel ID from Video ID
+            const videoResponse = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&access_token=${googleAccessToken}`);
+            const videoData = await videoResponse.json();
+            
+            if (!videoData.items || videoData.items.length === 0) throw new Error("រកវីដេអូមិនឃើញ");
+            const channelId = videoData.items[0].snippet.channelId;
+
+            // 3. Subscribe to Channel
+            const subResponse = await fetch(`https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&access_token=${googleAccessToken}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    snippet: {
+                        resourceId: {
+                            kind: 'youtube#channel',
+                            channelId: channelId
+                        }
+                    }
+                })
+            });
+
+            if (subResponse.ok) {
+                showNotification('បាន Subscribe ដោយជោគជ័យ!', 'success');
+                handleClaim(); 
+            } else {
+                const errorData = await subResponse.json();
+                // If already subscribed, count as success
+                if (errorData.error?.errors?.[0]?.reason === 'subscriptionDuplicate') {
+                    showNotification('អ្នកបាន Subscribe រួចហើយ!', 'success');
+                    handleClaim();
+                } else {
+                    throw new Error(errorData.error?.message || 'Subscribe Failed');
+                }
+            }
+
+        } catch (error) {
+            console.error(error);
+            showNotification('បរាជ័យ៖ ' + error.message, 'error');
+             // Fallback to old method if API fails
+             // window.open(current.link, '_blank');
+        }
     };
 
     const isVideo = type === 'view' || type === 'sub';
@@ -1200,7 +1257,7 @@ const MyPlanPage = ({ setPage }) => (
     </div>
 );
 
-// --- 7. AUTH COMPONENT (Updated with Google Login) ---
+// --- 7. AUTH COMPONENT ---
 const AuthForm = ({ onSubmit, btnText, isRegister = false, onGoogleLogin }) => {
     const [email, setEmail] = useState('');
     const [pass, setPass] = useState('');
@@ -1271,6 +1328,9 @@ const App = () => {
     const [notification, setNotification] = useState(null);
     const [authPage, setAuthPage] = useState('LOGIN');
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
+    
+    // Google Access Token State
+    const [googleAccessToken, setGoogleAccessToken] = useState(null);
 
     // ADMIN CONFIGURATION
     const ADMIN_EMAILS = ["admin@gmail.com"]; 
@@ -1319,7 +1379,6 @@ const App = () => {
             let bonusPoints = 5000;
             let referrerId = null;
 
-            // Process Referral Code
             if (referralCode && referralCode.length === 6) {
                 try {
                     const shortDoc = await getDoc(getShortCodeDocRef(referralCode));
@@ -1327,7 +1386,7 @@ const App = () => {
                         referrerId = shortDoc.data().fullUserId;
                         updateDoc(getProfileDocRef(referrerId), { 
                             points: increment(globalConfig.referrerReward),
-                            totalEarned: increment(globalConfig.referrerReward) // Update Total Earned for Referrer
+                            totalEarned: increment(globalConfig.referrerReward) 
                         });
                         bonusPoints += (globalConfig.referredBonus || 0);
                     }
@@ -1339,7 +1398,7 @@ const App = () => {
                 email, 
                 userName: username || `User_${shortId}`, 
                 points: bonusPoints, 
-                totalEarned: bonusPoints, // Initialize Total Earned
+                totalEarned: bonusPoints,
                 shortId, 
                 createdAt: serverTimestamp(), 
                 referredBy: referrerId ? referralCode : null 
@@ -1351,24 +1410,30 @@ const App = () => {
         } catch (e) { showNotification('បរាជ័យ: ' + e.code, 'error'); }
     };
 
-    // --- NEW: GOOGLE LOGIN HANDLER ---
+    // --- GOOGLE LOGIN HANDLER ---
     const handleGoogleLogin = async () => {
         try {
             const provider = new GoogleAuthProvider();
+            // Add YouTube Scope to allow subscribing
+            provider.addScope('https://www.googleapis.com/auth/youtube.force-ssl');
+
             const result = await signInWithPopup(auth, provider);
+            
+            // Save Access Token
+            const credential = GoogleAuthProvider.credentialFromResult(result);
+            const token = credential.accessToken;
+            setGoogleAccessToken(token);
+
             const user = result.user;
             const uid = user.uid;
 
-            // Check if user profile already exists in Firestore
             const userDocRef = getProfileDocRef(uid);
             const userDoc = await getDoc(userDocRef);
 
             if (!userDoc.exists()) {
-                // New User via Google -> Create Profile
-                const shortId = getShortId(uid);
-                const bonusPoints = 5000; // Default bonus for new user
-
-                await setDoc(userDocRef, {
+                 const shortId = getShortId(uid);
+                 const bonusPoints = 5000;
+                 await setDoc(userDocRef, {
                     userId: uid,
                     email: user.email,
                     userName: user.displayName || `User_${shortId}`,
@@ -1376,9 +1441,8 @@ const App = () => {
                     totalEarned: bonusPoints,
                     shortId,
                     createdAt: serverTimestamp(),
-                    referredBy: null // Google sign-in skips manual referral input usually
+                    referredBy: null
                 });
-
                 await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
                 showNotification('គណនីថ្មីត្រូវបានបង្កើតដោយជោគជ័យ!', 'success');
             } else {
@@ -1399,19 +1463,16 @@ const App = () => {
                 const dailyRef = getDailyStatusDocRef(userId);
                 const dailyDoc = await tx.get(dailyRef);
                 
-                // Check if already checked in (Strict check inside transaction)
                 if (dailyDoc.exists() && dailyDoc.data().checkinDone) {
                     throw new Error("ALREADY_CHECKED_IN");
                 }
                
-                // UPDATE TOTAL EARNED
                 tx.update(getProfileDocRef(userId), { 
                     points: increment(globalConfig.dailyCheckinReward),
                     totalEarned: increment(globalConfig.dailyCheckinReward) 
                 });
                 tx.set(dailyRef, { checkinDone: true, date: getTodayDateKey() }, { merge: true });
 
-                // SAVE HISTORY
                 const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
                 tx.set(historyRef, {
                     title: 'Daily Check-in',
@@ -1440,7 +1501,7 @@ const App = () => {
                     onSubmit={authPage === 'LOGIN' ? handleLogin : handleRegister} 
                     btnText={authPage === 'LOGIN' ? 'ចូល' : 'ចុះឈ្មោះ'} 
                     isRegister={authPage === 'REGISTER'}
-                    onGoogleLogin={handleGoogleLogin} // <--- Pass Google Handler
+                    onGoogleLogin={handleGoogleLogin}
                 />
                 <div className="text-center mt-6">
                     <button onClick={() => setAuthPage(authPage === 'LOGIN' ? 'REGISTER' : 'LOGIN')} className="text-teal-400 underline hover:text-teal-300">
@@ -1456,7 +1517,20 @@ const App = () => {
     switch (page) {
         case 'EARN_POINTS': Content = <EarnPage db={db} userId={userId} type="view" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'EXPLORE_WEBSITE': Content = <EarnPage db={db} userId={userId} type="website" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
-        case 'EXPLORE_SUBSCRIPTION': Content = <EarnPage db={db} userId={userId} type="sub" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
+        
+        // Pass Google Token to EarnPage for Subscriptions
+        case 'EXPLORE_SUBSCRIPTION': 
+            Content = <EarnPage 
+                        db={db} 
+                        userId={userId} 
+                        type="sub" 
+                        setPage={setPage} 
+                        showNotification={showNotification} 
+                        globalConfig={globalConfig} 
+                        googleAccessToken={googleAccessToken}
+                      />; 
+            break;
+
         case 'MY_CAMPAIGNS': Content = <MyCampaignsPage db={db} userId={userId} userProfile={userProfile} setPage={setPage} showNotification={showNotification} />; break;
         case 'REFERRAL_PAGE': Content = <ReferralPage db={db} userId={userId} userProfile={userProfile} showNotification={showNotification} setPage={setPage} globalConfig={globalConfig} />; break;
         case 'BUY_COINS': Content = <BuyCoinsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
