@@ -67,10 +67,13 @@ const getYouTubeID = (url) => {
     return (match && match[7].length === 11) ? match[7] : null;
 };
 
+// UPDATED: Enable Sound (mute=0) and Controls (controls=1)
 const getEmbedUrl = (url) => {
     const videoId = getYouTubeID(url);
     if (videoId) {
-        return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&rel=0`; 
+        // mute=0 : មានសម្លេង
+        // controls=1 : បង្ហាញប៊ូតុង Play/Pause/Volume (សំខាន់ព្រោះបើ Browser block autoplay គេអាចចុចបាន)
+        return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&rel=0`; 
     }
     return null;
 };
@@ -708,7 +711,6 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     );
 };
 
-// UPDATED EARN PAGE: Embeds Website in IFRAME
 const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
@@ -781,7 +783,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
         handleClaim();
     };
 
-    // DETERMINE WHAT TO SHOW IN IFRAME
     const isVideo = type === 'view' || type === 'sub';
     const iframeSrc = current ? (isVideo ? getEmbedUrl(current.link) : current.link) : null;
 
@@ -801,7 +802,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                                 allowFullScreen
                                 sandbox={!isVideo ? "allow-scripts allow-same-origin allow-forms" : undefined}
                             />
-                            {/* Fallback button for websites that block iframes */}
                             {!isVideo && (
                                 <button onClick={() => window.open(current.link)} className="absolute top-4 right-4 bg-black/60 hover:bg-black text-white px-3 py-1 rounded text-xs flex items-center backdrop-blur-sm border border-white/20">
                                     <ExternalLink size={14} className="mr-1"/> Open External
@@ -816,7 +816,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                 )}
             </div>
 
-            {/* CONTROLS FOOTER */}
             <div className="bg-white p-3 border-t border-gray-200 shadow-lg z-20">
                  {current ? (
                     <div className="flex flex-col space-y-2">
