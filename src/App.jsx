@@ -71,6 +71,7 @@ const getYouTubeID = (url) => {
 const getEmbedUrl = (url) => {
     const videoId = getYouTubeID(url);
     if (videoId) {
+        // mute=0 (Sound On), controls=1 (Show Controls)
         return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&rel=0`; 
     }
     return null;
@@ -151,7 +152,7 @@ const InputField = (props) => (
     />
 );
 
-// --- 5. ADMIN PAGES ---
+// --- 5. ADMIN PAGES (FIXED WHITE SCREEN) ---
 
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     const handleChange = (e) => {
@@ -168,9 +169,12 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     };
 
     const handlePackageChange = (index, field, value) => {
-        const newPackages = [...config.coinPackages];
-        newPackages[index][field] = field === 'coins' ? (parseInt(value) || 0) : value;
-        setConfig(prev => ({ ...prev, coinPackages: newPackages }));
+        // Use ?. and fallback to empty array to prevent crash
+        const newPackages = config.coinPackages ? [...config.coinPackages] : [];
+        if (newPackages[index]) {
+            newPackages[index][field] = field === 'coins' ? (parseInt(value) || 0) : value;
+            setConfig(prev => ({ ...prev, coinPackages: newPackages }));
+        }
     };
 
     return (
@@ -178,18 +182,19 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
             <Card className="p-4 border-l-4 border-yellow-400">
                 <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់</h3>
                 <div className="grid grid-cols-1 gap-3">
-                    <div><label className="text-xs font-bold text-purple-300">Daily Check-in Points</label><InputField name="dailyCheckinReward" type="number" value={config.dailyCheckinReward} onChange={handleChange} /></div>
-                    <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" value={config.referrerReward} onChange={handleChange} /></div>
-                    <div><label className="text-xs font-bold text-purple-300">Referred User Bonus</label><InputField name="referredBonus" type="number" value={config.referredBonus} onChange={handleChange} /></div>
-                    <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" value={config.adsReward} onChange={handleChange} /></div>
+                    <div><label className="text-xs font-bold text-purple-300">Daily Check-in Points</label><InputField name="dailyCheckinReward" type="number" value={config.dailyCheckinReward || 0} onChange={handleChange} /></div>
+                    <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" value={config.referrerReward || 0} onChange={handleChange} /></div>
+                    <div><label className="text-xs font-bold text-purple-300">Referred User Bonus</label><InputField name="referredBonus" type="number" value={config.referredBonus || 0} onChange={handleChange} /></div>
+                    <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" value={config.adsReward || 0} onChange={handleChange} /></div>
                 </div>
             </Card>
 
             <Card className="p-4 border-l-4 border-green-500">
                 <h3 className="font-bold text-lg mb-3 text-green-400 flex items-center"><ShoppingCart className="w-5 h-5 mr-2"/> កំណត់កញ្ចប់កាក់ (Sell Coins)</h3>
                 <div className="space-y-3">
-                    {config.coinPackages.map((pkg, idx) => (
-                        <div key={pkg.id} className="flex space-x-2 items-center bg-purple-900 p-2 rounded">
+                    {/* Safety Check added here */}
+                    {config.coinPackages?.map((pkg, idx) => (
+                        <div key={pkg.id || idx} className="flex space-x-2 items-center bg-purple-900 p-2 rounded">
                             <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold">{idx + 1}</div>
                             <div className="flex-1">
                                 <label className="text-xs text-purple-300">ចំនួនកាក់</label>
@@ -200,7 +205,7 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                                 <InputField type="text" value={pkg.price} onChange={(e) => handlePackageChange(idx, 'price', e.target.value)} />
                             </div>
                         </div>
-                    ))}
+                    )) || <p className="text-red-300 text-sm">No packages found. Please save first.</p>}
                 </div>
             </Card>
 
@@ -337,6 +342,91 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
     );
 };
 
+const AdminDashboardPage = ({ db, setPage, showNotification }) => {
+    const [activeTab, setActiveTab] = useState('SETTINGS');
+    const [config, setConfig] = useState(null);
+    const [campaigns, setCampaigns] = useState([]);
+
+    useEffect(() => {
+        const fetchConfig = async () => {
+            const docSnap = await getDoc(getGlobalConfigDocRef());
+            if (docSnap.exists()) {
+                // CRITICAL FIX: Merge with defaultGlobalConfig to ensure missing fields (like coinPackages) exist
+                setConfig({ ...defaultGlobalConfig, ...docSnap.data() });
+            } else {
+                setConfig(defaultGlobalConfig);
+            }
+        };
+        fetchConfig();
+    }, [db]);
+
+    useEffect(() => {
+        if(activeTab === 'CAMPAIGNS') {
+            const q = query(getCampaignsCollectionRef(), limit(50));
+            return onSnapshot(q, (snap) => {
+                setCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            });
+        }
+    }, [db, activeTab]);
+
+    const handleSaveConfig = async () => {
+        try {
+            await setDoc(getGlobalConfigDocRef(), config);
+            showNotification('Settings saved successfully!', 'success');
+        } catch(e) { showNotification('Failed to save', 'error'); }
+    };
+
+    const handleDeleteCampaign = async (id) => {
+        if(!window.confirm('Stop this campaign?')) return;
+        try { await updateDoc(doc(getCampaignsCollectionRef(), id), { remaining: 0, isActive: false }); } 
+        catch(e) {}
+    };
+
+    if (!config) return <Loading />;
+
+    return (
+        <div className="min-h-screen bg-purple-950 pb-16 pt-20">
+            <Header title="ADMIN PANEL" onBack={() => setPage('DASHBOARD')} className="bg-purple-900" />
+            <main className="p-4">
+                <div className="flex space-x-1 mb-4 bg-purple-800 p-1 rounded-lg">
+                    {['SETTINGS', 'USERS', 'CAMPAIGNS'].map(tab => (
+                        <button 
+                            key={tab}
+                            onClick={() => setActiveTab(tab)} 
+                            className={`flex-1 py-2 rounded-lg font-bold text-xs transition ${activeTab === tab ? 'bg-teal-600 text-white shadow' : 'text-purple-300 hover:bg-purple-700'}`}
+                        >
+                            {tab}
+                        </button>
+                    ))}
+                </div>
+
+                {activeTab === 'SETTINGS' && <AdminSettingsTab config={config} setConfig={setConfig} onSave={handleSaveConfig} />}
+                {activeTab === 'USERS' && <AdminUserManagerTab db={db} showNotification={showNotification} />}
+               
+                {activeTab === 'CAMPAIGNS' && (
+                    <div className="space-y-2 pb-10">
+                        {campaigns.map(c => (
+                            <div key={c.id} className={`bg-purple-800 p-3 rounded-lg shadow flex justify-between items-center border-l-4 ${c.remaining > 0 ? 'border-green-500' : 'border-red-500'}`}>
+                                <div className='overflow-hidden'>
+                                    <p className="font-bold text-sm truncate text-white w-48">{c.link}</p>
+                                    <div className='flex space-x-2 text-xs mt-1'>
+                                        <span className='bg-purple-900 px-2 py-0.5 rounded text-purple-200'>{c.type}</span>
+                                        <span className={`${c.remaining > 0 ? 'text-green-400' : 'text-red-400'} font-bold`}>
+                                            Rem: {c.remaining}
+                                        </span>
+                                    </div>
+                                </div>
+                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-900 text-red-200 rounded-full hover:bg-red-800"><Trash2 size={18}/></button>
+                            </div>
+                        ))}
+                        {campaigns.length === 0 && <p className="text-purple-300 text-center opacity-50">No campaigns found.</p>}
+                    </div>
+                )}
+            </main>
+        </div>
+    );
+};
+
 // --- 6. USER PAGES ---
 
 const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, globalConfig }) => {
@@ -375,7 +465,7 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
                 if (userDoc.data().referredBy) throw new Error("អ្នកមានអ្នកណែនាំរួចហើយ");
 
                 const referrerRef = getProfileDocRef(referrerId);
-                // UPDATE TOTAL EARNED FOR REFERRER & HISTORY
+                // UPDATE TOTAL EARNED FOR REFERRER
                 transaction.update(referrerRef, { 
                     points: increment(globalConfig.referrerReward),
                     totalEarned: increment(globalConfig.referrerReward)
@@ -389,7 +479,7 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
                 });
 
                 const bonus = globalConfig.referredBonus || 500;
-                // UPDATE TOTAL EARNED FOR CURRENT USER & HISTORY
+                // UPDATE TOTAL EARNED FOR CURRENT USER
                 transaction.update(userRef, { 
                     referredBy: code,
                     points: increment(bonus),
@@ -706,7 +796,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                 const campDoc = await transaction.get(campRef);
                 if (!campDoc.exists() || campDoc.data().remaining <= 0) throw new Error("Campaign finished");
                 
-                // UPDATE TOTAL EARNED
                 transaction.update(getProfileDocRef(userId), { 
                     points: increment(current.requiredDuration || 50),
                     totalEarned: increment(current.requiredDuration || 50)
@@ -822,7 +911,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
 const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
     const handlePurchase = async (pkg) => {
         try {
-            // UPDATE TOTAL EARNED
             await runTransaction(db, async (tx) => { 
                 tx.update(getProfileDocRef(userId), { 
                     points: increment(pkg.coins),
@@ -858,7 +946,6 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
     );
 };
 
-// UPDATED: Balance Details Page with History List
 const BalanceDetailsPage = ({ db, userId, setPage, userProfile }) => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -878,7 +965,6 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile }) => {
         <div className="min-h-screen bg-purple-900 pb-16 pt-20">
             <Header title="MY BALANCE" onBack={() => setPage('DASHBOARD')} />
             <main className="p-4 space-y-4">
-                {/* CARDS */}
                 <div className="grid grid-cols-2 gap-3">
                     <Card className="bg-gradient-to-br from-purple-700 to-purple-900 text-center p-4 text-white border-purple-500">
                         <p className="text-xs opacity-70 mb-1">Current Balance</p>
@@ -890,7 +976,6 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile }) => {
                     </Card>
                 </div>
 
-                {/* HISTORY LIST */}
                 <Card className="p-4">
                     <h3 className="font-bold text-white mb-3 border-b border-purple-600 pb-2 flex items-center"><Clock className="w-4 h-4 mr-2"/> ប្រវត្តិពិន្ទុ (History)</h3>
                     {loading ? (
@@ -949,7 +1034,6 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
         try {
             await runTransaction(db, async (tx) => { 
                 const dailyRef = getDailyStatusDocRef(userId);
-                // UPDATE TOTAL EARNED
                 tx.update(getProfileDocRef(userId), { 
                     points: increment(reward),
                     totalEarned: increment(reward)
