@@ -48,7 +48,7 @@ try {
     console.error("Firebase initialization failed:", error);
 }
 
-// --- 3. HELPER FUNCTIONS (IMPROVED) ---
+// --- 3. HELPER FUNCTIONS ---
 const getTodayDateKey = () => {
     const d = new Date();
     const year = d.getFullYear();
@@ -60,7 +60,6 @@ const getTodayDateKey = () => {
 const getShortId = (id) => id?.substring(0, 6).toUpperCase() || '------';
 const formatNumber = (num) => num?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') || '0';
 
-// New: Better YouTube Link Parser
 const getYouTubeID = (url) => {
     if (!url) return null;
     const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
@@ -179,6 +178,7 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                 <div className="grid grid-cols-1 gap-3">
                     <div><label className="text-xs font-bold text-purple-300">Daily Check-in Points</label><InputField name="dailyCheckinReward" type="number" value={config.dailyCheckinReward} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" value={config.referrerReward} onChange={handleChange} /></div>
+                    <div><label className="text-xs font-bold text-purple-300">Referred User Bonus</label><InputField name="referredBonus" type="number" value={config.referredBonus} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" value={config.adsReward} onChange={handleChange} /></div>
                 </div>
             </Card>
@@ -228,7 +228,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
         setLoadingList(true);
         try {
             const shortCodesRef = collection(db, 'artifacts', appId, 'public', 'data', 'short_codes');
-            const q = query(shortCodesRef, limit(20)); // Limit to save reads
+            const q = query(shortCodesRef, limit(20)); 
             const snap = await getDocs(q);
             
             const usersData = await Promise.all(snap.docs.map(async (docSnap) => {
@@ -418,22 +418,75 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
 
 // --- 6. USER PAGES ---
 
-const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) => {
+// UPDATED: ReferralPage with "Enter Code" feature
+const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, globalConfig }) => {
     const [referrals, setReferrals] = useState([]);
+    const [inputCode, setInputCode] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const shortId = getShortId(userId);
 
     useEffect(() => {
         if (!db || !userId) return;
         const q = query(getReferralCollectionRef(), where('referrerId', '==', userId));
-        onSnapshot(q, (snap) => {
+        const unsub = onSnapshot(q, (snap) => {
             setReferrals(snap.docs.map(d => d.data()));
         });
+        return () => unsub();
     }, [db, userId]);
+
+    const handleSubmitCode = async () => {
+        const code = inputCode.toUpperCase().trim();
+        
+        if (code.length !== 6) return showNotification('កូដត្រូវតែមាន ៦ ខ្ទង់', 'error');
+        if (code === shortId) return showNotification('មិនអាចដាក់កូដខ្លួនឯងបានទេ!', 'error');
+        if (userProfile.referredBy) return showNotification('អ្នកមានអ្នកណែនាំរួចហើយ', 'error');
+
+        setIsSubmitting(true);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const shortCodeRef = getShortCodeDocRef(code);
+                const shortCodeDoc = await transaction.get(shortCodeRef);
+                if (!shortCodeDoc.exists()) throw new Error("កូដអ្នកណែនាំមិនត្រឹមត្រូវ");
+
+                const referrerId = shortCodeDoc.data().fullUserId;
+                
+                const userRef = getProfileDocRef(userId);
+                const userDoc = await transaction.get(userRef);
+                if (userDoc.data().referredBy) throw new Error("អ្នកមានអ្នកណែនាំរួចហើយ");
+
+                const referrerRef = getProfileDocRef(referrerId);
+                transaction.update(referrerRef, { points: increment(globalConfig.referrerReward) });
+
+                const bonus = globalConfig.referredBonus || 500;
+                transaction.update(userRef, { 
+                    referredBy: code,
+                    points: increment(bonus)
+                });
+
+                const newReferralRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'referrals'));
+                transaction.set(newReferralRef, {
+                    referrerId: referrerId,
+                    referredUserId: userId,
+                    referredName: userProfile.userName || 'Unknown',
+                    reward: globalConfig.referrerReward,
+                    timestamp: serverTimestamp()
+                });
+            });
+            
+            showNotification(`ជោគជ័យ! ទទួលបាន +${formatNumber(globalConfig.referredBonus || 500)} Points`, 'success');
+            setInputCode('');
+        } catch (e) {
+            showNotification(e.message, 'error');
+        }
+        setIsSubmitting(false);
+    };
 
     return (
         <div className="min-h-screen bg-purple-900 pb-16 pt-20">
             <Header title="ណែនាំមិត្ត" onBack={() => setPage('DASHBOARD')} />
             <main className="p-4 space-y-4">
+                
+                {/* YOUR CODE */}
                 <Card className="p-6 text-center bg-purple-800 border-2 border-yellow-500/50">
                     <h3 className="font-bold text-white text-lg">កូដណែនាំរបស់អ្នក</h3>
                     <div className="text-4xl font-mono font-extrabold text-yellow-400 my-4 tracking-widest bg-purple-900 p-2 rounded-lg shadow-inner">{shortId}</div>
@@ -442,15 +495,51 @@ const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) =
                         <Copy className='w-4 h-4 mr-2'/> ចម្លងកូដ
                     </button>
                 </Card>
+
+                {/* INPUT REFERRER CODE */}
+                <Card className="p-4 border border-teal-500/30 bg-gradient-to-br from-purple-800 to-purple-900">
+                    <h3 className="font-bold text-white mb-2 flex items-center"><UserPlus className="w-4 h-4 mr-2"/> ដាក់កូដអ្នកណែនាំ</h3>
+                    
+                    {userProfile.referredBy ? (
+                        <div className="bg-purple-950/50 p-3 rounded border border-purple-700 text-center">
+                            <p className="text-purple-300 text-sm">អ្នកត្រូវបានណែនាំដោយ៖</p>
+                            <p className="text-xl font-mono font-bold text-yellow-400 mt-1">{userProfile.referredBy}</p>
+                            <p className="text-xs text-green-400 mt-1 flex justify-center items-center"><CheckCircle size={12} className="mr-1"/> បានទទួលរង្វាន់រួចរាល់</p>
+                        </div>
+                    ) : (
+                        <div>
+                            <p className="text-xs text-purple-200 mb-3">ដាក់កូដដើម្បីទទួលបាន <span className="text-yellow-400 font-bold">+{formatNumber(globalConfig.referredBonus || 500)} Points</span> បន្ថែម!</p>
+                            <div className="flex space-x-2">
+                                <input 
+                                    value={inputCode}
+                                    onChange={(e) => setInputCode(e.target.value.toUpperCase())}
+                                    placeholder="បញ្ចូលកូដ ៦ ខ្ទង់"
+                                    maxLength={6}
+                                    disabled={isSubmitting}
+                                    className="flex-1 p-2 bg-purple-950 border border-purple-600 rounded text-white font-mono text-center uppercase focus:border-yellow-400 outline-none"
+                                />
+                                <button 
+                                    onClick={handleSubmitCode}
+                                    disabled={isSubmitting || inputCode.length !== 6}
+                                    className={`px-4 rounded font-bold text-white transition ${isSubmitting || inputCode.length !== 6 ? 'bg-gray-600' : 'bg-yellow-600 hover:bg-yellow-700'}`}
+                                >
+                                    {isSubmitting ? '...' : 'OK'}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </Card>
+
+                {/* REFERRAL LIST */}
                 <Card className="p-4">
                     <h3 className="font-bold mb-4 text-white border-b border-purple-600 pb-2">បញ្ជីអ្នកដែលបានណែនាំ ({referrals.length})</h3>
-                    <div className="max-h-80 overflow-y-auto space-y-2">
+                    <div className="max-h-60 overflow-y-auto space-y-2">
                         {referrals.length > 0 ? referrals.map((r, i) => (
                             <div key={i} className="flex justify-between items-center bg-purple-700 p-3 rounded-lg border border-purple-600">
-                                <span className="text-white font-semibold">{i+1}. {r.referredName || 'User'}</span>
-                                <span className="text-green-400 font-bold">+{formatNumber(r.reward)}</span>
+                                <span className="text-white font-semibold text-sm">{i+1}. {r.referredName || 'User'}</span>
+                                <span className="text-green-400 font-bold text-sm">+{formatNumber(r.reward)}</span>
                             </div>
-                        )) : <div className="text-center py-8 text-purple-400">មិនទាន់មានការណែនាំ</div>}
+                        )) : <div className="text-center py-8 text-purple-400 text-sm">មិនទាន់មានការណែនាំ</div>}
                     </div>
                 </Card>
             </main>
@@ -637,7 +726,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
         const q = query(getCampaignsCollectionRef(), where('type', '==', type), limit(50));
         return onSnapshot(q, (snap) => {
             if(!isMounted.current) return;
-            // Filter client side for remaining > 0 to avoid complex index creation for now
             const list = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.userId !== userId && c.remaining > 0 && c.isActive !== false);
             setCampaigns(list);
             if (!current && list.length > 0) setCurrent(list[0]);
@@ -961,9 +1049,7 @@ const App = () => {
                     const shortDoc = await getDoc(getShortCodeDocRef(referralCode));
                     if (shortDoc.exists()) {
                         referrerId = shortDoc.data().fullUserId;
-                        // Give bonus to referrer
                         updateDoc(getProfileDocRef(referrerId), { points: increment(globalConfig.referrerReward) });
-                        // Increase bonus for new user
                         bonusPoints += (globalConfig.referredBonus || 0);
                     }
                 } catch(e) { console.error("Referral error", e); }
@@ -1031,7 +1117,7 @@ const App = () => {
         case 'EXPLORE_WEBSITE': Content = <EarnPage db={db} userId={userId} type="website" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'EXPLORE_SUBSCRIPTION': Content = <EarnPage db={db} userId={userId} type="sub" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'MY_CAMPAIGNS': Content = <MyCampaignsPage db={db} userId={userId} userProfile={userProfile} setPage={setPage} showNotification={showNotification} />; break;
-        case 'REFERRAL_PAGE': Content = <ReferralPage db={db} userId={userId} showNotification={showNotification} setPage={setPage} globalConfig={globalConfig} />; break;
+        case 'REFERRAL_PAGE': Content = <ReferralPage db={db} userId={userId} userProfile={userProfile} showNotification={showNotification} setPage={setPage} globalConfig={globalConfig} />; break;
         case 'BUY_COINS': Content = <BuyCoinsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'BALANCE_DETAILS': Content = <BalanceDetailsPage setPage={setPage} userProfile={userProfile} />; break;
         case 'WATCH_ADS': Content = <WatchAdsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
