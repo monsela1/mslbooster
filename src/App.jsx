@@ -1100,20 +1100,23 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                             {type === 'sub' ? (
                                 <button 
                                     onClick={handleSubscribeClick} 
-                                    className={`flex-1 text-white py-3 rounded-lg font-bold shadow active:scale-95 transition text-sm ${timer > 0 || claimed || timer === -1 ? 'bg-gradient-to-r from-slate-500 to-slate-600 cursor-not-allowed opacity-80' : 'bg-red-600 hover:bg-red-700'}`}
+                                    className={`flex-1 text-white py-3 rounded-lg font-bold shadow transition text-sm 
+                                        bg-red-600 hover:bg-red-700 
+                                        ${(timer > 0 || claimed || timer === -1) ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
                                     disabled={timer > 0 || claimed || timer === -1}
                                 >
-                                    {claimed ? 'CLAIMED' : timer > 0 ? `WAIT ${timer}s` : 'SUBSCRIBE & CLAIM'}
+                                    {/* CHANGE: Show Text */}
+                                    {claimed ? 'CLAIMED' : `SUBSCRIBE ${timer > 0 ? `(${timer}s)` : ''}`}
                                 </button>
                             ) : (
                                 <button 
                                     onClick={handleClaim} 
                                     disabled={timer > 0 || claimed || timer === -1} 
+                                    // CHANGE: Always Blue
                                     className={`flex-1 py-3 rounded-lg font-bold shadow text-sm text-white transition 
-                                        ${(timer > 0 || timer === -1) ? 'bg-gradient-to-r from-indigo-500 to-purple-600 cursor-not-allowed' : 
-                                          claimed ? 'bg-green-500' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}
+                                        ${claimed ? 'bg-green-500' : 'bg-blue-600 hover:bg-blue-700'}
+                                        ${(timer > 0 || timer === -1) ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
                                 >
-                                    {/* NEW UI: Text updates */}
                                     {claimed ? 'SUCCESS' : timer > 0 ? `WAIT ${timer}s` : timer === -1 ? 'LOADING...' : 'CLAIM REWARD'}
                                 </button>
                             )}
