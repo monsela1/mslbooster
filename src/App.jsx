@@ -18,7 +18,8 @@ import {
     CalendarCheck, Target, Wallet, Film, UserCheck,
     DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, 
     Settings, Copy, Save, Search, PlusCircle, MinusCircle, 
-    CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp
+    CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
+    ArrowUpRight, ArrowDownLeft, Clock
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -82,6 +83,7 @@ const getReferralCollectionRef = () => db ? collection(db, 'artifacts', appId, '
 const getDailyStatusDocRef = (userId) => db && userId ? doc(db, 'artifacts', appId, 'users', userId, 'daily_status', getTodayDateKey()) : null;
 const getGlobalConfigDocRef = () => db ? doc(db, 'artifacts', appId, 'public', 'data', 'config', 'global_settings') : null;
 const getShortCodeDocRef = (shortId) => db && shortId ? doc(db, 'artifacts', appId, 'public', 'data', 'short_codes', shortId) : null;
+const getHistoryCollectionRef = (userId) => db && userId ? collection(db, 'artifacts', appId, 'users', userId, 'history') : null;
 
 // Default Config
 const defaultGlobalConfig = {
@@ -373,18 +375,32 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
                 if (userDoc.data().referredBy) throw new Error("អ្នកមានអ្នកណែនាំរួចហើយ");
 
                 const referrerRef = getProfileDocRef(referrerId);
-                // UPDATE TOTAL EARNED FOR REFERRER
+                // UPDATE TOTAL EARNED FOR REFERRER & HISTORY
                 transaction.update(referrerRef, { 
                     points: increment(globalConfig.referrerReward),
                     totalEarned: increment(globalConfig.referrerReward)
                 });
+                const referrerHistoryRef = doc(collection(db, 'artifacts', appId, 'users', referrerId, 'history'));
+                transaction.set(referrerHistoryRef, {
+                    title: 'Referral Reward',
+                    amount: globalConfig.referrerReward,
+                    date: serverTimestamp(),
+                    type: 'referral'
+                });
 
                 const bonus = globalConfig.referredBonus || 500;
-                // UPDATE TOTAL EARNED FOR CURRENT USER
+                // UPDATE TOTAL EARNED FOR CURRENT USER & HISTORY
                 transaction.update(userRef, { 
                     referredBy: code,
                     points: increment(bonus),
                     totalEarned: increment(bonus)
+                });
+                const myHistoryRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                transaction.set(myHistoryRef, {
+                    title: 'Entered Code Bonus',
+                    amount: bonus,
+                    date: serverTimestamp(),
+                    type: 'referral_code'
                 });
 
                 const newReferralRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'referrals'));
@@ -533,6 +549,15 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                 transaction.update(profileRef, { points: increment(-cost) });
                 const newCampRef = doc(getCampaignsCollectionRef());
                 transaction.set(newCampRef, { userId, type, link: link.trim(), costPerUnit: type === 'sub' ? 50 : 1, requiredDuration: type === 'sub' ? 60 : (parseInt(time) || 60), initialCount: parseInt(count), remaining: parseInt(count), totalCost: cost, createdAt: serverTimestamp(), isActive: true });
+                
+                // SAVE HISTORY
+                const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                transaction.set(historyRef, {
+                    title: `Create ${type.toUpperCase()} Campaign`,
+                    amount: -cost,
+                    date: serverTimestamp(),
+                    type: 'campaign'
+                });
             });
             showNotification('ដាក់យុទ្ធនាការជោគជ័យ!', 'success');
             setLink('');
@@ -687,6 +712,15 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                     totalEarned: increment(current.requiredDuration || 50)
                 });
                 transaction.update(campRef, { remaining: increment(-1) });
+
+                // SAVE HISTORY
+                const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                transaction.set(historyRef, {
+                    title: type === 'view' ? 'Watched Video' : type === 'sub' ? 'Subscribed Channel' : 'Visited Website',
+                    amount: current.requiredDuration || 50,
+                    date: serverTimestamp(),
+                    type: 'earn'
+                });
             });
             if(isMounted.current) showNotification('Success! Points Added.', 'success');
             
@@ -788,12 +822,20 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
 const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
     const handlePurchase = async (pkg) => {
         try {
-            // UPDATE TOTAL EARNED (Even though it's purchased, it counts as positive balance flow)
+            // UPDATE TOTAL EARNED
             await runTransaction(db, async (tx) => { 
                 tx.update(getProfileDocRef(userId), { 
                     points: increment(pkg.coins),
                     totalEarned: increment(pkg.coins)
                 }); 
+                // SAVE HISTORY
+                const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                tx.set(historyRef, {
+                    title: 'Purchased Coins',
+                    amount: pkg.coins,
+                    date: serverTimestamp(),
+                    type: 'buy'
+                });
             });
             showNotification(`ទិញបានជោគជ័យ! +${formatNumber(pkg.coins)} coins`, 'success');
         } catch (error) { showNotification(`បរាជ័យ: ${error.message}`, 'error'); }
@@ -816,29 +858,70 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
     );
 };
 
-// UPDATED: Balance Details Page with TOTAL EARNED
-const BalanceDetailsPage = ({ setPage, userProfile }) => (
-    <div className="min-h-screen bg-purple-900 pb-16 pt-20">
-        <Header title="MY BALANCE" onBack={() => setPage('DASHBOARD')} />
-        <main className="p-4 space-y-4">
-            {/* CURRENT BALANCE CARD */}
-            <Card className="bg-gradient-to-r from-purple-600 to-purple-800 text-center p-6 text-white border-none">
-                <p className="text-sm opacity-80">សមតុល្យបច្ចុប្បន្ន (Current)</p>
-                <div className="flex justify-center items-center mt-2"><Coins className="w-8 h-8 text-yellow-400 mr-2" /><span className="text-4xl font-extrabold">{formatNumber(userProfile.points)}</span></div>
-                <p className="text-xs text-purple-300 mt-2">ពិន្ទុដែលអាចប្រើប្រាស់បាន</p>
-            </Card>
+// UPDATED: Balance Details Page with History List
+const BalanceDetailsPage = ({ db, userId, setPage, userProfile }) => {
+    const [history, setHistory] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-            {/* TOTAL EARNED CARD (NEW) */}
-             <Card className="bg-gradient-to-r from-teal-600 to-teal-800 text-center p-6 text-white border-none">
-                <p className="text-sm opacity-80">ពិន្ទុសរុបដែលរកបាន (Total Earned)</p>
-                <div className="flex justify-center items-center mt-2"><TrendingUp className="w-8 h-8 text-white mr-2" /><span className="text-4xl font-extrabold">{formatNumber(userProfile.totalEarned || 0)}</span></div>
-                <p className="text-xs text-teal-200 mt-2">ពិន្ទុសរុបតាំងពីចាប់ផ្តើម</p>
-            </Card>
+    useEffect(() => {
+        if (!db || !userId) return;
+        const q = query(getHistoryCollectionRef(userId), orderBy('date', 'desc'), limit(30));
+        
+        const unsub = onSnapshot(q, (snap) => {
+            setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setLoading(false);
+        });
+        return () => unsub();
+    }, [db, userId]);
 
-             <div className="text-center text-purple-300 mt-10 opacity-50">ប្រវត្តិប្រតិបត្តិការនឹងបង្ហាញនៅទីនេះ</div>
-        </main>
-    </div>
-);
+    return (
+        <div className="min-h-screen bg-purple-900 pb-16 pt-20">
+            <Header title="MY BALANCE" onBack={() => setPage('DASHBOARD')} />
+            <main className="p-4 space-y-4">
+                {/* CARDS */}
+                <div className="grid grid-cols-2 gap-3">
+                    <Card className="bg-gradient-to-br from-purple-700 to-purple-900 text-center p-4 text-white border-purple-500">
+                        <p className="text-xs opacity-70 mb-1">Current Balance</p>
+                        <div className="flex justify-center items-center"><Coins className="w-5 h-5 text-yellow-400 mr-1" /><span className="text-xl font-bold">{formatNumber(userProfile.points)}</span></div>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-teal-600 to-teal-800 text-center p-4 text-white border-teal-500">
+                        <p className="text-xs opacity-70 mb-1">Total Earned</p>
+                        <div className="flex justify-center items-center"><TrendingUp className="w-5 h-5 text-white mr-1" /><span className="text-xl font-bold">{formatNumber(userProfile.totalEarned || 0)}</span></div>
+                    </Card>
+                </div>
+
+                {/* HISTORY LIST */}
+                <Card className="p-4">
+                    <h3 className="font-bold text-white mb-3 border-b border-purple-600 pb-2 flex items-center"><Clock className="w-4 h-4 mr-2"/> ប្រវត្តិពិន្ទុ (History)</h3>
+                    {loading ? (
+                        <div className="text-center text-purple-300 py-4">Loading...</div>
+                    ) : history.length > 0 ? (
+                        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                            {history.map((item) => (
+                                <div key={item.id} className="flex justify-between items-center bg-purple-800 p-3 rounded-lg border border-purple-700">
+                                    <div className="flex items-center">
+                                        <div className={`p-2 rounded-full mr-3 ${item.amount > 0 ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`}>
+                                            {item.amount > 0 ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                                        </div>
+                                        <div>
+                                            <p className="text-white text-sm font-bold">{item.title || 'Unknown'}</p>
+                                            <p className="text-[10px] text-purple-300 opacity-70">{item.date?.toDate().toLocaleDateString()} {item.date?.toDate().toLocaleTimeString()}</p>
+                                        </div>
+                                    </div>
+                                    <span className={`font-bold ${item.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                        {item.amount > 0 ? '+' : ''}{formatNumber(item.amount)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center text-purple-400 py-8 opacity-50">មិនទាន់មានប្រវត្តិ</div>
+                    )}
+                </Card>
+            </main>
+        </div>
+    );
+};
 
 const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
     const [adsWatched, setAdsWatched] = useState(0);
@@ -872,6 +955,15 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
                     totalEarned: increment(reward)
                 });
                 tx.set(dailyRef, { adsWatchedCount: increment(1), date: getTodayDateKey() }, { merge: true });
+                
+                // SAVE HISTORY
+                const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                tx.set(historyRef, {
+                    title: 'Watched Ad',
+                    amount: reward,
+                    date: serverTimestamp(),
+                    type: 'ads'
+                });
             });
             showNotification(`ទទួលបាន ${reward} Coins!`, 'success');
             setPage('DASHBOARD');
@@ -1064,6 +1156,15 @@ const App = () => {
                     totalEarned: increment(globalConfig.dailyCheckinReward) 
                 });
                 tx.set(dailyRef, { checkinDone: true, date: getTodayDateKey() }, { merge: true });
+
+                // SAVE HISTORY
+                const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                tx.set(historyRef, {
+                    title: 'Daily Check-in',
+                    amount: globalConfig.dailyCheckinReward,
+                    date: serverTimestamp(),
+                    type: 'checkin'
+                });
             });
             showNotification('Check-in ជោគជ័យ!', 'success');
         } catch (e) { 
@@ -1101,7 +1202,7 @@ const App = () => {
         case 'MY_CAMPAIGNS': Content = <MyCampaignsPage db={db} userId={userId} userProfile={userProfile} setPage={setPage} showNotification={showNotification} />; break;
         case 'REFERRAL_PAGE': Content = <ReferralPage db={db} userId={userId} userProfile={userProfile} showNotification={showNotification} setPage={setPage} globalConfig={globalConfig} />; break;
         case 'BUY_COINS': Content = <BuyCoinsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
-        case 'BALANCE_DETAILS': Content = <BalanceDetailsPage setPage={setPage} userProfile={userProfile} />; break;
+        case 'BALANCE_DETAILS': Content = <BalanceDetailsPage db={db} userId={userId} setPage={setPage} userProfile={userProfile} />; break;
         case 'WATCH_ADS': Content = <WatchAdsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'MY_PLAN': Content = <MyPlanPage setPage={setPage} />; break;
         case 'ADMIN_DASHBOARD': Content = <AdminDashboardPage db={db} setPage={setPage} showNotification={showNotification} />; break;
