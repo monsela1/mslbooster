@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
     getAuth,
@@ -16,10 +16,12 @@ import {
     Users, Coins, Video, Link, Globe, MonitorPlay, Zap,
     UserPlus, ChevronLeft, BookOpen, ShoppingCart,
     CalendarCheck, Target, Wallet, Film, UserCheck,
-    DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, Settings, Copy, Save, Search, PlusCircle, MinusCircle, CheckCircle, XCircle, RefreshCw
+    DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, 
+    Settings, Copy, Save, Search, PlusCircle, MinusCircle, 
+    CheckCircle, XCircle, RefreshCw, User
 } from 'lucide-react';
 
-// --- Configuration ---
+// --- 1. CONFIGURATION ---
 const firebaseConfig = {
     apiKey: "AIzaSyDw-b18l9BgIv61DFBxWAFbP6Mh_HsBv24",
     authDomain: "we4u-e1134.firebaseapp.com",
@@ -32,7 +34,7 @@ const firebaseConfig = {
 
 const appId = 'we4u_live_app';
 
-// --- Firebase Initialization ---
+// --- 2. FIREBASE INITIALIZATION ---
 let app, db, auth;
 try {
     if (!getApps().length) {
@@ -46,7 +48,7 @@ try {
     console.error("Firebase initialization failed:", error);
 }
 
-// Helper Functions
+// --- 3. HELPER FUNCTIONS (IMPROVED) ---
 const getTodayDateKey = () => {
     const d = new Date();
     const year = d.getFullYear();
@@ -58,6 +60,22 @@ const getTodayDateKey = () => {
 const getShortId = (id) => id?.substring(0, 6).toUpperCase() || '------';
 const formatNumber = (num) => num?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') || '0';
 
+// New: Better YouTube Link Parser
+const getYouTubeID = (url) => {
+    if (!url) return null;
+    const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[7].length === 11) ? match[7] : null;
+};
+
+const getEmbedUrl = (url) => {
+    const videoId = getYouTubeID(url);
+    if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&rel=0`; 
+    }
+    return null;
+};
+
 // Firestore Paths
 const getProfileDocRef = (userId) => db && userId ? doc(db, 'artifacts', appId, 'users', userId, 'profile', 'user_data') : null;
 const getCampaignsCollectionRef = () => db ? collection(db, 'artifacts', appId, 'public', 'data', 'campaigns') : null;
@@ -66,10 +84,11 @@ const getDailyStatusDocRef = (userId) => db && userId ? doc(db, 'artifacts', app
 const getGlobalConfigDocRef = () => db ? doc(db, 'artifacts', appId, 'public', 'data', 'config', 'global_settings') : null;
 const getShortCodeDocRef = (shortId) => db && shortId ? doc(db, 'artifacts', appId, 'public', 'data', 'short_codes', shortId) : null;
 
-// --- Default Config ---
+// Default Config
 const defaultGlobalConfig = {
     dailyCheckinReward: 200,
     referrerReward: 1000,
+    referredBonus: 500,
     adsReward: 30,
     maxDailyAds: 15,
     adsSettings: {
@@ -85,7 +104,7 @@ const defaultGlobalConfig = {
     ]
 };
 
-// --- UI Components (Purple Theme) ---
+// --- 4. SHARED UI COMPONENTS ---
 const Loading = () => (
     <div className="flex justify-center items-center h-screen bg-purple-900">
         <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-yellow-400"></div>
@@ -131,7 +150,7 @@ const InputField = (props) => (
     />
 );
 
-// --- ADMIN SUB-COMPONENTS ---
+// --- 5. ADMIN PAGES ---
 
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     const handleChange = (e) => {
@@ -154,13 +173,13 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     };
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 pb-10">
             <Card className="p-4 border-l-4 border-yellow-400">
                 <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់</h3>
                 <div className="grid grid-cols-1 gap-3">
                     <div><label className="text-xs font-bold text-purple-300">Daily Check-in Points</label><InputField name="dailyCheckinReward" type="number" value={config.dailyCheckinReward} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" value={config.referrerReward} onChange={handleChange} /></div>
-                     <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" value={config.adsReward} onChange={handleChange} /></div>
+                    <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" value={config.adsReward} onChange={handleChange} /></div>
                 </div>
             </Card>
 
@@ -186,7 +205,7 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
             <Card className="p-4 border-l-4 border-pink-500">
                 <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ Ads IDs</h3>
                 <div className="space-y-3">
-                     <div><label className="text-xs font-bold text-purple-300">Banner ID</label><InputField name="bannerId" type="text" value={config.adsSettings?.bannerId || ''} onChange={handleAdsChange} /></div>
+                    <div><label className="text-xs font-bold text-purple-300">Banner ID</label><InputField name="bannerId" type="text" value={config.adsSettings?.bannerId || ''} onChange={handleAdsChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Interstitial/Video ID</label><InputField name="interstitialId" type="text" value={config.adsSettings?.interstitialId || ''} onChange={handleAdsChange} /></div>
                 </div>
             </Card>
@@ -198,7 +217,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     );
 };
 
-// --- MODIFIED: USER MANAGER TAB WITH USER LIST ---
 const AdminUserManagerTab = ({ db, showNotification }) => {
     const [searchId, setSearchId] = useState('');
     const [foundUser, setFoundUser] = useState(null);
@@ -206,17 +224,15 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
     const [allUsers, setAllUsers] = useState([]);
     const [loadingList, setLoadingList] = useState(false);
 
-    // Load recent users
     const loadUserList = async () => {
         setLoadingList(true);
         try {
-            // Fetch short codes doc to map to profiles
             const shortCodesRef = collection(db, 'artifacts', appId, 'public', 'data', 'short_codes');
-            const q = query(shortCodesRef, limit(20)); // Limit to 20 for performance
+            const q = query(shortCodesRef, limit(20)); // Limit to save reads
             const snap = await getDocs(q);
             
             const usersData = await Promise.all(snap.docs.map(async (docSnap) => {
-                const { fullUserId, shortId } = docSnap.data();
+                const { fullUserId } = docSnap.data();
                 const profileSnap = await getDoc(getProfileDocRef(fullUserId));
                 if (profileSnap.exists()) {
                     return { ...profileSnap.data(), uid: fullUserId };
@@ -229,9 +245,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
         setLoadingList(false);
     };
 
-    useEffect(() => {
-        loadUserList();
-    }, []);
+    useEffect(() => { loadUserList(); }, []);
 
     const handleSearch = async () => {
         if(searchId.length !== 6) return showNotification('Please enter 6-digit Short ID', 'error');
@@ -257,13 +271,12 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
             showNotification('Points updated successfully', 'success');
             setFoundUser(prev => ({...prev, points: prev.points + parseInt(pointsToAdd)}));
             setPointsToAdd(0);
-            loadUserList(); // Refresh list
+            loadUserList();
         } catch(e) { showNotification('Update failed', 'error'); }
     };
 
     return (
-        <div className='space-y-4'>
-            {/* Edit Section */}
+        <div className='space-y-4 pb-10'>
             <Card className="p-4">
                 <h3 className="font-bold text-lg mb-4 text-white">ស្វែងរក & កែប្រែ</h3>
                 <div className="flex space-x-2 mb-4">
@@ -276,7 +289,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                     />
                     <button onClick={handleSearch} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"><Search/></button>
                 </div>
-                
+               
                 {foundUser && (
                     <div className="bg-purple-900 p-4 rounded-lg border border-purple-600">
                         <p className="font-bold text-lg text-white">{foundUser.userName}</p>
@@ -298,7 +311,6 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                 )}
             </Card>
 
-            {/* User List Table */}
             <Card className="p-4">
                 <div className='flex justify-between items-center mb-3'>
                     <h3 className="font-bold text-lg text-white">បញ្ជីអ្នកប្រើប្រាស់ ({allUsers.length})</h3>
@@ -339,7 +351,7 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
 
     useEffect(() => {
         if(activeTab === 'CAMPAIGNS') {
-            const q = query(getCampaignsCollectionRef());
+            const q = query(getCampaignsCollectionRef(), limit(50));
             return onSnapshot(q, (snap) => {
                 setCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             });
@@ -379,11 +391,11 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
 
                 {activeTab === 'SETTINGS' && <AdminSettingsTab config={config} setConfig={setConfig} onSave={handleSaveConfig} />}
                 {activeTab === 'USERS' && <AdminUserManagerTab db={db} showNotification={showNotification} />}
-                
+               
                 {activeTab === 'CAMPAIGNS' && (
-                    <div className="space-y-2">
+                    <div className="space-y-2 pb-10">
                         {campaigns.map(c => (
-                             <div key={c.id} className={`bg-purple-800 p-3 rounded-lg shadow flex justify-between items-center border-l-4 ${c.remaining > 0 ? 'border-green-500' : 'border-red-500'}`}>
+                            <div key={c.id} className={`bg-purple-800 p-3 rounded-lg shadow flex justify-between items-center border-l-4 ${c.remaining > 0 ? 'border-green-500' : 'border-red-500'}`}>
                                 <div className='overflow-hidden'>
                                     <p className="font-bold text-sm truncate text-white w-48">{c.link}</p>
                                     <div className='flex space-x-2 text-xs mt-1'>
@@ -396,7 +408,7 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
                                 <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-900 text-red-200 rounded-full hover:bg-red-800"><Trash2 size={18}/></button>
                             </div>
                         ))}
-                         {campaigns.length === 0 && <p className="text-purple-300 text-center opacity-50">No campaigns found.</p>}
+                        {campaigns.length === 0 && <p className="text-purple-300 text-center opacity-50">No campaigns found.</p>}
                     </div>
                 )}
             </main>
@@ -404,7 +416,7 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
     );
 };
 
-// ... (User Pages) ...
+// --- 6. USER PAGES ---
 
 const ReferralPage = ({ db, userId, showNotification, setPage, globalConfig }) => {
     const [referrals, setReferrals] = useState([]);
@@ -469,20 +481,19 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
         return type === 'sub' ? c * 50 : c * t * 1;
     }, [type, count, time]);
 
-    const getEmbedUrl = (url) => {
-        if (url.includes('youtu')) {
-             const id = url.split('v=')[1]?.split('&')[0] || url.split('/').pop();
-             return `https://www.youtube.com/embed/${id}?autoplay=1&mute=1`; 
-        }
-        return null;
-    }
-
     const handleCheckLink = (e) => {
         e.preventDefault();
         if(!link.trim()) return showNotification('សូមបញ្ចូល Link ជាមុនសិន', 'error');
-        const embed = getEmbedUrl(link);
-        if (embed) setPreviewUrl(embed);
-        else if(type !== 'view' && type !== 'sub') setPreviewUrl(null);
+        
+        if (type === 'view' || type === 'sub') {
+            const embed = getEmbedUrl(link);
+            if(!embed) return showNotification('Link YouTube មិនត្រឹមត្រូវ', 'error');
+            setPreviewUrl(embed);
+        } else {
+            if(!link.startsWith('http')) return showNotification('Link ត្រូវតែមាន http:// ឬ https://', 'error');
+            setPreviewUrl(null);
+        }
+        
         setIsLinkVerified(true);
         showNotification('Link ត្រឹមត្រូវ!', 'success');
     };
@@ -541,7 +552,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                                 <input 
                                     value={link} 
                                     onChange={e => {setLink(e.target.value); setIsLinkVerified(false);}} 
-                                    placeholder="https://youtu.be/..." 
+                                    placeholder={type === 'website' ? "https://yoursite.com" : "https://youtu.be/..."}
                                     required 
                                     disabled={isLinkVerified}
                                     className="flex-1 p-3 bg-white text-black placeholder-gray-500 border-none rounded-l-md focus:outline-none focus:ring-1 focus:ring-teal-500"
@@ -558,7 +569,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                             {isLinkVerified && (
                                 <div className='mt-4 space-y-4'>
                                     <h3 className='text-white font-bold text-sm border-b border-gray-600 pb-2'>Campaigns Setting</h3>
-                                    
+                                   
                                     <div className="flex justify-between items-center mb-2">
                                         <label className="text-white font-bold text-sm">Number of view</label>
                                         <input 
@@ -580,14 +591,14 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                                             />
                                         </div>
                                     )}
-                                    
+                                   
                                     <div className="flex justify-between items-center mb-4 pt-2 border-t border-gray-600">
                                          <label className="text-white font-bold text-sm">Campaign Cost</label>
                                          <span className='text-xl font-bold text-yellow-500'>{formatNumber(calculateCost())}</span>
                                     </div>
 
                                     <button type="submit" disabled={isSubmitting} className="w-full bg-yellow-600 text-white py-3 rounded-full font-bold shadow-lg hover:bg-yellow-700 transition mt-4">
-                                        {isSubmitting ? 'Processing...' : 'DONE'}
+                                         {isSubmitting ? 'Processing...' : 'DONE'}
                                     </button>
                                 </div>
                             )}
@@ -615,33 +626,42 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
     const [timer, setTimer] = useState(0);
     const [claimed, setClaimed] = useState(false);
     const [autoPlay, setAutoPlay] = useState(true);
+    const isMounted = useRef(true);
 
     useEffect(() => {
-        const q = query(getCampaignsCollectionRef(), where('type', '==', type));
+        isMounted.current = true;
+        return () => { isMounted.current = false; };
+    }, []);
+
+    useEffect(() => {
+        const q = query(getCampaignsCollectionRef(), where('type', '==', type), limit(50));
         return onSnapshot(q, (snap) => {
-            const list = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.userId !== userId && c.remaining > 0);
+            if(!isMounted.current) return;
+            // Filter client side for remaining > 0 to avoid complex index creation for now
+            const list = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.userId !== userId && c.remaining > 0 && c.isActive !== false);
             setCampaigns(list);
             if (!current && list.length > 0) setCurrent(list[0]);
         });
-    }, [db, userId, type, current]);
+    }, [db, userId, type]);
 
-    useEffect(() => { if (current) { setTimer(current.requiredDuration || 30); setClaimed(false); } }, [current]);
-    
-    // AUTO CLAIM LOGIC (Only for 'view' and 'website')
     useEffect(() => { 
-        if (timer > 0) { 
-            const interval = setInterval(() => setTimer(t => t - 1), 1000); 
-            return () => clearInterval(interval); 
+        if (current) { setTimer(current.requiredDuration || 30); setClaimed(false); } 
+    }, [current]);
+    
+    useEffect(() => { 
+        let interval = null;
+        if (timer > 0 && !claimed) { 
+            interval = setInterval(() => {
+                setTimer(t => Math.max(0, t - 1));
+            }, 1000); 
         } else if (timer === 0 && !claimed && current) {
-            // If it's NOT subscription, auto claim
-            if (type !== 'sub') {
-                handleClaim();
-            }
+            if (type !== 'sub') handleClaim();
         }
+        return () => clearInterval(interval); 
     }, [timer, claimed, current, type]);
 
     const handleClaim = async () => {
-        if (claimed) return;
+        if (claimed || !current) return;
         setClaimed(true);
         try {
             await runTransaction(db, async (transaction) => {
@@ -651,39 +671,31 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                 transaction.update(getProfileDocRef(userId), { points: increment(current.requiredDuration || 50) });
                 transaction.update(campRef, { remaining: increment(-1) });
             });
-            showNotification('Success! Points Added.', 'success');
+            if(isMounted.current) showNotification('Success! Points Added.', 'success');
             
-            // For website, open link if not already (Subscribe handles this separately)
             if (type === 'website') window.open(current.link, '_blank');
             
-            // Auto Next
-            setTimeout(() => {
-                const next = campaigns.filter(c => c.id !== current?.id && c.remaining > 0)[0];
-                setCurrent(next || null);
-            }, 1500);
-
-        } catch (e) { showNotification('បរាជ័យ: ' + e.message, 'error'); }
+            if(autoPlay && isMounted.current) {
+                setTimeout(() => {
+                    if(!isMounted.current) return;
+                    handleNext();
+                }, 1500);
+            }
+        } catch (e) { if(isMounted.current) showNotification('បរាជ័យ: ' + e.message, 'error'); }
     };
 
     const handleNext = () => {
-         const next = campaigns.filter(c => c.id !== current?.id && c.remaining > 0)[0];
-         setCurrent(next || null);
+        const next = campaigns.filter(c => c.id !== current?.id && c.remaining > 0)[0];
+        setCurrent(next || null);
     }
 
-    // Special handler for Subscription Button
     const handleSubscribeClick = () => {
         if(!current) return;
-        window.open(current.link, '_blank'); // Open channel
-        handleClaim(); // Then claim and skip
+        window.open(current.link, '_blank');
+        handleClaim();
     };
 
-    const getEmbedUrl = (link) => {
-        if (link.includes('youtu')) {
-             const id = link.split('v=')[1]?.split('&')[0] || link.split('/').pop();
-             return `https://www.youtube.com/embed/${id}?autoplay=1&mute=0&controls=0`; 
-        }
-        return link;
-    }
+    const embedSrc = current ? (type === 'view' || type === 'sub' ? getEmbedUrl(current.link) : null) : null;
 
     return (
         <div className="min-h-screen bg-purple-900 pb-16 pt-20">
@@ -691,51 +703,43 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
             <main className="p-0">
                 {current ? (
                     <div className='flex flex-col h-full'>
-                        {/* Show Video for View AND Sub types */}
-                        {(type === 'view' || type === 'sub') ? (
-                            <div className="aspect-video bg-black w-full">
-                                <iframe src={getEmbedUrl(current.link)} className="w-full h-full" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+                        {(type === 'view' || type === 'sub') && embedSrc ? (
+                            <div className="aspect-video bg-black w-full sticky top-16 z-20">
+                                <iframe src={embedSrc} className="w-full h-full" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
                             </div>
                         ) : (
                             <div className="bg-purple-900 h-40 flex items-center justify-center border-b border-purple-700"><Globe className="w-16 h-16 text-purple-400" /></div>
                         )}
                         
-                        <div className='p-4 bg-white rounded-t-3xl mt-[-20px] relative z-10 min-h-[50vh]'>
-                             <div className="flex justify-between items-center mb-4 px-4">
-                                <div className="text-center flex items-center text-xl font-bold text-yellow-500"><Coins className="w-6 h-6 mr-2" /> {current.requiredDuration}</div>
-                                <div className="text-center flex items-center text-xl font-bold text-red-500"><Zap className="w-6 h-6 mr-2" /> {timer}s</div>
+                        <div className='p-4 bg-white rounded-t-3xl -mt-4 relative z-30 min-h-[60vh] shadow-inner'>
+                             <div className="flex justify-between items-center mb-4 px-4 pt-4">
+                                <div className="text-center flex items-center text-xl font-bold text-yellow-600 bg-yellow-100 px-3 py-1 rounded-full border border-yellow-300"><Coins className="w-5 h-5 mr-2" /> {current.requiredDuration}</div>
+                                <div className={`text-center flex items-center text-xl font-bold px-3 py-1 rounded-full border ${timer > 0 ? 'text-red-500 bg-red-100 border-red-300' : 'text-green-500 bg-green-100 border-green-300'}`}>
+                                    {timer > 0 ? <><Zap className="w-5 h-5 mr-2" /> {timer}s</> : <><CheckCircle className="w-5 h-5 mr-2"/> Ready</>}
+                                </div>
                             </div>
 
-                            <button onClick={handleNext} className="w-full py-3 mb-3 bg-yellow-600 text-white font-bold rounded-full shadow-md">VIEW ANOTHER</button>
-                            
-                            <div className="flex justify-center items-center space-x-3 mb-4">
-                                <span className="text-gray-600 font-bold">auto play next video</span>
-                                <button onClick={() => setAutoPlay(!autoPlay)} className={`w-12 h-6 rounded-full p-1 transition ${autoPlay ? 'bg-teal-500' : 'bg-gray-300'}`}>
-                                    <div className={`w-4 h-4 bg-white rounded-full shadow transition transform ${autoPlay ? 'translate-x-6' : ''}`}></div>
+                            <div className="flex justify-center items-center space-x-3 mb-6 bg-gray-100 p-2 rounded-lg">
+                                <span className="text-gray-600 font-bold text-sm">Auto Play Next</span>
+                                <button onClick={() => setAutoPlay(!autoPlay)} className={`w-12 h-6 rounded-full p-1 transition duration-300 ease-in-out ${autoPlay ? 'bg-teal-500' : 'bg-gray-300'}`}>
+                                    <div className={`w-4 h-4 bg-white rounded-full shadow transform transition duration-300 ${autoPlay ? 'translate-x-6' : ''}`}></div>
                                 </button>
                             </div>
 
-                            {/* MOCK AD BANNER */}
-                            <div className="w-full bg-gray-200 h-20 flex flex-col items-center justify-center mb-4 border border-gray-400 rounded">
-                                <p className="text-xs text-gray-500 font-bold">SPONSORED AD</p>
-                                <p className="text-xs text-gray-400">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p>
-                            </div>
-
-                            {/* Logic for Buttons based on Type */}
-                            {type === 'sub' && timer === 0 && !claimed ? (
-                                <button onClick={handleSubscribeClick} className="w-full py-3 rounded-full font-bold text-white shadow-lg mb-4 bg-red-600 animate-bounce">
-                                    SUBSCRIBE & CLAIM
+                             {type === 'sub' && timer === 0 && !claimed ? (
+                                <button onClick={handleSubscribeClick} className="w-full py-3 rounded-full font-bold text-white shadow-lg mb-4 bg-red-600 animate-bounce flex justify-center items-center">
+                                    <MonitorPlay className='mr-2'/> SUBSCRIBE & CLAIM
                                 </button>
                             ) : (
-                                <button onClick={handleClaim} disabled={timer > 0 || claimed} className={`w-full py-3 rounded-full font-bold text-white shadow-lg mb-4 ${timer > 0 || claimed ? 'bg-gray-400' : 'bg-green-500'}`}>
-                                    {timer > 0 ? `Please wait ${timer}s` : 'CLAIM REWARD'}
+                                <button onClick={handleClaim} disabled={timer > 0 || claimed} className={`w-full py-3 rounded-full font-bold text-white shadow-lg mb-4 transition-all ${timer > 0 || claimed ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}>
+                                    {claimed ? 'CLAIMED' : timer > 0 ? `Please wait ${timer}s` : 'CLAIM REWARD'}
                                 </button>
                             )}
                             
-                            <button className="w-full py-3 bg-teal-500 text-white font-bold rounded-full shadow-md">WATCH VIDEO ADS</button>
+                            <button onClick={handleNext} className="w-full py-3 mb-3 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-full shadow-md">SKIP / NEXT</button>
                         </div>
                     </div>
-                ) : <div className="text-white text-center mt-20 text-xl">មិនមានយុទ្ធនាការទេ</div>}
+                ) : <div className="flex flex-col items-center justify-center pt-20 text-white"><RefreshCw className="animate-spin mb-4"/>កំពុងស្វែងរកយុទ្ធនាការ...</div>}
             </main>
         </div>
     );
@@ -794,8 +798,10 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
     }, [userId]);
 
     useEffect(() => {
-        if (timer > 0) { const interval = setInterval(() => setTimer(t => t - 1), 1000); return () => clearInterval(interval); } 
+        let interval;
+        if (timer > 0) { interval = setInterval(() => setTimer(t => t - 1), 1000); } 
         else setFinished(true);
+        return () => clearInterval(interval);
     }, [timer]);
 
     const claimReward = async () => {
@@ -853,7 +859,7 @@ const MyPlanPage = ({ setPage }) => (
     </div>
 );
 
-// --- AUTH COMPONENT (REGISTER FORM UPDATED) ---
+// --- 7. AUTH COMPONENT ---
 const AuthForm = ({ onSubmit, btnText, isRegister = false }) => {
     const [email, setEmail] = useState('');
     const [pass, setPass] = useState('');
@@ -892,7 +898,7 @@ const AuthForm = ({ onSubmit, btnText, isRegister = false }) => {
     );
 };
 
-// --- Main App Component ---
+// --- 8. MAIN APP COMPONENT ---
 const App = () => {
     const [page, setPage] = useState('DASHBOARD');
     const [userId, setUserId] = useState(null);
@@ -902,8 +908,9 @@ const App = () => {
     const [authPage, setAuthPage] = useState('LOGIN');
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
 
-    const ADMIN_EMAIL = "admin@gmail.com";
-    const isAdmin = userProfile.email === ADMIN_EMAIL; 
+    // ADMIN CONFIGURATION
+    const ADMIN_EMAILS = ["admin@gmail.com"]; 
+    const isAdmin = userProfile.email && ADMIN_EMAILS.includes(userProfile.email);
 
     const showNotification = useCallback((msg, type = 'info') => {
         setNotification({ message: msg, type });
@@ -954,7 +961,7 @@ const App = () => {
                     const shortDoc = await getDoc(getShortCodeDocRef(referralCode));
                     if (shortDoc.exists()) {
                         referrerId = shortDoc.data().fullUserId;
-                        // Give bonus to referrer immediately (optional, or do it later)
+                        // Give bonus to referrer
                         updateDoc(getProfileDocRef(referrerId), { points: increment(globalConfig.referrerReward) });
                         // Increase bonus for new user
                         bonusPoints += (globalConfig.referredBonus || 0);
@@ -981,32 +988,19 @@ const App = () => {
     const handleLogout = async () => { await signOut(auth); showNotification('បានចាកចេញ', 'success'); };
 
     const handleDailyCheckin = async () => {
-        // Check local status immediately to prevent multiple clicks
-        if (userProfile.dailyCheckin) {
-             showNotification('បាន Check-in រួចហើយ!', 'info');
-             return;
-        }
-
+        if (userProfile.dailyCheckin) return showNotification('បាន Check-in រួចហើយ!', 'info');
         try {
             await runTransaction(db, async (tx) => {
-                // Read inside transaction for consistency
                 const dailyRef = getDailyStatusDocRef(userId);
                 const dailyDoc = await tx.get(dailyRef);
-                
-                if (dailyDoc.exists() && dailyDoc.data().checkinDone) {
-                    throw new Error("Already checked in today");
-                }
-
+                if (dailyDoc.exists() && dailyDoc.data().checkinDone) throw new Error("Already checked in today");
                 tx.update(getProfileDocRef(userId), { points: increment(globalConfig.dailyCheckinReward) });
                 tx.set(dailyRef, { checkinDone: true, date: getTodayDateKey() }, { merge: true });
             });
             showNotification('Check-in ជោគជ័យ!', 'success');
         } catch (e) { 
-            console.error(e); 
-            // Only show error if it wasn't the "already checked in" one, or just show info
-            if (e.message === "Already checked in today") {
-                showNotification('បាន Check-in រួចហើយ!', 'info');
-            }
+             if (e.message === "Already checked in today") showNotification('បាន Check-in រួចហើយ!', 'info');
+             else console.error(e);
         }
     };
 
@@ -1077,7 +1071,6 @@ const App = () => {
                                 textColor={userProfile.dailyCheckin ? 'text-gray-400' : 'text-white'} 
                                 disabled={userProfile.dailyCheckin}
                             />
-                            {/* MODIFIED: SUBSCRIBE BUTTON (Replaces My Plan) */}
                             <IconButton icon={UserCheck} title="SUBSCRIBE" onClick={() => setPage('EXPLORE_SUBSCRIPTION')} iconColor="text-pink-400" />
                             <IconButton icon={Film} title="PLAY VIDEO" onClick={() => setPage('EARN_POINTS')} iconColor="text-red-400" />
                             <IconButton icon={Wallet} title="MY BALANCE" onClick={() => setPage('BALANCE_DETAILS')} iconColor="text-orange-400" />
@@ -1089,7 +1082,6 @@ const App = () => {
                         </Card>
                     </div>
 
-                    {/* DASHBOARD BOTTOM AD */}
                     <div className="px-4 mt-6">
                         <div className="w-full bg-white h-20 flex flex-col items-center justify-center rounded-lg border-2 border-yellow-500/50 shadow-lg relative overflow-hidden">
                              <div className="absolute top-0 right-0 bg-yellow-500 text-purple-900 text-[10px] px-2 font-bold">AD</div>
