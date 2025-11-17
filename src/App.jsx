@@ -10,9 +10,9 @@ import {
     signInWithPopup
 } from 'firebase/auth';
 import {
-    getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc, deleteDoc, // <--- ADDED deleteDoc
+    getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc,
     collection, query, where, serverTimestamp, getDocs,
-    runTransaction, increment, limit, orderBy
+    runTransaction, increment, limit, orderBy, deleteDoc
 } from 'firebase/firestore';
 import {
     Users, Coins, Video, Link, Globe, MonitorPlay, Zap,
@@ -341,22 +341,14 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
         } catch(e) { showNotification('Update failed', 'error'); }
     };
 
-    // --- NEW: Delete User Function ---
     const handleDeleteUser = async (targetUid, targetShortId) => {
         if(!window.confirm('តើអ្នកពិតជាចង់លុបគណនីនេះមែនទេ? (សកម្មភាពនេះមិនអាចត្រឡប់ក្រោយវិញបានទេ)')) return;
-        
         try {
-            // 1. Delete Profile Data
             if(targetUid) await deleteDoc(getProfileDocRef(targetUid));
-            
-            // 2. Delete Short Code Mapping
             if(targetShortId) await deleteDoc(getShortCodeDocRef(targetShortId));
-
-            // Optional: We could also delete history/referrals, but user profile is main entry.
-            
             showNotification('បានលុបគណនីដោយជោគជ័យ!', 'success');
             setFoundUser(null);
-            loadUserList(); // Refresh list
+            loadUserList(); 
         } catch (e) {
             console.error(e);
             showNotification('បរាជ័យក្នុងការលុប: ' + e.message, 'error');
@@ -380,7 +372,6 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                
                 {foundUser && (
                     <div className="bg-purple-900 p-4 rounded-lg border border-purple-600 relative">
-                         {/* DELETE BUTTON */}
                          <button 
                             onClick={() => handleDeleteUser(foundUser.uid, foundUser.shortId)}
                             className="absolute top-4 right-4 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
@@ -424,7 +415,6 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                                 </div>
                                 <div className="flex items-center space-x-3">
                                     <span className='font-bold text-yellow-400 mr-2'>{formatNumber(u.points)}</span>
-                                    {/* LIST DELETE BUTTON */}
                                     <button 
                                         onClick={(e) => {
                                             e.stopPropagation(); 
@@ -481,17 +471,10 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
         } catch(e) { showNotification('Failed to save', 'error'); }
     };
 
-    // --- UPDATED: Hard Delete Campaign ---
     const handleDeleteCampaign = async (id) => {
-        if(!window.confirm('Are you sure you want to DELETE this campaign?')) return;
-        try { 
-            // Use deleteDoc instead of updating to inactive
-            await deleteDoc(doc(getCampaignsCollectionRef(), id));
-            showNotification('Campaign deleted!', 'success');
-        }
-        catch(e) {
-             showNotification('Failed to delete', 'error');
-        }
+        if(!window.confirm('Stop this campaign?')) return;
+        try { await deleteDoc(doc(getCampaignsCollectionRef(), id)); showNotification('Deleted!', 'success'); }
+        catch(e) {}
     };
 
     if (!config) return <Loading />;
@@ -528,9 +511,7 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
                                         </span>
                                     </div>
                                 </div>
-                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 shadow">
-                                    <Trash2 size={18}/>
-                                </button>
+                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-900 text-red-200 rounded-full hover:bg-red-800"><Trash2 size={18}/></button>
                             </div>
                         ))}
                         {campaigns.length === 0 && <p className="text-purple-300 text-center opacity-50">No campaigns found.</p>}
@@ -1117,10 +1098,11 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                             {type === 'sub' ? (
                                 <button 
                                     onClick={handleSubscribeClick} 
-                                    className={`flex-1 text-white py-3 rounded-lg font-bold shadow active:scale-95 transition text-sm ${timer > 0 || claimed || timer === -1 ? 'bg-gradient-to-r from-slate-500 to-slate-600 cursor-not-allowed opacity-80' : 'bg-red-600 hover:bg-red-700'}`}
+                                    className={`flex-1 text-white py-3 rounded-lg font-bold shadow active:scale-95 transition text-sm ${timer > 0 || claimed || timer === -1 ? 'bg-red-600 opacity-80 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
                                     disabled={timer > 0 || claimed || timer === -1}
                                 >
-                                    {claimed ? 'CLAIMED' : timer > 0 ? `WAIT ${timer}s` : 'SUBSCRIBE & CLAIM'}
+                                    {/* VISIBLE TEXT ALWAYS SAYS SUBSCRIBE */}
+                                    {claimed ? 'CLAIMED' : `SUBSCRIBE ${timer > 0 ? `(${timer}s)` : ''}`}
                                 </button>
                             ) : (
                                 <button 
@@ -1130,7 +1112,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                                         ${(timer > 0 || timer === -1) ? 'bg-gradient-to-r from-indigo-500 to-purple-600 cursor-not-allowed' : 
                                           claimed ? 'bg-green-500' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}
                                 >
-                                    {/* NEW UI: Text updates */}
                                     {claimed ? 'SUCCESS' : timer > 0 ? `WAIT ${timer}s` : timer === -1 ? 'LOADING...' : 'CLAIM REWARD'}
                                 </button>
                             )}
