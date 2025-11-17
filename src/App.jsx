@@ -19,7 +19,7 @@ import {
     DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2,
     Settings, Copy, Save, Search, PlusCircle, MinusCircle,
     CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
-    ArrowUpRight, ArrowDownLeft, Clock
+    ArrowUpRight, ArrowDownLeft, Clock, ToggleLeft, ToggleRight
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -33,7 +33,7 @@ const firebaseConfig = {
     measurementId: "G-NN4S9Z8SB9"
 };
 
-const appId = 'we4u_live_app';
+const appId = 'we4u_live_app'; // Internal ID (Keep same to save data)
 
 // --- 2. FIREBASE INITIALIZATION ---
 let app, db, auth;
@@ -85,13 +85,14 @@ const getGlobalConfigDocRef = () => db ? doc(db, 'artifacts', appId, 'public', '
 const getShortCodeDocRef = (shortId) => db && shortId ? doc(db, 'artifacts', appId, 'public', 'data', 'short_codes', shortId) : null;
 const getHistoryCollectionRef = (userId) => db && userId ? collection(db, 'artifacts', appId, 'users', userId, 'history') : null;
 
-// Default Config (MODIFIED CURRENCY HERE)
+// Default Config
 const defaultGlobalConfig = {
     dailyCheckinReward: 200,
     referrerReward: 1000,
     referredBonus: 500,
     adsReward: 30,
     maxDailyAds: 15,
+    enableBuyCoins: false, // <--- NEW SETTING: Default Disabled
     adsSettings: {
         bannerId: "ca-app-pub-xxxxxxxx/yyyyyy",
         interstitialId: "ca-app-pub-xxxxxxxx/zzzzzz",
@@ -160,6 +161,11 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
         setConfig(prev => ({ ...prev, [name]: parseInt(value) || 0 }));
     };
 
+    const handleToggleChange = (e) => {
+        const { name, checked } = e.target;
+        setConfig(prev => ({ ...prev, [name]: checked }));
+    };
+
     const handleAdsChange = (e) => {
         const { name, value } = e.target;
         setConfig(prev => ({
@@ -178,6 +184,26 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
 
     return (
         <div className="space-y-4 pb-10">
+            
+            {/* NEW: Feature Control Card */}
+            <Card className="p-4 border-l-4 border-blue-500">
+                <h3 className="font-bold text-lg mb-3 text-blue-400 flex items-center"><Settings className="w-5 h-5 mr-2"/> ការកំណត់ទូទៅ (Features)</h3>
+                <div className="flex items-center justify-between bg-purple-900 p-3 rounded">
+                    <span className="text-white font-bold">បើកមុខងារទិញកាក់ (Enable Buy Coins)</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            name="enableBuyCoins" 
+                            checked={config.enableBuyCoins || false} 
+                            onChange={handleToggleChange} 
+                            className="sr-only peer" 
+                        />
+                        <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+                <p className="text-xs text-gray-400 mt-2">* បើបិទ User នឹងមិនឃើញប៊ូតុងទិញកាក់ទេ</p>
+            </Card>
+
             <Card className="p-4 border-l-4 border-yellow-400">
                 <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់</h3>
                 <div className="grid grid-cols-1 gap-3">
@@ -1320,7 +1346,7 @@ const App = () => {
             Content = (
                 <div className="min-h-screen bg-purple-900 pb-16 pt-20">
                     <Header 
-                        title="We4u App" 
+                        title="MSL Booster" // <--- UPDATED APP NAME
                         className="z-20" 
                         rightContent={
                             <div className="flex space-x-2">
@@ -1348,12 +1374,17 @@ const App = () => {
                                 onClick={handleDailyCheckin} 
                                 iconColor={userProfile.dailyCheckin ? 'text-gray-500' : 'text-blue-400'} 
                                 textColor={userProfile.dailyCheckin ? 'text-gray-400' : 'text-white'} 
-                                disabled={!!userProfile.dailyCheckin} // Double check logic
+                                disabled={!!userProfile.dailyCheckin} 
                             />
                             <IconButton icon={UserCheck} title="SUBSCRIBE" onClick={() => setPage('EXPLORE_SUBSCRIPTION')} iconColor="text-pink-400" />
                             <IconButton icon={Film} title="PLAY VIDEO" onClick={() => setPage('EARN_POINTS')} iconColor="text-red-400" />
                             <IconButton icon={Wallet} title="MY BALANCE" onClick={() => setPage('BALANCE_DETAILS')} iconColor="text-orange-400" />
-                            <IconButton icon={ShoppingCart} title="BUY COINS" onClick={() => setPage('BUY_COINS')} iconColor="text-purple-400" />
+                            
+                            {/* CONDITIONALLY RENDER BUY COINS BUTTON */}
+                            {globalConfig.enableBuyCoins && (
+                                <IconButton icon={ShoppingCart} title="BUY COINS" onClick={() => setPage('BUY_COINS')} iconColor="text-purple-400" />
+                            )}
+
                             <IconButton icon={Target} title="CAMPAIGNS" onClick={() => setPage('MY_CAMPAIGNS')} iconColor="text-teal-400" />
                             <IconButton icon={UserPlus} title="ណែនាំមិត្ត" onClick={() => setPage('REFERRAL_PAGE')} iconColor="text-blue-400" />
                             <IconButton icon={Globe} title="មើល WEBSITE" onClick={() => setPage('EXPLORE_WEBSITE')} iconColor="text-indigo-400" />
