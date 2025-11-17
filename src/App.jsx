@@ -19,7 +19,7 @@ import {
     DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2,
     Settings, Copy, Save, Search, PlusCircle, MinusCircle,
     CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
-    ArrowUpRight, ArrowDownLeft, Clock
+    ArrowUpRight, ArrowDownLeft, Clock, ChevronDown
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -91,7 +91,7 @@ const defaultGlobalConfig = {
     referrerReward: 1000,
     referredBonus: 500,
     adsReward: 30,
-    maxDailyAds: 15, // Default value if not set
+    maxDailyAds: 15,
     enableBuyCoins: false, 
     adsSettings: {
         bannerId: "ca-app-pub-xxxxxxxx/yyyyyy",
@@ -153,6 +153,34 @@ const InputField = (props) => (
     />
 );
 
+// --- NEW COMPONENT: Selection Modal (Like the Screenshot) ---
+const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-xl w-full max-w-xs p-0 overflow-hidden shadow-2xl animate-in fade-in zoom-in duration-200">
+                <div className="p-4 border-b border-gray-200">
+                    <h3 className="font-bold text-lg text-gray-800 text-center">{title}</h3>
+                </div>
+                <div className="max-h-64 overflow-y-auto">
+                    {options.map((opt, index) => (
+                        <button 
+                            key={opt} 
+                            onClick={() => { onSelect(opt); onClose(); }} 
+                            className={`w-full py-4 text-lg font-medium text-gray-700 hover:bg-teal-50 hover:text-teal-600 transition border-b border-gray-100 last:border-0 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+                        >
+                            {opt}
+                        </button>
+                    ))}
+                </div>
+                <div className="p-3 bg-gray-50 border-t border-gray-200 text-center">
+                   <button onClick={onClose} className="text-red-500 font-bold text-sm px-6 py-2 rounded-full hover:bg-red-50 transition">CANCEL</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- 5. ADMIN PAGES ---
 
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
@@ -183,8 +211,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
 
     return (
         <div className="space-y-4 pb-10">
-            
-            {/* Feature Control Card */}
             <Card className="p-4 border-l-4 border-blue-500">
                 <h3 className="font-bold text-lg mb-3 text-blue-400 flex items-center"><Settings className="w-5 h-5 mr-2"/> ការកំណត់ទូទៅ (Features)</h3>
                 <div className="flex items-center justify-between bg-purple-900/50 p-4 rounded-lg border border-purple-600">
@@ -207,7 +233,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                 </div>
             </Card>
 
-            {/* Rewards Card - ADDED MAX DAILY ADS HERE */}
             <Card className="p-4 border-l-4 border-yellow-400">
                 <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់</h3>
                 <div className="grid grid-cols-1 gap-3">
@@ -215,7 +240,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                     <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" min="0" value={config.referrerReward || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referred User Bonus</label><InputField name="referredBonus" type="number" min="0" value={config.referredBonus || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" min="0" value={config.adsReward || 0} onChange={handleChange} /></div>
-                    {/* ADDED FIELD BELOW */}
                     <div className="pt-2 border-t border-purple-600 mt-2">
                         <label className="text-xs font-bold text-yellow-300">ចំនួនមើលពាណិជ្ជកម្មក្នុងមួយថ្ងៃ (Max Daily Ads)</label>
                         <InputField name="maxDailyAds" type="number" min="1" value={config.maxDailyAds || 15} onChange={handleChange} />
@@ -626,6 +650,14 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     const [isLinkVerified, setIsLinkVerified] = useState(false);
     const [previewUrl, setPreviewUrl] = useState(null);
 
+    // Modal Control States
+    const [showViewPicker, setShowViewPicker] = useState(false);
+    const [showTimePicker, setShowTimePicker] = useState(false);
+
+    // PREDEFINED OPTIONS
+    const VIEW_OPTIONS = [10, 20, 30, 40, 50, 100, 200, 500, 1000];
+    const TIME_OPTIONS = [60, 90, 120, 150, 180, 210, 240, 300, 600];
+
     useEffect(() => {
         const q = query(getCampaignsCollectionRef(), where('userId', '==', userId));
         return onSnapshot(q, (snap) => {
@@ -750,27 +782,27 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                                 <div className='mt-4 space-y-4'>
                                     <h3 className='text-white font-bold text-sm border-b border-gray-600 pb-2'>Campaigns Setting</h3>
                                    
+                                    {/* MODIFIED: Selection for Views */}
                                     <div className="flex justify-between items-center mb-2">
-                                        <label className="text-white font-bold text-sm">Number of view</label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            value={count}
-                                            onChange={e => setCount(Math.max(1, parseInt(e.target.value)))}
-                                            className="w-32 p-2 bg-white text-black text-center font-bold rounded-full border-none"
-                                        />
+                                        <label className="text-white font-bold text-sm">Number of views</label>
+                                        <div 
+                                            onClick={() => setShowViewPicker(true)}
+                                            className="w-32 p-2 bg-white text-black text-center font-bold rounded-full border-none cursor-pointer flex items-center justify-center active:scale-95 transition"
+                                        >
+                                            {count} <ChevronDown size={16} className="ml-1"/>
+                                        </div>
                                     </div>
 
+                                    {/* MODIFIED: Selection for Seconds */}
                                     {type !== 'sub' && (
                                         <div className="flex justify-between items-center mb-4">
                                             <label className="text-white font-bold text-sm">Time Required (sec.)</label>
-                                            <input
-                                                type="number"
-                                                min="10"
-                                                value={time}
-                                                onChange={e => setTime(Math.max(10, parseInt(e.target.value)))}
-                                                className="w-32 p-2 bg-white text-black text-center font-bold rounded-full border-none"
-                                            />
+                                            <div 
+                                                onClick={() => setShowTimePicker(true)}
+                                                className="w-32 p-2 bg-white text-black text-center font-bold rounded-full border-none cursor-pointer flex items-center justify-center active:scale-95 transition"
+                                            >
+                                                {time} <ChevronDown size={16} className="ml-1"/>
+                                            </div>
                                         </div>
                                     )}
                                    
@@ -797,6 +829,24 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                         ))}
                     </div>
                 </div>
+
+                {/* PICKER MODALS */}
+                <SelectionModal 
+                    isOpen={showViewPicker} 
+                    onClose={() => setShowViewPicker(false)} 
+                    title="Choose Number of views" 
+                    options={VIEW_OPTIONS}
+                    onSelect={setCount}
+                />
+
+                <SelectionModal 
+                    isOpen={showTimePicker} 
+                    onClose={() => setShowTimePicker(false)} 
+                    title="Choose Number of Seconds" 
+                    options={TIME_OPTIONS}
+                    onSelect={setTime}
+                />
+
             </main>
         </div>
     );
