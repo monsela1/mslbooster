@@ -70,10 +70,11 @@ const getYouTubeID = (url) => {
     return (match && match[7].length === 11) ? match[7] : null;
 };
 
+// UPDATED: Fix YouTube Embed
 const getEmbedUrl = (url) => {
     const videoId = getYouTubeID(url);
     if (videoId) {
-        return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&rel=0`;
+        return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&rel=0&playsinline=1&modestbranding=1`;
     }
     return null;
 };
@@ -155,7 +156,7 @@ const InputField = (props) => (
     />
 );
 
-// --- NEW COMPONENT: Selection Modal ---
+// --- SELECTION MODAL ---
 const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
     if (!isOpen) return null;
     return (
@@ -213,10 +214,8 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
 
     return (
         <div className="space-y-4 pb-10">
-            
             <Card className="p-4 border-l-4 border-blue-500">
                 <h3 className="font-bold text-lg mb-3 text-blue-400 flex items-center"><Settings className="w-5 h-5 mr-2"/> ការកំណត់ទូទៅ (Features)</h3>
-                
                 <div className="flex items-center justify-between bg-purple-900/50 p-4 rounded-lg border border-purple-600">
                     <div className="flex flex-col">
                         <span className="text-white font-bold text-base">បើកមុខងារទិញកាក់ (Enable Buy Coins)</span>
@@ -224,7 +223,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                             ស្ថានភាព: {config.enableBuyCoins ? 'កំពុងបើក (ON)' : 'កំពុងបិទ (OFF)'}
                         </span>
                     </div>
-                    
                     <button 
                         onClick={handleToggleChange}
                         className={`relative w-16 h-8 rounded-full transition-colors duration-300 focus:outline-none shadow-inner ${
@@ -245,7 +243,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                     <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" min="0" value={config.referrerReward || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referred User Bonus</label><InputField name="referredBonus" type="number" min="0" value={config.referredBonus || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" min="0" value={config.adsReward || 0} onChange={handleChange} /></div>
-                    
                     <div className="pt-3 border-t border-purple-600 mt-2">
                         <label className="text-xs font-bold text-yellow-300">ចំនួនមើលពាណិជ្ជកម្មក្នុងមួយថ្ងៃ (Max Daily Ads)</label>
                         <InputField name="maxDailyAds" type="number" min="1" value={config.maxDailyAds || 15} onChange={handleChange} />
@@ -888,14 +885,22 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
             interval = setInterval(() => {
                 setTimer(t => Math.max(0, t - 1));
             }, 1000);
-        } else if (timer === 0 && !claimed && current) {
-            if (type !== 'sub') handleClaim();
-        }
+        } 
+        // REMOVED AUTO CLAIM ON TIMER 0 - USER MUST CLICK
+        
         return () => clearInterval(interval);
-    }, [timer, claimed, current, type]);
+    }, [timer, claimed]);
 
+    // UPDATED: Check Timer before claiming
     const handleClaim = async () => {
         if (claimed || !current) return;
+        
+        // PREVENT CLAIMING IF TIMER IS NOT 0
+        if (timer > 0) {
+            showNotification(`សូមរង់ចាំ ${timer} វិនាទីទៀត!`, 'error');
+            return;
+        }
+
         setClaimed(true);
         try {
             await runTransaction(db, async (transaction) => {
@@ -937,36 +942,33 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     const handleSubscribeClick = async () => {
         if(!current) return;
 
-        // Check if Google Token Exists
+        // Check Timer First
+        if (timer > 0) {
+            showNotification(`សូមរង់ចាំ ${timer} វិនាទីទៀត!`, 'error');
+            return;
+        }
+
         if (!googleAccessToken) {
             showNotification('សូម Login តាម Google ម្តងទៀតដើម្បីផ្តល់សិទ្ធិ!', 'error');
             return;
         }
 
         try {
-            // 1. Find Video ID
             const videoId = getYouTubeID(current.link);
             if (!videoId) throw new Error("Invalid Video Link");
 
-            // 2. Fetch Channel ID from Video ID
             const videoResponse = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&access_token=${googleAccessToken}`);
             const videoData = await videoResponse.json();
             
             if (!videoData.items || videoData.items.length === 0) throw new Error("រកវីដេអូមិនឃើញ");
             const channelId = videoData.items[0].snippet.channelId;
 
-            // 3. Subscribe to Channel
             const subResponse = await fetch(`https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&access_token=${googleAccessToken}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     snippet: {
-                        resourceId: {
-                            kind: 'youtube#channel',
-                            channelId: channelId
-                        }
+                        resourceId: { kind: 'youtube#channel', channelId: channelId }
                     }
                 })
             });
@@ -976,7 +978,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                 handleClaim(); 
             } else {
                 const errorData = await subResponse.json();
-                // If already subscribed, count as success
                 if (errorData.error?.errors?.[0]?.reason === 'subscriptionDuplicate') {
                     showNotification('អ្នកបាន Subscribe រួចហើយ!', 'success');
                     handleClaim();
@@ -988,8 +989,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
         } catch (error) {
             console.error(error);
             showNotification('បរាជ័យ៖ ' + error.message, 'error');
-             // Fallback to old method if API fails
-             // window.open(current.link, '_blank');
         }
     };
 
@@ -997,7 +996,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     const iframeSrc = current ? (isVideo ? getEmbedUrl(current.link) : current.link) : null;
 
     return (
-        <div className="h-screen bg-[#0f172a] flex flex-col">
+        <div className="h-screen bg-[#0f172a] flex flex-col relative">
             <Header title={type === 'view' ? 'មើលវីដេអូ' : type === 'website' ? 'មើល Website' : 'Subscribe'} onBack={() => setPage('DASHBOARD')} className="relative" />
            
             <div className="flex-1 relative bg-black">
@@ -1027,7 +1026,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                 )}
             </div>
 
-            <div className="bg-white p-3 border-t border-gray-200 shadow-lg z-20">
+            <div className="bg-white p-3 border-t border-gray-200 shadow-lg z-20 pb-24"> {/* Add padding-bottom for banner */}
                  {current ? (
                     <div className="flex flex-col space-y-2">
                          <div className="flex justify-between items-center">
@@ -1049,13 +1048,21 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                         </div>
 
                         <div className="flex space-x-2">
-                            {type === 'sub' && timer === 0 && !claimed ? (
-                                <button onClick={handleSubscribeClick} className="flex-1 bg-red-600 text-white py-3 rounded-lg font-bold shadow hover:bg-red-700 active:scale-95 transition text-sm">
-                                    SUBSCRIBE & CLAIM
+                            {type === 'sub' ? (
+                                <button 
+                                    onClick={handleSubscribeClick} 
+                                    className={`flex-1 text-white py-3 rounded-lg font-bold shadow active:scale-95 transition text-sm ${timer > 0 || claimed ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
+                                    disabled={timer > 0 || claimed}
+                                >
+                                    {claimed ? 'CLAIMED' : timer > 0 ? `WAIT ${timer}s` : 'SUBSCRIBE & CLAIM'}
                                 </button>
                             ) : (
-                                <button onClick={handleClaim} disabled={timer > 0 || claimed} className={`flex-1 py-3 rounded-lg font-bold shadow text-sm text-white transition ${timer > 0 || claimed ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}>
-                                    {claimed ? 'CLAIMED' : timer > 0 ? 'PLEASE WAIT...' : 'CLAIM REWARD'}
+                                <button 
+                                    onClick={handleClaim} 
+                                    disabled={timer > 0 || claimed} 
+                                    className={`flex-1 py-3 rounded-lg font-bold shadow text-sm text-white transition ${timer > 0 || claimed ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}
+                                >
+                                    {claimed ? 'CLAIMED' : timer > 0 ? `WAIT ${timer}s` : 'CLAIM REWARD'}
                                 </button>
                             )}
                             <button onClick={handleNext} className="px-4 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-lg shadow active:scale-95 transition">
@@ -1064,6 +1071,14 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                         </div>
                     </div>
                  ) : <div className="text-center text-gray-400 text-sm py-2">No active campaigns</div>}
+            </div>
+
+            {/* --- ADDED BANNER ADS AT BOTTOM --- */}
+            <div className="absolute bottom-0 w-full bg-gray-100 border-t border-gray-300 h-16 flex items-center justify-center z-30">
+                 <div className="flex flex-col items-center">
+                    <span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-1 rounded mb-1">AD</span>
+                    <p className="text-xs text-gray-500 font-mono">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p>
+                </div>
             </div>
         </div>
     );
