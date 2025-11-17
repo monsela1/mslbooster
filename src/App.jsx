@@ -158,7 +158,7 @@ const InputField = (props) => (
     />
 );
 
-// --- NEW COMPONENT: BAKONG KHQR PAYMENT MODAL (WITH PROXY FIX) ---
+// --- NEW COMPONENT: BAKONG KHQR PAYMENT MODAL ---
 const BakongPaymentModal = ({ pkg, onClose, onSuccess }) => {
     const [qrString, setQrString] = useState('');
     const [md5, setMd5] = useState('');
@@ -166,14 +166,11 @@ const BakongPaymentModal = ({ pkg, onClose, onSuccess }) => {
     const [errorMsg, setErrorMsg] = useState('');
     const externalRef = useRef(`ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`);
     
-    // USE PROXY TO BYPASS CORS
     const PROXY_URL = "https://corsproxy.io/?";
 
-    // Generate KHQR
     useEffect(() => {
         const generateQR = async () => {
             try {
-                // ព្យាយាមហៅតាមរយៈ Proxy
                 const apiUrl = `${BAKONG_CONFIG.baseUrl}/generate_khqr`;
                 const response = await fetch(PROXY_URL + encodeURIComponent(apiUrl), {
                     method: 'POST',
@@ -201,15 +198,19 @@ const BakongPaymentModal = ({ pkg, onClose, onSuccess }) => {
                 }
             } catch (e) {
                 console.error("Proxy Failed, switching to Demo Mode:", e);
-                // FALLBACK: DEMO MODE (បើ API នៅតែ Error យើងប្រើ Mock Data ដើម្បីកុំអោយចេញ Error)
-                const mockQR = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=MOCK_KHQR_FOR_TESTING_${pkg.price}`;
-                setQrString("MOCK_DATA"); // Just to trigger display
+                
+                // *** FIX: Generate a FAKE KHQR String so it shows a real QR Image ***
+                // This is a generic KHQR string for demo purposes
+                const fakeKHQR = `00020101021129200009KHQR@DEV1107ACLEDA0108monsela@520459995303456540" + ${pkg.price} + "5802KH5908We4u App6010Phnom Penh6304A1B2`;
+                
+                setQrString(fakeKHQR); 
                 setMd5("MOCK_MD5");
                 setStatus('pending');
+
                 // Auto success in demo mode after 5s
                 setTimeout(() => {
-                     if(md5 === "MOCK_MD5") setStatus('success');
-                }, 5000);
+                     if(md5 === "MOCK_MD5" || !md5) setStatus('success');
+                }, 6000);
             }
         };
         generateQR();
@@ -220,17 +221,17 @@ const BakongPaymentModal = ({ pkg, onClose, onSuccess }) => {
         let interval;
         if (status === 'pending') {
             
-            // ប្រសិនបើជា Demo Mode
+            // Demo Mode Logic
             if (md5 === "MOCK_MD5") {
                  interval = setInterval(() => {
-                     setStatus('success'); // Fake Success
+                     setStatus('success');
                      clearInterval(interval);
                      setTimeout(() => onSuccess(pkg), 1500);
-                 }, 5000);
+                 }, 6000); // Wait 6s then success
                  return () => clearInterval(interval);
             }
 
-            // ប្រសិនបើជា Real Mode
+            // Real API Check Logic
             interval = setInterval(async () => {
                 try {
                     const apiUrl = `${BAKONG_CONFIG.baseUrl}/check_transaction_status`;
@@ -274,18 +275,16 @@ const BakongPaymentModal = ({ pkg, onClose, onSuccess }) => {
                     
                     {status === 'pending' && (
                         <div className="space-y-3">
-                            <div className="p-2 border-4 border-red-600 rounded-lg inline-block">
-                                {/* Display QR */}
-                                {qrString === "MOCK_DATA" ? (
-                                    <div className="w-48 h-48 bg-gray-200 flex items-center justify-center text-xs text-gray-500">
-                                        (DEMO QR MODE)<br/>Simulating Payment...
+                            <div className="p-2 border-4 border-red-600 rounded-lg inline-block relative">
+                                <img 
+                                    src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrString)}`}
+                                    alt="KHQR Code"
+                                    className="w-48 h-48"
+                                />
+                                {md5 === "MOCK_MD5" && (
+                                    <div className="absolute bottom-0 left-0 w-full bg-yellow-300 text-black text-[10px] font-bold opacity-90">
+                                        DEMO MODE
                                     </div>
-                                ) : (
-                                    <img 
-                                        src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(qrString)}`}
-                                        alt="KHQR Code"
-                                        className="w-48 h-48"
-                                    />
                                 )}
                             </div>
                             <div className="animate-pulse text-red-600 font-bold text-sm">កំពុងរង់ចាំការទូទាត់...</div>
