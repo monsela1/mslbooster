@@ -3,7 +3,6 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
     getAuth,
     onAuthStateChanged,
-    createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     signOut,
     GoogleAuthProvider,
@@ -70,7 +69,6 @@ const getYouTubeID = (url) => {
     return (match && match[7].length === 11) ? match[7] : null;
 };
 
-// UPDATED: Fix YouTube Embed
 const getEmbedUrl = (url) => {
     const videoId = getYouTubeID(url);
     if (videoId) {
@@ -156,7 +154,6 @@ const InputField = (props) => (
     />
 );
 
-// --- SELECTION MODAL ---
 const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
     if (!isOpen) return null;
     return (
@@ -886,12 +883,10 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                 setTimer(t => Math.max(0, t - 1));
             }, 1000);
         } 
-        // REMOVED AUTO CLAIM ON TIMER 0 - USER MUST CLICK
         
         return () => clearInterval(interval);
     }, [timer, claimed]);
 
-    // UPDATED: Check Timer before claiming
     const handleClaim = async () => {
         if (claimed || !current) return;
         
@@ -1073,7 +1068,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                  ) : <div className="text-center text-gray-400 text-sm py-2">No active campaigns</div>}
             </div>
 
-            {/* --- ADDED BANNER ADS AT BOTTOM --- */}
+            {/* --- BANNER ADS AT BOTTOM --- */}
             <div className="absolute bottom-0 w-full bg-gray-100 border-t border-gray-300 h-16 flex items-center justify-center z-30">
                  <div className="flex flex-col items-center">
                     <span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-1 rounded mb-1">AD</span>
@@ -1272,54 +1267,23 @@ const MyPlanPage = ({ setPage }) => (
     </div>
 );
 
-// --- 7. AUTH COMPONENT ---
+// --- 7. AUTH COMPONENT (Google + Email Login Only) ---
 const AuthForm = ({ onSubmit, btnText, isRegister = false, onGoogleLogin }) => {
     const [email, setEmail] = useState('');
     const [pass, setPass] = useState('');
-    const [username, setUsername] = useState('');
-    const [referralCode, setReferralCode] = useState('');
-
+    
+    // No need for username/referral code since manual registration is disabled
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSubmit(email, pass, username, referralCode);
+        onSubmit(email, pass, null, null);
     };
 
     return (
         <div className="space-y-4">
-            <form onSubmit={handleSubmit} className="space-y-4">
-                 {isRegister && (
-                     <div className="relative">
-                        <User className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input type="text" placeholder="ឈ្មោះ (Username)" value={username} onChange={e => setUsername(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" />
-                    </div>
-                )}
-                <div className="relative">
-                    <Mail className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input type="email" placeholder="អ៊ីមែល (Email)" value={email} onChange={e => setEmail(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" />
-                </div>
-                <div className="relative">
-                    <Lock className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input type="password" placeholder="ពាក្យសម្ងាត់ (Password)" value={pass} onChange={e => setPass(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" />
-                </div>
-                 {isRegister && (
-                     <div className="relative">
-                        <UserPlus className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                        <input type="text" placeholder="កូដអ្នកណែនាំ (Optional)" value={referralCode} onChange={e => setReferralCode(e.target.value.toUpperCase())} maxLength={6} className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400 uppercase" />
-                    </div>
-                )}
-                <button type="submit" className="w-full bg-teal-500 text-white p-3 rounded font-bold hover:bg-teal-600 transition shadow-lg">{btnText}</button>
-            </form>
-
-            <div className="flex items-center justify-center space-x-2 my-4">
-                <div className="h-px bg-purple-600 flex-1"></div>
-                <span className="text-purple-300 text-xs">OR</span>
-                <div className="h-px bg-purple-600 flex-1"></div>
-            </div>
-            
-            {/* GOOGLE SIGN IN BUTTON */}
+             {/* GOOGLE BUTTON FIRST (Primary Action) */}
             <button 
                 onClick={onGoogleLogin} 
-                className="w-full bg-white text-gray-800 p-3 rounded font-bold hover:bg-gray-100 transition shadow-lg flex items-center justify-center"
+                className="w-full bg-white text-gray-800 p-3 rounded font-bold hover:bg-gray-100 transition shadow-lg flex items-center justify-center border border-gray-300"
             >
                 {/* Google SVG Icon */}
                 <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24">
@@ -1330,6 +1294,24 @@ const AuthForm = ({ onSubmit, btnText, isRegister = false, onGoogleLogin }) => {
                 </svg>
                 បន្តជាមួយប្រើ Google
             </button>
+
+            <div className="flex items-center justify-center space-x-2 my-4">
+                <div className="h-px bg-purple-600 flex-1"></div>
+                <span className="text-purple-300 text-xs font-bold">ឬ ចូលប្រើគណនី (ADMIN/LEGACY)</span>
+                <div className="h-px bg-purple-600 flex-1"></div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="relative">
+                    <Mail className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input type="email" placeholder="អ៊ីមែល (Email)" value={email} onChange={e => setEmail(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" />
+                </div>
+                <div className="relative">
+                    <Lock className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input type="password" placeholder="ពាក្យសម្ងាត់ (Password)" value={pass} onChange={e => setPass(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" />
+                </div>
+                <button type="submit" className="w-full bg-teal-500 text-white p-3 rounded font-bold hover:bg-teal-600 transition shadow-lg">ចូលគណនី</button>
+            </form>
         </div>
     );
 };
@@ -1341,15 +1323,14 @@ const App = () => {
     const [userProfile, setUserProfile] = useState({});
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [notification, setNotification] = useState(null);
-    const [authPage, setAuthPage] = useState('LOGIN');
+    // Removed authPage state as we only show one view now
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
-    
-    // Google Access Token State
     const [googleAccessToken, setGoogleAccessToken] = useState(null);
 
-    // ADMIN CONFIGURATION
-    const ADMIN_EMAILS = ["admin@gmail.com"]; 
-    const isAdmin = userProfile.email && ADMIN_EMAILS.includes(userProfile.email);
+    // --- UPDATED ADMIN CONFIGURATION (UID CHECK) ---
+    // Replace this with your specific UID: 48wx8GPZbVYSxmfws1MxbuEOzsE3
+    const ADMIN_UIDS = ["48wx8GPZbVYSxmfws1MxbuEOzsE3"]; 
+    const isAdmin = userId && ADMIN_UIDS.includes(userId);
 
     const showNotification = useCallback((msg, type = 'info') => {
         setNotification({ message: msg, type });
@@ -1384,64 +1365,20 @@ const App = () => {
         catch (e) { showNotification('បរាជ័យ: ' + e.code, 'error'); }
     };
 
-    const handleRegister = async (email, password, username, referralCode) => {
-        if (password.length < 6) return showNotification('Password must be 6+ chars', 'error');
-        try {
-            const cred = await createUserWithEmailAndPassword(auth, email, password);
-            const uid = cred.user.uid;
-            const shortId = getShortId(uid);
-            
-            let bonusPoints = 5000;
-            let referrerId = null;
+    // handleRegister Removed from usage, keeping logic minimal just in case, but not exposed in UI
 
-            if (referralCode && referralCode.length === 6) {
-                try {
-                    const shortDoc = await getDoc(getShortCodeDocRef(referralCode));
-                    if (shortDoc.exists()) {
-                        referrerId = shortDoc.data().fullUserId;
-                        updateDoc(getProfileDocRef(referrerId), { 
-                            points: increment(globalConfig.referrerReward),
-                            totalEarned: increment(globalConfig.referrerReward) 
-                        });
-                        bonusPoints += (globalConfig.referredBonus || 0);
-                    }
-                } catch(e) { console.error("Referral error", e); }
-            }
-
-            await setDoc(getProfileDocRef(uid), { 
-                userId: uid, 
-                email, 
-                userName: username || `User_${shortId}`, 
-                points: bonusPoints, 
-                totalEarned: bonusPoints,
-                shortId, 
-                createdAt: serverTimestamp(), 
-                referredBy: referrerId ? referralCode : null 
-            });
-            
-            await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
-            showNotification('ចុះឈ្មោះជោគជ័យ!', 'success');
-
-        } catch (e) { showNotification('បរាជ័យ: ' + e.code, 'error'); }
-    };
-
-    // --- GOOGLE LOGIN HANDLER ---
     const handleGoogleLogin = async () => {
         try {
             const provider = new GoogleAuthProvider();
-            // Add YouTube Scope to allow subscribing
             provider.addScope('https://www.googleapis.com/auth/youtube.force-ssl');
 
             const result = await signInWithPopup(auth, provider);
-            
-            // Save Access Token
             const credential = GoogleAuthProvider.credentialFromResult(result);
             const token = credential.accessToken;
             setGoogleAccessToken(token);
 
             const user = result.user;
             const uid = user.uid;
-
             const userDocRef = getProfileDocRef(uid);
             const userDoc = await getDoc(userDocRef);
 
@@ -1463,7 +1400,6 @@ const App = () => {
             } else {
                 showNotification('ចូលគណនីជោគជ័យ', 'success');
             }
-
         } catch (error) {
             console.error(error);
             showNotification('បរាជ័យ: ' + error.message, 'error');
@@ -1477,10 +1413,7 @@ const App = () => {
             await runTransaction(db, async (tx) => {
                 const dailyRef = getDailyStatusDocRef(userId);
                 const dailyDoc = await tx.get(dailyRef);
-                
-                if (dailyDoc.exists() && dailyDoc.data().checkinDone) {
-                    throw new Error("ALREADY_CHECKED_IN");
-                }
+                if (dailyDoc.exists() && dailyDoc.data().checkinDone) throw new Error("ALREADY_CHECKED_IN");
                
                 tx.update(getProfileDocRef(userId), { 
                     points: increment(globalConfig.dailyCheckinReward),
@@ -1499,10 +1432,7 @@ const App = () => {
             showNotification('Check-in ជោគជ័យ!', 'success');
         } catch (e) { 
            if (e.message === "ALREADY_CHECKED_IN") showNotification('បាន Check-in រួចហើយ!', 'info');
-           else {
-               console.error(e);
-               showNotification('មានបញ្ហា!', 'error');
-           }
+           else { console.error(e); showNotification('មានបញ្ហា!', 'error'); }
         }
     };
 
@@ -1511,18 +1441,16 @@ const App = () => {
     if (!userId) return (
         <div className="min-h-screen bg-purple-900 flex items-center justify-center p-4">
             <Card className="w-full max-w-sm p-6">
-                <h2 className="text-2xl font-bold text-center mb-6 text-white">{authPage === 'LOGIN' ? 'ចូលគណនី' : 'បង្កើតគណនី'}</h2>
+                <div className="text-center mb-6">
+                    <h2 className="text-2xl font-bold text-white mb-2">MSL Booster</h2>
+                    <p className="text-purple-300 text-sm">សូមស្វាគមន៍មកកាន់ MSL Booster</p>
+                </div>
+                
                 <AuthForm 
-                    onSubmit={authPage === 'LOGIN' ? handleLogin : handleRegister} 
-                    btnText={authPage === 'LOGIN' ? 'ចូល' : 'ចុះឈ្មោះ'} 
-                    isRegister={authPage === 'REGISTER'}
+                    onSubmit={handleLogin} 
+                    btnText="ចូល" 
                     onGoogleLogin={handleGoogleLogin}
                 />
-                <div className="text-center mt-6">
-                    <button onClick={() => setAuthPage(authPage === 'LOGIN' ? 'REGISTER' : 'LOGIN')} className="text-teal-400 underline hover:text-teal-300">
-                        {authPage === 'LOGIN' ? 'មិនទាន់មានគណនី? ចុះឈ្មោះ' : 'មានគណនីហើយ? ចូល'}
-                    </button>
-                </div>
             </Card>
             {notification && <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 p-2 rounded text-white bg-red-500`}>{notification.message}</div>}
         </div>
@@ -1532,20 +1460,7 @@ const App = () => {
     switch (page) {
         case 'EARN_POINTS': Content = <EarnPage db={db} userId={userId} type="view" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'EXPLORE_WEBSITE': Content = <EarnPage db={db} userId={userId} type="website" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
-        
-        // Pass Google Token to EarnPage for Subscriptions
-        case 'EXPLORE_SUBSCRIPTION': 
-            Content = <EarnPage 
-                        db={db} 
-                        userId={userId} 
-                        type="sub" 
-                        setPage={setPage} 
-                        showNotification={showNotification} 
-                        globalConfig={globalConfig} 
-                        googleAccessToken={googleAccessToken}
-                      />; 
-            break;
-
+        case 'EXPLORE_SUBSCRIPTION': Content = <EarnPage db={db} userId={userId} type="sub" setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} googleAccessToken={googleAccessToken} />; break;
         case 'MY_CAMPAIGNS': Content = <MyCampaignsPage db={db} userId={userId} userProfile={userProfile} setPage={setPage} showNotification={showNotification} />; break;
         case 'REFERRAL_PAGE': Content = <ReferralPage db={db} userId={userId} userProfile={userProfile} showNotification={showNotification} setPage={setPage} globalConfig={globalConfig} />; break;
         case 'BUY_COINS': Content = <BuyCoinsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
