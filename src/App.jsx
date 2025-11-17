@@ -19,7 +19,7 @@ import {
     DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2,
     Settings, Copy, Save, Search, PlusCircle, MinusCircle,
     CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
-    ArrowUpRight, ArrowDownLeft, Clock, ToggleLeft, ToggleRight
+    ArrowUpRight, ArrowDownLeft, Clock
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -33,7 +33,7 @@ const firebaseConfig = {
     measurementId: "G-NN4S9Z8SB9"
 };
 
-const appId = 'we4u_live_app'; // Internal ID (Keep same to save data)
+const appId = 'we4u_live_app';
 
 // --- 2. FIREBASE INITIALIZATION ---
 let app, db, auth;
@@ -92,7 +92,7 @@ const defaultGlobalConfig = {
     referredBonus: 500,
     adsReward: 30,
     maxDailyAds: 15,
-    enableBuyCoins: false, // <--- NEW SETTING: Default Disabled
+    enableBuyCoins: false, 
     adsSettings: {
         bannerId: "ca-app-pub-xxxxxxxx/yyyyyy",
         interstitialId: "ca-app-pub-xxxxxxxx/zzzzzz",
@@ -161,9 +161,8 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
         setConfig(prev => ({ ...prev, [name]: parseInt(value) || 0 }));
     };
 
-    const handleToggleChange = (e) => {
-        const { name, checked } = e.target;
-        setConfig(prev => ({ ...prev, [name]: checked }));
+    const handleToggleChange = () => {
+        setConfig(prev => ({ ...prev, enableBuyCoins: !prev.enableBuyCoins }));
     };
 
     const handleAdsChange = (e) => {
@@ -185,23 +184,30 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     return (
         <div className="space-y-4 pb-10">
             
-            {/* NEW: Feature Control Card */}
+            {/* UPDATED: Feature Control Card (Easy to see) */}
             <Card className="p-4 border-l-4 border-blue-500">
                 <h3 className="font-bold text-lg mb-3 text-blue-400 flex items-center"><Settings className="w-5 h-5 mr-2"/> ការកំណត់ទូទៅ (Features)</h3>
-                <div className="flex items-center justify-between bg-purple-900 p-3 rounded">
-                    <span className="text-white font-bold">បើកមុខងារទិញកាក់ (Enable Buy Coins)</span>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                        <input 
-                            type="checkbox" 
-                            name="enableBuyCoins" 
-                            checked={config.enableBuyCoins || false} 
-                            onChange={handleToggleChange} 
-                            className="sr-only peer" 
-                        />
-                        <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
+                
+                <div className="flex items-center justify-between bg-purple-900/50 p-4 rounded-lg border border-purple-600">
+                    <div className="flex flex-col">
+                        <span className="text-white font-bold text-base">បើកមុខងារទិញកាក់ (Enable Buy Coins)</span>
+                        <span className={`text-xs mt-1 font-bold ${config.enableBuyCoins ? 'text-green-400' : 'text-red-400'}`}>
+                            ស្ថានភាព: {config.enableBuyCoins ? 'កំពុងបើក (ON)' : 'កំពុងបិទ (OFF)'}
+                        </span>
+                    </div>
+                    
+                    {/* Custom Toggle Switch */}
+                    <button 
+                        onClick={handleToggleChange}
+                        className={`relative w-16 h-8 rounded-full transition-colors duration-300 focus:outline-none shadow-inner ${
+                            config.enableBuyCoins ? 'bg-green-500' : 'bg-gray-600'
+                        }`}
+                    >
+                        <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 ${
+                            config.enableBuyCoins ? 'translate-x-8' : 'translate-x-0'
+                        }`}></div>
+                    </button>
                 </div>
-                <p className="text-xs text-gray-400 mt-2">* បើបិទ User នឹងមិនឃើញប៊ូតុងទិញកាក់ទេ</p>
             </Card>
 
             <Card className="p-4 border-l-4 border-yellow-400">
@@ -1346,7 +1352,7 @@ const App = () => {
             Content = (
                 <div className="min-h-screen bg-purple-900 pb-16 pt-20">
                     <Header 
-                        title="MSL Booster" // <--- UPDATED APP NAME
+                        title="MSL Booster" 
                         className="z-20" 
                         rightContent={
                             <div className="flex space-x-2">
@@ -1380,10 +1386,16 @@ const App = () => {
                             <IconButton icon={Film} title="PLAY VIDEO" onClick={() => setPage('EARN_POINTS')} iconColor="text-red-400" />
                             <IconButton icon={Wallet} title="MY BALANCE" onClick={() => setPage('BALANCE_DETAILS')} iconColor="text-orange-400" />
                             
-                            {/* CONDITIONALLY RENDER BUY COINS BUTTON */}
-                            {globalConfig.enableBuyCoins && (
-                                <IconButton icon={ShoppingCart} title="BUY COINS" onClick={() => setPage('BUY_COINS')} iconColor="text-purple-400" />
-                            )}
+                            {/* UPDATED BUTTON BEHAVIOR */}
+                            <IconButton 
+                                icon={ShoppingCart} 
+                                title="BUY COINS" 
+                                onClick={() => {
+                                    if(globalConfig.enableBuyCoins) setPage('BUY_COINS');
+                                    else showNotification('ឆាប់ៗនេះ (Coming Soon)!', 'info');
+                                }} 
+                                iconColor="text-purple-400" 
+                            />
 
                             <IconButton icon={Target} title="CAMPAIGNS" onClick={() => setPage('MY_CAMPAIGNS')} iconColor="text-teal-400" />
                             <IconButton icon={UserPlus} title="ណែនាំមិត្ត" onClick={() => setPage('REFERRAL_PAGE')} iconColor="text-blue-400" />
