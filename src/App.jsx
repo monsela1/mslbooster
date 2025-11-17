@@ -91,7 +91,7 @@ const defaultGlobalConfig = {
     referrerReward: 1000,
     referredBonus: 500,
     adsReward: 30,
-    maxDailyAds: 15,
+    maxDailyAds: 15, // Default value if not set
     enableBuyCoins: false, 
     adsSettings: {
         bannerId: "ca-app-pub-xxxxxxxx/yyyyyy",
@@ -184,10 +184,9 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     return (
         <div className="space-y-4 pb-10">
             
-            {/* UPDATED: Feature Control Card (Easy to see) */}
+            {/* Feature Control Card */}
             <Card className="p-4 border-l-4 border-blue-500">
                 <h3 className="font-bold text-lg mb-3 text-blue-400 flex items-center"><Settings className="w-5 h-5 mr-2"/> ការកំណត់ទូទៅ (Features)</h3>
-                
                 <div className="flex items-center justify-between bg-purple-900/50 p-4 rounded-lg border border-purple-600">
                     <div className="flex flex-col">
                         <span className="text-white font-bold text-base">បើកមុខងារទិញកាក់ (Enable Buy Coins)</span>
@@ -195,8 +194,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                             ស្ថានភាព: {config.enableBuyCoins ? 'កំពុងបើក (ON)' : 'កំពុងបិទ (OFF)'}
                         </span>
                     </div>
-                    
-                    {/* Custom Toggle Switch */}
                     <button 
                         onClick={handleToggleChange}
                         className={`relative w-16 h-8 rounded-full transition-colors duration-300 focus:outline-none shadow-inner ${
@@ -210,6 +207,7 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                 </div>
             </Card>
 
+            {/* Rewards Card - ADDED MAX DAILY ADS HERE */}
             <Card className="p-4 border-l-4 border-yellow-400">
                 <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់</h3>
                 <div className="grid grid-cols-1 gap-3">
@@ -217,6 +215,11 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                     <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" min="0" value={config.referrerReward || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referred User Bonus</label><InputField name="referredBonus" type="number" min="0" value={config.referredBonus || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" min="0" value={config.adsReward || 0} onChange={handleChange} /></div>
+                    {/* ADDED FIELD BELOW */}
+                    <div className="pt-2 border-t border-purple-600 mt-2">
+                        <label className="text-xs font-bold text-yellow-300">ចំនួនមើលពាណិជ្ជកម្មក្នុងមួយថ្ងៃ (Max Daily Ads)</label>
+                        <InputField name="maxDailyAds" type="number" min="1" value={config.maxDailyAds || 15} onChange={handleChange} />
+                    </div>
                 </div>
             </Card>
 
@@ -1386,7 +1389,7 @@ const App = () => {
                             <IconButton icon={Film} title="PLAY VIDEO" onClick={() => setPage('EARN_POINTS')} iconColor="text-red-400" />
                             <IconButton icon={Wallet} title="MY BALANCE" onClick={() => setPage('BALANCE_DETAILS')} iconColor="text-orange-400" />
                             
-                            {/* UPDATED BUTTON BEHAVIOR */}
+                            {/* BUTTON IS ALWAYS VISIBLE, BUT LOGIC HANDLES THE ACTION */}
                             <IconButton 
                                 icon={ShoppingCart} 
                                 title="BUY COINS" 
