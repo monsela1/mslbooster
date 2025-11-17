@@ -3,16 +3,15 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
     getAuth,
     onAuthStateChanged,
-    createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     signOut,
     GoogleAuthProvider,
     signInWithPopup
 } from 'firebase/auth';
 import {
-    getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc,
+    getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc, deleteDoc,
     collection, query, where, serverTimestamp, getDocs,
-    runTransaction, increment, limit, orderBy, deleteDoc
+    runTransaction, increment, limit, orderBy
 } from 'firebase/firestore';
 import {
     Users, Coins, Video, Link, Globe, MonitorPlay, Zap,
@@ -511,7 +510,9 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
                                         </span>
                                     </div>
                                 </div>
-                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-900 text-red-200 rounded-full hover:bg-red-800"><Trash2 size={18}/></button>
+                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 shadow">
+                                    <Trash2 size={18}/>
+                                </button>
                             </div>
                         ))}
                         {campaigns.length === 0 && <p className="text-purple-300 text-center opacity-50">No campaigns found.</p>}
@@ -636,19 +637,20 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
                     ) : (
                         <div>
                             <p className="text-xs text-purple-200 mb-3">ដាក់កូដដើម្បីទទួលបាន <span className="text-yellow-400 font-bold">+{formatNumber(globalConfig.referredBonus || 500)} Points</span> បន្ថែម!</p>
-                            <div className="flex space-x-2">
+                            <div className="flex">
+                                {/* UPDATED: White Background, Black Text */}
                                 <input
                                     value={inputCode}
                                     onChange={(e) => setInputCode(e.target.value.toUpperCase())}
                                     placeholder="បញ្ចូលកូដ ៦ ខ្ទង់"
                                     maxLength={6}
                                     disabled={isSubmitting}
-                                    className="flex-1 p-2 bg-purple-950 border border-purple-600 rounded text-white font-mono text-center uppercase focus:border-yellow-400 outline-none"
+                                    className="flex-1 p-3 bg-white text-black font-bold placeholder-gray-500 rounded-l-lg focus:outline-none uppercase"
                                 />
                                 <button
                                     onClick={handleSubmitCode}
                                     disabled={isSubmitting || inputCode.length !== 6}
-                                    className={`px-4 rounded font-bold text-white transition ${isSubmitting || inputCode.length !== 6 ? 'bg-gray-600' : 'bg-yellow-600 hover:bg-yellow-700'}`}
+                                    className={`px-6 font-bold text-white rounded-r-lg transition ${isSubmitting || inputCode.length !== 6 ? 'bg-gray-500' : 'bg-yellow-600 hover:bg-yellow-700'}`}
                                 >
                                     {isSubmitting ? '...' : 'OK'}
                                 </button>
@@ -1098,11 +1100,10 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                             {type === 'sub' ? (
                                 <button 
                                     onClick={handleSubscribeClick} 
-                                    className={`flex-1 text-white py-3 rounded-lg font-bold shadow active:scale-95 transition text-sm ${timer > 0 || claimed || timer === -1 ? 'bg-red-600 opacity-80 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
+                                    className={`flex-1 text-white py-3 rounded-lg font-bold shadow active:scale-95 transition text-sm ${timer > 0 || claimed || timer === -1 ? 'bg-gradient-to-r from-slate-500 to-slate-600 cursor-not-allowed opacity-80' : 'bg-red-600 hover:bg-red-700'}`}
                                     disabled={timer > 0 || claimed || timer === -1}
                                 >
-                                    {/* VISIBLE TEXT ALWAYS SAYS SUBSCRIBE */}
-                                    {claimed ? 'CLAIMED' : `SUBSCRIBE ${timer > 0 ? `(${timer}s)` : ''}`}
+                                    {claimed ? 'CLAIMED' : timer > 0 ? `WAIT ${timer}s` : 'SUBSCRIBE & CLAIM'}
                                 </button>
                             ) : (
                                 <button 
@@ -1112,6 +1113,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                                         ${(timer > 0 || timer === -1) ? 'bg-gradient-to-r from-indigo-500 to-purple-600 cursor-not-allowed' : 
                                           claimed ? 'bg-green-500' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}
                                 >
+                                    {/* NEW UI: Text updates */}
                                     {claimed ? 'SUCCESS' : timer > 0 ? `WAIT ${timer}s` : timer === -1 ? 'LOADING...' : 'CLAIM REWARD'}
                                 </button>
                             )}
