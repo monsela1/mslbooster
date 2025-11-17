@@ -18,7 +18,7 @@ import {
     CalendarCheck, Target, Wallet, Film, UserCheck,
     DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2, 
     Settings, Copy, Save, Search, PlusCircle, MinusCircle, 
-    CheckCircle, XCircle, RefreshCw, User, ExternalLink
+    CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -67,12 +67,9 @@ const getYouTubeID = (url) => {
     return (match && match[7].length === 11) ? match[7] : null;
 };
 
-// UPDATED: Enable Sound (mute=0) and Controls (controls=1)
 const getEmbedUrl = (url) => {
     const videoId = getYouTubeID(url);
     if (videoId) {
-        // mute=0 : មានសម្លេង
-        // controls=1 : បង្ហាញប៊ូតុង Play/Pause/Volume (សំខាន់ព្រោះបើ Browser block autoplay គេអាចចុចបាន)
         return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&rel=0`; 
     }
     return null;
@@ -338,87 +335,6 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
     );
 };
 
-const AdminDashboardPage = ({ db, setPage, showNotification }) => {
-    const [activeTab, setActiveTab] = useState('SETTINGS');
-    const [config, setConfig] = useState(null);
-    const [campaigns, setCampaigns] = useState([]);
-
-    useEffect(() => {
-        const fetchConfig = async () => {
-            const docSnap = await getDoc(getGlobalConfigDocRef());
-            if (docSnap.exists()) setConfig(docSnap.data());
-            else setConfig(defaultGlobalConfig);
-        };
-        fetchConfig();
-    }, [db]);
-
-    useEffect(() => {
-        if(activeTab === 'CAMPAIGNS') {
-            const q = query(getCampaignsCollectionRef(), limit(50));
-            return onSnapshot(q, (snap) => {
-                setCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-            });
-        }
-    }, [db, activeTab]);
-
-    const handleSaveConfig = async () => {
-        try {
-            await setDoc(getGlobalConfigDocRef(), config);
-            showNotification('Settings saved successfully!', 'success');
-        } catch(e) { showNotification('Failed to save', 'error'); }
-    };
-
-    const handleDeleteCampaign = async (id) => {
-        if(!window.confirm('Stop this campaign?')) return;
-        try { await updateDoc(doc(getCampaignsCollectionRef(), id), { remaining: 0, isActive: false }); } 
-        catch(e) {}
-    };
-
-    if (!config) return <Loading />;
-
-    return (
-        <div className="min-h-screen bg-purple-950 pb-16 pt-20">
-            <Header title="ADMIN PANEL" onBack={() => setPage('DASHBOARD')} className="bg-purple-900" />
-            <main className="p-4">
-                <div className="flex space-x-1 mb-4 bg-purple-800 p-1 rounded-lg">
-                    {['SETTINGS', 'USERS', 'CAMPAIGNS'].map(tab => (
-                        <button 
-                            key={tab}
-                            onClick={() => setActiveTab(tab)} 
-                            className={`flex-1 py-2 rounded-lg font-bold text-xs transition ${activeTab === tab ? 'bg-teal-600 text-white shadow' : 'text-purple-300 hover:bg-purple-700'}`}
-                        >
-                            {tab}
-                        </button>
-                    ))}
-                </div>
-
-                {activeTab === 'SETTINGS' && <AdminSettingsTab config={config} setConfig={setConfig} onSave={handleSaveConfig} />}
-                {activeTab === 'USERS' && <AdminUserManagerTab db={db} showNotification={showNotification} />}
-               
-                {activeTab === 'CAMPAIGNS' && (
-                    <div className="space-y-2 pb-10">
-                        {campaigns.map(c => (
-                            <div key={c.id} className={`bg-purple-800 p-3 rounded-lg shadow flex justify-between items-center border-l-4 ${c.remaining > 0 ? 'border-green-500' : 'border-red-500'}`}>
-                                <div className='overflow-hidden'>
-                                    <p className="font-bold text-sm truncate text-white w-48">{c.link}</p>
-                                    <div className='flex space-x-2 text-xs mt-1'>
-                                        <span className='bg-purple-900 px-2 py-0.5 rounded text-purple-200'>{c.type}</span>
-                                        <span className={`${c.remaining > 0 ? 'text-green-400' : 'text-red-400'} font-bold`}>
-                                            Rem: {c.remaining}
-                                        </span>
-                                    </div>
-                                </div>
-                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-900 text-red-200 rounded-full hover:bg-red-800"><Trash2 size={18}/></button>
-                            </div>
-                        ))}
-                        {campaigns.length === 0 && <p className="text-purple-300 text-center opacity-50">No campaigns found.</p>}
-                    </div>
-                )}
-            </main>
-        </div>
-    );
-};
-
 // --- 6. USER PAGES ---
 
 const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, globalConfig }) => {
@@ -457,12 +373,18 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
                 if (userDoc.data().referredBy) throw new Error("អ្នកមានអ្នកណែនាំរួចហើយ");
 
                 const referrerRef = getProfileDocRef(referrerId);
-                transaction.update(referrerRef, { points: increment(globalConfig.referrerReward) });
+                // UPDATE TOTAL EARNED FOR REFERRER
+                transaction.update(referrerRef, { 
+                    points: increment(globalConfig.referrerReward),
+                    totalEarned: increment(globalConfig.referrerReward)
+                });
 
                 const bonus = globalConfig.referredBonus || 500;
+                // UPDATE TOTAL EARNED FOR CURRENT USER
                 transaction.update(userRef, { 
                     referredBy: code,
-                    points: increment(bonus)
+                    points: increment(bonus),
+                    totalEarned: increment(bonus)
                 });
 
                 const newReferralRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'referrals'));
@@ -758,7 +680,12 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
                 const campRef = doc(getCampaignsCollectionRef(), current.id);
                 const campDoc = await transaction.get(campRef);
                 if (!campDoc.exists() || campDoc.data().remaining <= 0) throw new Error("Campaign finished");
-                transaction.update(getProfileDocRef(userId), { points: increment(current.requiredDuration || 50) });
+                
+                // UPDATE TOTAL EARNED
+                transaction.update(getProfileDocRef(userId), { 
+                    points: increment(current.requiredDuration || 50),
+                    totalEarned: increment(current.requiredDuration || 50)
+                });
                 transaction.update(campRef, { remaining: increment(-1) });
             });
             if(isMounted.current) showNotification('Success! Points Added.', 'success');
@@ -861,7 +788,13 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig })
 const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
     const handlePurchase = async (pkg) => {
         try {
-            await runTransaction(db, async (tx) => { tx.update(getProfileDocRef(userId), { points: increment(pkg.coins) }); });
+            // UPDATE TOTAL EARNED (Even though it's purchased, it counts as positive balance flow)
+            await runTransaction(db, async (tx) => { 
+                tx.update(getProfileDocRef(userId), { 
+                    points: increment(pkg.coins),
+                    totalEarned: increment(pkg.coins)
+                }); 
+            });
             showNotification(`ទិញបានជោគជ័យ! +${formatNumber(pkg.coins)} coins`, 'success');
         } catch (error) { showNotification(`បរាជ័យ: ${error.message}`, 'error'); }
     };
@@ -883,14 +816,25 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
     );
 };
 
+// UPDATED: Balance Details Page with TOTAL EARNED
 const BalanceDetailsPage = ({ setPage, userProfile }) => (
     <div className="min-h-screen bg-purple-900 pb-16 pt-20">
         <Header title="MY BALANCE" onBack={() => setPage('DASHBOARD')} />
         <main className="p-4 space-y-4">
+            {/* CURRENT BALANCE CARD */}
             <Card className="bg-gradient-to-r from-purple-600 to-purple-800 text-center p-6 text-white border-none">
-                <p className="text-sm opacity-80">សមតុល្យបច្ចុប្បន្ន</p>
+                <p className="text-sm opacity-80">សមតុល្យបច្ចុប្បន្ន (Current)</p>
                 <div className="flex justify-center items-center mt-2"><Coins className="w-8 h-8 text-yellow-400 mr-2" /><span className="text-4xl font-extrabold">{formatNumber(userProfile.points)}</span></div>
+                <p className="text-xs text-purple-300 mt-2">ពិន្ទុដែលអាចប្រើប្រាស់បាន</p>
             </Card>
+
+            {/* TOTAL EARNED CARD (NEW) */}
+             <Card className="bg-gradient-to-r from-teal-600 to-teal-800 text-center p-6 text-white border-none">
+                <p className="text-sm opacity-80">ពិន្ទុសរុបដែលរកបាន (Total Earned)</p>
+                <div className="flex justify-center items-center mt-2"><TrendingUp className="w-8 h-8 text-white mr-2" /><span className="text-4xl font-extrabold">{formatNumber(userProfile.totalEarned || 0)}</span></div>
+                <p className="text-xs text-teal-200 mt-2">ពិន្ទុសរុបតាំងពីចាប់ផ្តើម</p>
+            </Card>
+
              <div className="text-center text-purple-300 mt-10 opacity-50">ប្រវត្តិប្រតិបត្តិការនឹងបង្ហាញនៅទីនេះ</div>
         </main>
     </div>
@@ -922,7 +866,11 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
         try {
             await runTransaction(db, async (tx) => { 
                 const dailyRef = getDailyStatusDocRef(userId);
-                tx.update(getProfileDocRef(userId), { points: increment(reward) });
+                // UPDATE TOTAL EARNED
+                tx.update(getProfileDocRef(userId), { 
+                    points: increment(reward),
+                    totalEarned: increment(reward)
+                });
                 tx.set(dailyRef, { adsWatchedCount: increment(1), date: getTodayDateKey() }, { merge: true });
             });
             showNotification(`ទទួលបាន ${reward} Coins!`, 'success');
@@ -1074,7 +1022,10 @@ const App = () => {
                     const shortDoc = await getDoc(getShortCodeDocRef(referralCode));
                     if (shortDoc.exists()) {
                         referrerId = shortDoc.data().fullUserId;
-                        updateDoc(getProfileDocRef(referrerId), { points: increment(globalConfig.referrerReward) });
+                        updateDoc(getProfileDocRef(referrerId), { 
+                            points: increment(globalConfig.referrerReward),
+                            totalEarned: increment(globalConfig.referrerReward) // Update Total Earned for Referrer
+                        });
                         bonusPoints += (globalConfig.referredBonus || 0);
                     }
                 } catch(e) { console.error("Referral error", e); }
@@ -1085,6 +1036,7 @@ const App = () => {
                 email, 
                 userName: username || `User_${shortId}`, 
                 points: bonusPoints, 
+                totalEarned: bonusPoints, // Initialize Total Earned
                 shortId, 
                 createdAt: serverTimestamp(), 
                 referredBy: referrerId ? referralCode : null 
@@ -1105,7 +1057,12 @@ const App = () => {
                 const dailyRef = getDailyStatusDocRef(userId);
                 const dailyDoc = await tx.get(dailyRef);
                 if (dailyDoc.exists() && dailyDoc.data().checkinDone) throw new Error("Already checked in today");
-                tx.update(getProfileDocRef(userId), { points: increment(globalConfig.dailyCheckinReward) });
+                
+                // UPDATE TOTAL EARNED
+                tx.update(getProfileDocRef(userId), { 
+                    points: increment(globalConfig.dailyCheckinReward),
+                    totalEarned: increment(globalConfig.dailyCheckinReward) 
+                });
                 tx.set(dailyRef, { checkinDone: true, date: getTodayDateKey() }, { merge: true });
             });
             showNotification('Check-in ជោគជ័យ!', 'success');
