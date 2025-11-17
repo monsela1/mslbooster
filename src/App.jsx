@@ -3,6 +3,7 @@ import { initializeApp, getApps, getApp } from 'firebase/app';
 import {
     getAuth,
     onAuthStateChanged,
+    createUserWithEmailAndPassword,
     signInWithEmailAndPassword,
     signOut,
     GoogleAuthProvider,
@@ -20,7 +21,7 @@ import {
     DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2,
     Settings, Copy, Save, Search, PlusCircle, MinusCircle,
     CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
-    ArrowUpRight, ArrowDownLeft, Clock, ChevronDown
+    ArrowUpRight, ArrowDownLeft, Clock, ChevronDown, PlayCircle
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -182,7 +183,6 @@ const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
 };
 
 // --- 5. ADMIN PAGES ---
-
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -882,18 +882,19 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
             interval = setInterval(() => {
                 setTimer(t => Math.max(0, t - 1));
             }, 1000);
-        } 
+        } else if (timer === 0 && !claimed && current) {
+            // Auto Claim Logic (Only for View/Website)
+            if (type !== 'sub') handleClaim();
+        }
         
         return () => clearInterval(interval);
-    }, [timer, claimed]);
+    }, [timer, claimed, current, type]);
 
     const handleClaim = async () => {
         if (claimed || !current) return;
         
-        // PREVENT CLAIMING IF TIMER IS NOT 0
         if (timer > 0) {
-            showNotification(`សូមរង់ចាំ ${timer} វិនាទីទៀត!`, 'error');
-            return;
+            return; // Silent return for auto-claim
         }
 
         setClaimed(true);
@@ -937,7 +938,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     const handleSubscribeClick = async () => {
         if(!current) return;
 
-        // Check Timer First
         if (timer > 0) {
             showNotification(`សូមរង់ចាំ ${timer} វិនាទីទៀត!`, 'error');
             return;
@@ -1021,7 +1021,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                 )}
             </div>
 
-            <div className="bg-white p-3 border-t border-gray-200 shadow-lg z-20 pb-24"> {/* Add padding-bottom for banner */}
+            <div className="bg-white p-3 border-t border-gray-200 shadow-lg z-20 pb-24"> 
                  {current ? (
                     <div className="flex flex-col space-y-2">
                          <div className="flex justify-between items-center">
@@ -1043,10 +1043,11 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                         </div>
 
                         <div className="flex space-x-2">
+                            {/* UI UPDATE: Gradient Bar for Waiting */}
                             {type === 'sub' ? (
                                 <button 
                                     onClick={handleSubscribeClick} 
-                                    className={`flex-1 text-white py-3 rounded-lg font-bold shadow active:scale-95 transition text-sm ${timer > 0 || claimed ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700'}`}
+                                    className={`flex-1 text-white py-3 rounded-lg font-bold shadow active:scale-95 transition text-sm ${timer > 0 || claimed ? 'bg-gradient-to-r from-purple-600 to-blue-600 cursor-not-allowed opacity-80' : 'bg-red-600 hover:bg-red-700'}`}
                                     disabled={timer > 0 || claimed}
                                 >
                                     {claimed ? 'CLAIMED' : timer > 0 ? `WAIT ${timer}s` : 'SUBSCRIBE & CLAIM'}
@@ -1055,9 +1056,11 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                                 <button 
                                     onClick={handleClaim} 
                                     disabled={timer > 0 || claimed} 
-                                    className={`flex-1 py-3 rounded-lg font-bold shadow text-sm text-white transition ${timer > 0 || claimed ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}
+                                    className={`flex-1 py-3 rounded-lg font-bold shadow text-sm text-white transition 
+                                        ${timer > 0 ? 'bg-gradient-to-r from-purple-600 to-blue-600 animate-pulse cursor-not-allowed' : 
+                                          claimed ? 'bg-green-500' : 'bg-green-600 hover:bg-green-700 active:scale-95'}`}
                                 >
-                                    {claimed ? 'CLAIMED' : timer > 0 ? `WAIT ${timer}s` : 'CLAIM REWARD'}
+                                    {claimed ? 'SUCCESS' : timer > 0 ? `WAIT ${timer}s` : 'CLAIMING...'}
                                 </button>
                             )}
                             <button onClick={handleNext} className="px-4 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-lg shadow active:scale-95 transition">
@@ -1068,7 +1071,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                  ) : <div className="text-center text-gray-400 text-sm py-2">No active campaigns</div>}
             </div>
 
-            {/* --- BANNER ADS AT BOTTOM --- */}
             <div className="absolute bottom-0 w-full bg-gray-100 border-t border-gray-300 h-16 flex items-center justify-center z-30">
                  <div className="flex flex-col items-center">
                     <span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-1 rounded mb-1">AD</span>
@@ -1267,12 +1269,11 @@ const MyPlanPage = ({ setPage }) => (
     </div>
 );
 
-// --- 7. AUTH COMPONENT (Google + Email Login Only) ---
+// --- 7. AUTH COMPONENT ---
 const AuthForm = ({ onSubmit, btnText, isRegister = false, onGoogleLogin }) => {
     const [email, setEmail] = useState('');
     const [pass, setPass] = useState('');
     
-    // No need for username/referral code since manual registration is disabled
     const handleSubmit = (e) => {
         e.preventDefault();
         onSubmit(email, pass, null, null);
