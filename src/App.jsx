@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
-// Note: គួរតែប្រើ Environment Variables សម្រាប់សុវត្ថិភាព (process.env.REACT_APP_FIREBASE_KEY...)
 const firebaseConfig = {
     apiKey: "AIzaSyDw-b18l9BgIv61DFBxWAFbP6Mh_HsBv24",
     authDomain: "we4u-e1134.firebaseapp.com",
@@ -72,7 +71,6 @@ const getYouTubeID = (url) => {
 const getEmbedUrl = (url) => {
     const videoId = getYouTubeID(url);
     if (videoId) {
-        // mute=0 (Sound On), controls=1 (Show Controls)
         return `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=0&controls=1&rel=0`;
     }
     return null;
@@ -87,7 +85,7 @@ const getGlobalConfigDocRef = () => db ? doc(db, 'artifacts', appId, 'public', '
 const getShortCodeDocRef = (shortId) => db && shortId ? doc(db, 'artifacts', appId, 'public', 'data', 'short_codes', shortId) : null;
 const getHistoryCollectionRef = (userId) => db && userId ? collection(db, 'artifacts', appId, 'users', userId, 'history') : null;
 
-// Default Config
+// Default Config (MODIFIED CURRENCY HERE)
 const defaultGlobalConfig = {
     dailyCheckinReward: 200,
     referrerReward: 1000,
@@ -100,10 +98,10 @@ const defaultGlobalConfig = {
         isEnabled: true
     },
     coinPackages: [
-        { id: 1, coins: 5000, price: '5,000 Riel', color: 'bg-green-500' },
-        { id: 2, coins: 15000, price: '15,000 Riel', color: 'bg-blue-500' },
-        { id: 3, coins: 50000, price: '50,000 Riel', color: 'bg-purple-500' },
-        { id: 4, coins: 150000, price: '150,000 Riel', color: 'bg-red-500' },
+        { id: 1, coins: 5000, price: '$1.00', color: 'bg-green-500' },
+        { id: 2, coins: 15000, price: '$3.00', color: 'bg-blue-500' },
+        { id: 3, coins: 50000, price: '$10.00', color: 'bg-purple-500' },
+        { id: 4, coins: 150000, price: '$30.00', color: 'bg-red-500' },
     ]
 };
 
@@ -201,7 +199,7 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                                 <InputField type="number" min="0" value={pkg.coins} onChange={(e) => handlePackageChange(idx, 'coins', e.target.value)} />
                             </div>
                             <div className="flex-1">
-                                <label className="text-xs text-purple-300">តម្លៃលក់</label>
+                                <label className="text-xs text-purple-300">តម្លៃលក់ ($)</label>
                                 <InputField type="text" value={pkg.price} onChange={(e) => handlePackageChange(idx, 'price', e.target.value)} />
                             </div>
                         </div>
@@ -235,7 +233,6 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
         setLoadingList(true);
         try {
             const shortCodesRef = collection(db, 'artifacts', appId, 'public', 'data', 'short_codes');
-            // Limit to 20 to prevent lag
             const q = query(shortCodesRef, limit(20));
             const snap = await getDocs(q);
             
@@ -280,7 +277,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
             showNotification('Points updated successfully', 'success');
             setFoundUser(prev => ({...prev, points: prev.points + parseInt(pointsToAdd)}));
             setPointsToAdd(0);
-            loadUserList(); // Refresh list
+            loadUserList();
         } catch(e) { showNotification('Update failed', 'error'); }
     };
 
@@ -1168,7 +1165,7 @@ const App = () => {
     const [authPage, setAuthPage] = useState('LOGIN');
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
 
-    // ADMIN CONFIGURATION (NOTE: This is Client-side security only. Use Firebase Rules for real security)
+    // ADMIN CONFIGURATION
     const ADMIN_EMAILS = ["admin@gmail.com"]; 
     const isAdmin = userProfile.email && ADMIN_EMAILS.includes(userProfile.email);
 
