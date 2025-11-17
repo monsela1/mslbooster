@@ -10,7 +10,7 @@ import {
     signInWithPopup
 } from 'firebase/auth';
 import {
-    getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc,
+    getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc, deleteDoc, // <--- ADDED deleteDoc
     collection, query, where, serverTimestamp, getDocs,
     runTransaction, increment, limit, orderBy
 } from 'firebase/firestore';
@@ -341,6 +341,28 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
         } catch(e) { showNotification('Update failed', 'error'); }
     };
 
+    // --- NEW: Delete User Function ---
+    const handleDeleteUser = async (targetUid, targetShortId) => {
+        if(!window.confirm('តើអ្នកពិតជាចង់លុបគណនីនេះមែនទេ? (សកម្មភាពនេះមិនអាចត្រឡប់ក្រោយវិញបានទេ)')) return;
+        
+        try {
+            // 1. Delete Profile Data
+            if(targetUid) await deleteDoc(getProfileDocRef(targetUid));
+            
+            // 2. Delete Short Code Mapping
+            if(targetShortId) await deleteDoc(getShortCodeDocRef(targetShortId));
+
+            // Optional: We could also delete history/referrals, but user profile is main entry.
+            
+            showNotification('បានលុបគណនីដោយជោគជ័យ!', 'success');
+            setFoundUser(null);
+            loadUserList(); // Refresh list
+        } catch (e) {
+            console.error(e);
+            showNotification('បរាជ័យក្នុងការលុប: ' + e.message, 'error');
+        }
+    };
+
     return (
         <div className='space-y-4 pb-10'>
             <Card className="p-4">
@@ -357,7 +379,16 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                 </div>
                
                 {foundUser && (
-                    <div className="bg-purple-900 p-4 rounded-lg border border-purple-600">
+                    <div className="bg-purple-900 p-4 rounded-lg border border-purple-600 relative">
+                         {/* DELETE BUTTON */}
+                         <button 
+                            onClick={() => handleDeleteUser(foundUser.uid, foundUser.shortId)}
+                            className="absolute top-4 right-4 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                            title="លុបគណនីនេះ"
+                         >
+                            <Trash2 size={20} />
+                        </button>
+
                         <p className="font-bold text-lg text-white">{foundUser.userName}</p>
                         <p className="text-purple-300 text-sm">Email: {foundUser.email}</p>
                         <p className="text-purple-300 text-sm mb-2">Current Points: <span className="font-bold text-yellow-400">{formatNumber(foundUser.points)}</span></p>
@@ -386,12 +417,24 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                 {loadingList ? <div className='text-center text-purple-300'>Loading users...</div> : (
                     <div className='overflow-y-auto max-h-64 space-y-2'>
                         {allUsers.map((u, i) => (
-                            <div key={u.uid || i} onClick={() => {setFoundUser(u); setSearchId(u.shortId);}} className='flex justify-between items-center bg-purple-900 p-3 rounded border border-purple-700 cursor-pointer hover:bg-purple-700 transition'>
-                                <div>
+                            <div key={u.uid || i} className='flex justify-between items-center bg-purple-900 p-3 rounded border border-purple-700 cursor-pointer hover:bg-purple-800 transition'>
+                                <div onClick={() => {setFoundUser(u); setSearchId(u.shortId);}} className="flex-1">
                                     <p className='font-bold text-white text-sm'>{u.userName}</p>
                                     <p className='text-xs text-purple-400 font-mono'>{u.shortId} | {u.email}</p>
                                 </div>
-                                <div className='font-bold text-yellow-400'>{formatNumber(u.points)}</div>
+                                <div className="flex items-center space-x-3">
+                                    <span className='font-bold text-yellow-400 mr-2'>{formatNumber(u.points)}</span>
+                                    {/* LIST DELETE BUTTON */}
+                                    <button 
+                                        onClick={(e) => {
+                                            e.stopPropagation(); 
+                                            handleDeleteUser(u.uid, u.shortId);
+                                        }}
+                                        className="p-2 bg-red-900/50 text-red-400 rounded hover:bg-red-600 hover:text-white transition"
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -438,10 +481,17 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
         } catch(e) { showNotification('Failed to save', 'error'); }
     };
 
+    // --- UPDATED: Hard Delete Campaign ---
     const handleDeleteCampaign = async (id) => {
-        if(!window.confirm('Stop this campaign?')) return;
-        try { await updateDoc(doc(getCampaignsCollectionRef(), id), { remaining: 0, isActive: false }); }
-        catch(e) {}
+        if(!window.confirm('Are you sure you want to DELETE this campaign?')) return;
+        try { 
+            // Use deleteDoc instead of updating to inactive
+            await deleteDoc(doc(getCampaignsCollectionRef(), id));
+            showNotification('Campaign deleted!', 'success');
+        }
+        catch(e) {
+             showNotification('Failed to delete', 'error');
+        }
     };
 
     if (!config) return <Loading />;
@@ -478,7 +528,9 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
                                         </span>
                                     </div>
                                 </div>
-                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-900 text-red-200 rounded-full hover:bg-red-800"><Trash2 size={18}/></button>
+                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 shadow">
+                                    <Trash2 size={18}/>
+                                </button>
                             </div>
                         ))}
                         {campaigns.length === 0 && <p className="text-purple-300 text-center opacity-50">No campaigns found.</p>}
@@ -854,7 +906,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
     
-    // UPDATE: Start timer at -1 to prevent instant claim
+    // UPDATE: Start timer at -1 to prevent instant claim on video switch
     const [timer, setTimer] = useState(-1); 
     const [claimed, setClaimed] = useState(false);
     const [autoPlay, setAutoPlay] = useState(true);
@@ -890,7 +942,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                 setTimer(t => Math.max(0, t - 1));
             }, 1000);
         } else if (timer === 0 && !claimed && current) {
-            // AUTO CLAIM: when timer hits 0
+            // Auto Claim Logic (Only for View/Website)
             if (type !== 'sub') handleClaim();
         }
         
@@ -900,8 +952,9 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     const handleClaim = async () => {
         if (claimed || !current) return;
         
-        if (timer > 0) {
-            return; // Silent return for auto-claim
+        // Prevent claim if timer is not 0 (or if it's -1 loading state)
+        if (timer !== 0) {
+            return; 
         }
 
         setClaimed(true);
