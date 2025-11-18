@@ -50,7 +50,7 @@ try {
     console.error("Firebase initialization failed:", error);
 }
 
-// --- 3. HELPER FUNCTIONS & KHQR GENERATOR (FIXED) ---
+// --- 3. HELPER FUNCTIONS & ROBUST KHQR GENERATOR ---
 const getTodayDateKey = () => {
     const d = new Date();
     const year = d.getFullYear();
@@ -77,7 +77,7 @@ const getEmbedUrl = (url) => {
     return null;
 };
 
-// --- ROBUST KHQR GENERATOR START ---
+// --- KHQR LOGIC START ---
 const crc16 = (str) => {
     let crc = 0xFFFF;
     for (let c = 0; c < str.length; c++) {
@@ -88,7 +88,7 @@ const crc16 = (str) => {
             } else {
                 crc = crc << 1;
             }
-            crc = crc & 0xFFFF; // Mask to 16-bit
+            crc = crc & 0xFFFF; 
         }
     }
     return crc.toString(16).toUpperCase().padStart(4, '0');
@@ -101,26 +101,25 @@ const formatTag = (id, value) => {
 };
 
 const generateKhqr = (bakongId, amount) => {
-    // Construct Merchant Account Info (Tag 29)
     // GUI (Tag 00) for Bakong is "bakong"
     const tag29Content = formatTag("00", "bakong") + formatTag("01", bakongId);
     
     const tags = [
-        formatTag("00", "01"),              // Payload Format Indicator
-        formatTag("01", "12"),              // Point of Initiation Method (12=Dynamic)
-        formatTag("29", tag29Content),      // Merchant Account Info
-        formatTag("52", "5999"),            // Merchant Category Code (General)
-        formatTag("53", "840"),             // Transaction Currency (840=USD, 116=KHR)
-        formatTag("54", amount.toFixed(2)), // Transaction Amount
-        formatTag("58", "KH"),              // Country Code
-        formatTag("59", "MSL BOOSTER"),     // Merchant Name
-        formatTag("60", "PHNOM PENH"),      // Merchant City
+        formatTag("00", "01"),              
+        formatTag("01", "12"),              
+        formatTag("29", tag29Content),      
+        formatTag("52", "5999"),            
+        formatTag("53", "840"),             
+        formatTag("54", amount.toFixed(2)), 
+        formatTag("58", "KH"),              
+        formatTag("59", "MSL BOOSTER"),     
+        formatTag("60", "PHNOM PENH"),      
     ];
 
-    let qrString = tags.join("") + "6304";  // Append CRC Tag ID & Length
+    let qrString = tags.join("") + "6304"; 
     return qrString + crc16(qrString);
 };
-// --- ROBUST KHQR GENERATOR END ---
+// --- KHQR LOGIC END ---
 
 // Firestore Paths
 const getProfileDocRef = (userId) => db && userId ? doc(db, 'artifacts', appId, 'users', userId, 'profile', 'user_data') : null;
@@ -1166,12 +1165,71 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     );
 };
 
+// --- NEW YOUTUBE PLAYER COMPONENT (For Play/Pause Detection) ---
+const YouTubePlayer = ({ videoId, onStateChange }) => {
+    const playerRef = useRef(null);
+
+    useEffect(() => {
+        // 1. Load YouTube API script if not exists
+        if (!window.YT) {
+            const tag = document.createElement('script');
+            tag.src = "https://www.youtube.com/iframe_api";
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+        }
+
+        // 2. Init Player when API is ready
+        const initPlayer = () => {
+            if (window.YT && window.YT.Player) {
+                playerRef.current = new window.YT.Player(`Youtubeer-${videoId}`, {
+                    height: '100%',
+                    width: '100%',
+                    videoId: videoId,
+                    playerVars: {
+                        'playsinline': 1,
+                        'autoplay': 1,
+                        'controls': 1,
+                        'rel': 0,
+                        'modestbranding': 1
+                    },
+                    events: {
+                        'onStateChange': (event) => {
+                            // 1 = Playing, 2 = Paused, 3 = Buffering
+                            const isPlaying = event.data === window.YT.PlayerState.PLAYING;
+                            onStateChange(isPlaying);
+                        }
+                    }
+                });
+            }
+        };
+
+        if (window.YT && window.YT.Player) {
+            initPlayer();
+        } else {
+            window.onYouTubeIframeAPIReady = initPlayer;
+        }
+
+        return () => {
+            if (playerRef.current) {
+                playerRef.current.destroy(); 
+            }
+        };
+    }, [videoId, onStateChange]);
+
+    return <div id={`Youtubeer-${videoId}`} className="w-full h-full" />;
+};
+
+// --- EARN PAGE (UPDATED WITH YOUTUBE API) ---
 const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, googleAccessToken }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
-    const [timer, setTimer] = useState(-1); 
+    const [timer, setTimer] = useState(-1);
     const [claimed, setClaimed] = useState(false);
     const [autoPlay, setAutoPlay] = useState(true);
+    
+    // State to check if video is playing
+    const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+    
     const isMounted = useRef(true);
     const [watchedIds, setWatchedIds] = useState(new Set());
 
@@ -1202,16 +1260,33 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
         });
     }, [db, userId, type, watchedIds]);
 
+    // Reset Timer when Current changes
     useEffect(() => {
-        if (current) { setTimer(current.requiredDuration || 30); setClaimed(false); }
+        if (current) { 
+            setTimer(current.requiredDuration || 30); 
+            setClaimed(false);
+            setIsVideoPlaying(false); // Reset Playing State
+        }
     }, [current]);
     
+    // --- TIMER LOGIC ---
     useEffect(() => {
         let interval = null;
-        if (timer > 0 && !claimed) { interval = setInterval(() => { setTimer(t => Math.max(0, t - 1)); }, 1000); } 
-        else if (timer === 0 && !claimed && current) { if (type !== 'sub') handleClaim(); }
+        const isVideo = type === 'view' || type === 'sub';
+        
+        // Timer counts down ONLY if: (Not Claimed) AND (Timer > 0) AND (Video is Playing OR it's a Website task)
+        const shouldCountDown = !claimed && timer > 0 && (isVideo ? isVideoPlaying : true);
+
+        if (shouldCountDown) { 
+            interval = setInterval(() => { 
+                setTimer(t => Math.max(0, t - 1)); 
+            }, 1000); 
+        } else if (timer === 0 && !claimed && current) { 
+            if (type !== 'sub') handleClaim(); 
+        }
+
         return () => clearInterval(interval);
-    }, [timer, claimed, current, type]);
+    }, [timer, claimed, current, type, isVideoPlaying]);
 
     const handleClaim = async () => {
         if (claimed || !current || timer !== 0) return; 
@@ -1235,7 +1310,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     };
 
     const handleNext = () => {
-        setTimer(-1); setClaimed(false);
+        setTimer(-1); setClaimed(false); setIsVideoPlaying(false);
         const nextList = campaigns.filter(c => c.id !== current?.id && !watchedIds.has(c.id));
         setCurrent(nextList[0] || null);
     }
@@ -1264,21 +1339,27 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     };
 
     const isVideo = type === 'view' || type === 'sub';
-    const iframeSrc = current ? (isVideo ? getEmbedUrl(current.link) : current.link) : null;
+    const videoId = current ? getYouTubeID(current.link) : null;
 
     return (
         <div className="h-screen bg-[#0f172a] flex flex-col relative">
             <Header title={type === 'view' ? 'មើលវីដេអូ' : type === 'website' ? 'មើល Website' : 'Subscribe'} onBack={() => setPage('DASHBOARD')} className="relative" />
             <div className="flex-1 relative bg-black">
                 {current ? (
-                    iframeSrc ? (
+                    isVideo && videoId ? (
+                        <YouTubePlayer 
+                            videoId={videoId} 
+                            onStateChange={(playing) => setIsVideoPlaying(playing)} 
+                        />
+                    ) : (
                         <>
-                            <iframe src={iframeSrc} className="w-full h-full absolute top-0 left-0" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen title="content-viewer" sandbox={!isVideo ? "allow-scripts allow-same-origin allow-forms" : undefined} />
-                            {!isVideo && (<button onClick={() => window.open(current.link)} className="absolute top-4 right-4 bg-black/60 hover:bg-black text-white px-3 py-1 rounded text-xs flex items-center backdrop-blur-sm border border-white/20"><ExternalLink size={14} className="mr-1"/> Open External</button>)}
+                            <iframe src={current.link} className="w-full h-full absolute top-0 left-0" frameBorder="0" allowFullScreen title="content-viewer" sandbox="allow-scripts allow-same-origin allow-forms" />
+                            <button onClick={() => window.open(current.link)} className="absolute top-4 right-4 bg-black/60 hover:bg-black text-white px-3 py-1 rounded text-xs flex items-center backdrop-blur-sm border border-white/20"><ExternalLink size={14} className="mr-1"/> Open External</button>
                         </>
-                    ) : (<div className="flex items-center justify-center h-full text-white"><p>Invalid Link</p></div>)
+                    )
                 ) : (<div className="flex flex-col items-center justify-center h-full text-white"><RefreshCw className="animate-spin mb-4"/>កំពុងស្វែងរក...</div>)}
             </div>
+            
             <div className="bg-white p-3 border-t border-gray-200 shadow-lg z-20 pb-24"> 
                  {current ? (
                     <div className="flex flex-col space-y-2">
@@ -1286,7 +1367,12 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                             <div className="flex items-center space-x-2">
                                 <span className="text-lg font-bold text-yellow-600 flex items-center"><Coins className="w-5 h-5 mr-1" /> {current.requiredDuration}</span>
                                 {timer > 0 ? (
-                                    <div className="flex items-center bg-gradient-to-r from-red-100 to-pink-100 px-3 py-1 rounded-full border border-red-200"><Zap className="w-4 h-4 mr-1 text-red-500 animate-pulse" /><span className="text-red-600 font-bold text-sm">{timer}s</span></div>
+                                    <div className={`flex items-center px-3 py-1 rounded-full border ${isVideo && !isVideoPlaying ? 'bg-gray-100 border-gray-300' : 'bg-gradient-to-r from-red-100 to-pink-100 border-red-200'}`}>
+                                        <Zap className={`w-4 h-4 mr-1 ${isVideo && !isVideoPlaying ? 'text-gray-400' : 'text-red-500 animate-pulse'}`} />
+                                        <span className={`${isVideo && !isVideoPlaying ? 'text-gray-500' : 'text-red-600'} font-bold text-sm`}>
+                                            {timer}s {isVideo && !isVideoPlaying ? '(Paused)' : ''}
+                                        </span>
+                                    </div>
                                 ) : (timer === -1 ? <span className="text-gray-500 font-bold flex items-center bg-gray-200 px-2 py-0.5 rounded-full text-sm">...</span> : <span className="text-green-600 font-bold flex items-center bg-green-100 px-3 py-1 rounded-full text-sm border border-green-200"><CheckCircle className="w-4 h-4 mr-1" /> Ready</span>)}
                             </div>
                             <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setAutoPlay(!autoPlay)}><span className={`text-xs font-bold ${autoPlay ? 'text-green-600' : 'text-gray-400'}`}>Auto Play {autoPlay ? 'ON' : 'OFF'}</span><div className={`w-10 h-5 rounded-full p-1 transition-colors duration-300 flex items-center ${autoPlay ? 'bg-green-500' : 'bg-gray-300'}`}><div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300 ${autoPlay ? 'translate-x-5' : 'translate-x-0'}`}></div></div></div>
@@ -1299,9 +1385,13 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                             )}
                             <button onClick={handleNext} className="px-4 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-lg shadow active:scale-95 transition">SKIP</button>
                         </div>
+                        {isVideo && !isVideoPlaying && !claimed && timer > 0 && (
+                            <p className="text-[10px] text-red-500 text-center animate-pulse font-bold">សូមចុច Play វីដេអូដើម្បីរាប់នាទី</p>
+                        )}
                     </div>
                  ) : <div className="text-center text-gray-400 text-sm py-2">No active campaigns</div>}
             </div>
+            
             <div className="absolute bottom-0 w-full bg-gray-100 border-t border-gray-300 h-16 flex items-center justify-center z-30">
                  {globalConfig.adsSettings?.bannerImgUrl ? (
                      <a href={globalConfig.adsSettings.bannerClickUrl || '#'} target="_blank" rel="noopener noreferrer" className="w-full h-full block"><img src={globalConfig.adsSettings.bannerImgUrl} alt="Ads" className="w-full h-full object-cover"/></a>
@@ -1577,7 +1667,6 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig, use
 
     // --- CONFIGURATION ---
     const BAKONG_ID = "monsela@aclb"; 
-    // TOKEN នេះសម្រាប់ការសាកល្បង។ សម្រាប់ Production សូមដាក់នៅ Backend (Firebase Functions) ដើម្បីសុវត្ថិភាព។
     const BAKONG_API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7ImlkIjoiZmYzNTdjNWRlNjM0NDgwOSJ9LCJpYXQiOjE3NjI2MTM0MjQsImV4cCI6MTc3MDM4OTQyNH0.6CogHoCPR5pqLVP9C1N6zkk4Wj2KgKdcEh9qy3qAXWU"; 
 
     const handleBuyClick = (pkg) => { 
