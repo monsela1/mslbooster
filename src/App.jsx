@@ -97,12 +97,11 @@ const defaultGlobalConfig = {
     exchangeRate: 10000,
     withdrawalOptions: [2, 5, 7, 10],
     adsSettings: {
-        bannerId: "", // Legacy
-        interstitialId: "", // Legacy
-        directLinkUrl: "https://google.com", // Monetag Link for Watch Ads
-        // NEW: Custom Banner Settings
-        bannerImgUrl: "", // Link to image (e.g., https://i.imgur.com/...)
-        bannerClickUrl: "", // Link to open when clicked (Monetag Link)
+        bannerId: "", 
+        interstitialId: "", 
+        directLinkUrl: "https://google.com", // Adsterra/Monetag Link
+        bannerImgUrl: "", 
+        bannerClickUrl: "", 
         isEnabled: true
     },
     coinPackages: [
@@ -288,11 +287,30 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                 </div>
             </Card>
 
+            <Card className="p-4 border-l-4 border-green-500">
+                <h3 className="font-bold text-lg mb-3 text-green-400 flex items-center"><ShoppingCart className="w-5 h-5 mr-2"/> កំណត់កញ្ចប់កាក់ (Sell Coins)</h3>
+                <div className="space-y-3">
+                    {config.coinPackages?.map((pkg, idx) => (
+                        <div key={pkg.id || idx} className="flex space-x-2 items-center bg-purple-900 p-2 rounded">
+                            <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold">{idx + 1}</div>
+                            <div className="flex-1">
+                                <label className="text-xs text-purple-300">ចំនួនកាក់</label>
+                                <InputField type="number" min="0" value={pkg.coins} onChange={(e) => handlePackageChange(idx, 'coins', e.target.value)} />
+                            </div>
+                            <div className="flex-1">
+                                <label className="text-xs text-purple-300">តម្លៃលក់ ($)</label>
+                                <InputField type="text" value={pkg.price} onChange={(e) => handlePackageChange(idx, 'price', e.target.value)} />
+                            </div>
+                        </div>
+                    )) || <p className="text-red-300 text-sm">No packages found.</p>}
+                </div>
+            </Card>
+
             <Card className="p-4 border-l-4 border-pink-500">
-                <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ Ads & Banners</h3>
+                <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ Ads Network (Monetag/Adsterra)</h3>
                 <div className="space-y-3">
                     <div>
-                        <label className="text-xs font-bold text-purple-300">Monetag Direct Link URL (For Watch Ads)</label>
+                        <label className="text-xs font-bold text-purple-300">Direct Link URL (Monetag/Adsterra)</label>
                         <InputField 
                             name="directLinkUrl" 
                             type="text" 
@@ -301,6 +319,7 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                             onChange={handleAdsChange} 
                             className="text-blue-300"
                         />
+                        <p className="text-[10px] text-gray-400 mt-1">ដាក់ Link ពី Adsterra ឬ Monetag នៅទីនេះ</p>
                     </div>
                     
                     <div className="pt-2 border-t border-purple-600 mt-2">
@@ -325,7 +344,7 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                              <InputField 
                                 name="bannerClickUrl" 
                                 type="text" 
-                                placeholder="https://monetag-link..." 
+                                placeholder="https://adsterra-link..." 
                                 value={config.adsSettings?.bannerClickUrl || ''} 
                                 onChange={handleAdsChange} 
                             />
@@ -1295,7 +1314,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
 
             <div className="absolute bottom-0 w-full bg-gray-100 border-t border-gray-300 h-16 flex items-center justify-center z-30">
                  {globalConfig.adsSettings?.bannerImgUrl ? (
-                     <a href={globalConfig.adsSettings.bannerClickUrl || '#'} target="_blank" rel="noopener noreferrer" className="w-full h-full">
+                     <a href={globalConfig.adsSettings.bannerClickUrl || '#'} target="_blank" rel="noopener noreferrer" className="w-full h-full block">
                          <img src={globalConfig.adsSettings.bannerImgUrl} alt="Ads" className="w-full h-full object-cover"/>
                      </a>
                  ) : (
@@ -1652,7 +1671,7 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
                
                 const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
                 tx.set(historyRef, {
-                    title: 'Watched Ad (Monetag)',
+                    title: 'Watched Ad (Reward)',
                     amount: reward,
                     date: serverTimestamp(),
                     type: 'ads'
