@@ -77,7 +77,7 @@ const getEmbedUrl = (url) => {
     return null;
 };
 
-// --- KHQR LOGIC START ---
+// --- KHQR LOGIC START (STANDARD EMVCo) ---
 const crc16 = (str) => {
     let crc = 0xFFFF;
     for (let c = 0; c < str.length; c++) {
@@ -101,22 +101,23 @@ const formatTag = (id, value) => {
 };
 
 const generateKhqr = (bakongId, amount) => {
-    // GUI (Tag 00) for Bakong is "bakong"
+    // Tag 29: Merchant Account Information
+    // GUI (Tag 00) for Bakong is "bakong", Account ID (Tag 01) is the Bakong ID
     const tag29Content = formatTag("00", "bakong") + formatTag("01", bakongId);
     
     const tags = [
-        formatTag("00", "01"),              
-        formatTag("01", "12"),              
-        formatTag("29", tag29Content),      
-        formatTag("52", "5999"),            
-        formatTag("53", "840"),             
-        formatTag("54", amount.toFixed(2)), 
-        formatTag("58", "KH"),              
-        formatTag("59", "MSL BOOSTER"),     
-        formatTag("60", "PHNOM PENH"),      
+        formatTag("00", "01"),              // Payload Format Indicator
+        formatTag("01", "12"),              // Point of Initiation Method (12=Dynamic)
+        formatTag("29", tag29Content),      // Merchant Account Info
+        formatTag("52", "5999"),            // Merchant Category Code
+        formatTag("53", "840"),             // Currency (840=USD)
+        formatTag("54", amount.toFixed(2)), // Amount (Must have 2 decimals)
+        formatTag("58", "KH"),              // Country Code
+        formatTag("59", "MSL BOOSTER"),     // Merchant Name
+        formatTag("60", "PHNOM PENH"),      // Merchant City
     ];
 
-    let qrString = tags.join("") + "6304"; 
+    let qrString = tags.join("") + "6304"; // Append CRC Tag ID & Length
     return qrString + crc16(qrString);
 };
 // --- KHQR LOGIC END ---
@@ -1165,12 +1166,17 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     );
 };
 
-// --- NEW YOUTUBE PLAYER COMPONENT (For Play/Pause Detection) ---
+// --- NEW YOUTUBE PLAYER COMPONENT (Fixed Stuttering) ---
 const YouTubePlayer = ({ videoId, onStateChange }) => {
     const playerRef = useRef(null);
+    // Use a ref to store the latest callback, preventing re-renders of useEffect
+    const callbackRef = useRef(onStateChange);
 
     useEffect(() => {
-        // 1. Load YouTube API script if not exists
+        callbackRef.current = onStateChange;
+    }, [onStateChange]);
+
+    useEffect(() => {
         if (!window.YT) {
             const tag = document.createElement('script');
             tag.src = "https://www.youtube.com/iframe_api";
@@ -1178,48 +1184,54 @@ const YouTubePlayer = ({ videoId, onStateChange }) => {
             firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
         }
 
-        // 2. Init Player when API is ready
-        const initPlayer = () => {
-            if (window.YT && window.YT.Player) {
-                playerRef.current = new window.YT.Player(`Youtubeer-${videoId}`, {
-                    height: '100%',
-                    width: '100%',
-                    videoId: videoId,
-                    playerVars: {
-                        'playsinline': 1,
-                        'autoplay': 1,
-                        'controls': 1,
-                        'rel': 0,
-                        'modestbranding': 1
-                    },
-                    events: {
-                        'onStateChange': (event) => {
-                            // 1 = Playing, 2 = Paused, 3 = Buffering
-                            const isPlaying = event.data === window.YT.PlayerState.PLAYING;
-                            onStateChange(isPlaying);
+        const createPlayer = () => {
+            if (playerRef.current) return; // Prevent duplicate players
+
+            playerRef.current = new window.YT.Player(`Youtubeer-${videoId}`, {
+                height: '100%',
+                width: '100%',
+                videoId: videoId,
+                playerVars: {
+                    'playsinline': 1,
+                    'autoplay': 1,
+                    'controls': 1,
+                    'rel': 0,
+                    'modestbranding': 1,
+                    'disablekb': 0
+                },
+                events: {
+                    'onStateChange': (event) => {
+                        const isPlaying = event.data === window.YT.PlayerState.PLAYING;
+                        if (callbackRef.current) {
+                            callbackRef.current(isPlaying);
                         }
                     }
-                });
-            }
+                }
+            });
         };
 
         if (window.YT && window.YT.Player) {
-            initPlayer();
+            createPlayer();
         } else {
-            window.onYouTubeIframeAPIReady = initPlayer;
+            const existingOnReady = window.onYouTubeIframeAPIReady;
+            window.onYouTubeIframeAPIReady = () => {
+                if(existingOnReady) existingOnReady();
+                createPlayer();
+            };
         }
 
         return () => {
             if (playerRef.current) {
-                playerRef.current.destroy(); 
+                try { playerRef.current.destroy(); } catch(e) {}
+                playerRef.current = null;
             }
         };
-    }, [videoId, onStateChange]);
+    }, [videoId]); // Only re-run if videoId changes
 
-    return <div id={`Youtubeer-${videoId}`} className="w-full h-full" />;
+    return <div id={`Youtubeer-${videoId}`} className="w-full h-full bg-black" />;
 };
 
-// --- EARN PAGE (UPDATED WITH YOUTUBE API) ---
+// --- EARN PAGE (UPDATED WITH YOUTUBE FIX) ---
 const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, googleAccessToken }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
@@ -1227,7 +1239,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     const [claimed, setClaimed] = useState(false);
     const [autoPlay, setAutoPlay] = useState(true);
     
-    // State to check if video is playing
     const [isVideoPlaying, setIsVideoPlaying] = useState(false);
     
     const isMounted = useRef(true);
@@ -1260,21 +1271,18 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
         });
     }, [db, userId, type, watchedIds]);
 
-    // Reset Timer when Current changes
     useEffect(() => {
         if (current) { 
             setTimer(current.requiredDuration || 30); 
             setClaimed(false);
-            setIsVideoPlaying(false); // Reset Playing State
+            setIsVideoPlaying(false);
         }
     }, [current]);
     
-    // --- TIMER LOGIC ---
+    // --- TIMER LOGIC (DEPENDS ON VIDEO STATE) ---
     useEffect(() => {
         let interval = null;
         const isVideo = type === 'view' || type === 'sub';
-        
-        // Timer counts down ONLY if: (Not Claimed) AND (Timer > 0) AND (Video is Playing OR it's a Website task)
         const shouldCountDown = !claimed && timer > 0 && (isVideo ? isVideoPlaying : true);
 
         if (shouldCountDown) { 
@@ -1287,6 +1295,11 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
 
         return () => clearInterval(interval);
     }, [timer, claimed, current, type, isVideoPlaying]);
+
+    // Use Callback for Player State to prevent re-renders
+    const handlePlayerStateChange = useCallback((isPlaying) => {
+        setIsVideoPlaying(isPlaying);
+    }, []);
 
     const handleClaim = async () => {
         if (claimed || !current || timer !== 0) return; 
@@ -1349,7 +1362,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                     isVideo && videoId ? (
                         <YouTubePlayer 
                             videoId={videoId} 
-                            onStateChange={(playing) => setIsVideoPlaying(playing)} 
+                            onStateChange={handlePlayerStateChange} 
                         />
                     ) : (
                         <>
@@ -1667,6 +1680,7 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig, use
 
     // --- CONFIGURATION ---
     const BAKONG_ID = "monsela@aclb"; 
+    // TOKEN នេះសម្រាប់ការសាកល្បង។ សម្រាប់ Production សូមដាក់នៅ Backend (Firebase Functions) ដើម្បីសុវត្ថិភាព។
     const BAKONG_API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7ImlkIjoiZmYzNTdjNWRlNjM0NDgwOSJ9LCJpYXQiOjE3NjI2MTM0MjQsImV4cCI6MTc3MDM4OTQyNH0.6CogHoCPR5pqLVP9C1N6zkk4Wj2KgKdcEh9qy3qAXWU"; 
 
     const handleBuyClick = (pkg) => { 
