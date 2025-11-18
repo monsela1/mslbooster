@@ -20,7 +20,7 @@ import {
     DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2,
     Settings, Copy, Save, Search, PlusCircle, MinusCircle,
     CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
-    ArrowUpRight, ArrowDownLeft, Clock, ChevronDown, Image as ImageIcon
+    ArrowUpRight, ArrowDownLeft, Clock, ChevronDown, Image as ImageIcon, LogIn
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -137,7 +137,7 @@ const defaultGlobalConfig = {
     adsReward: 30,
     maxDailyAds: 15,
     enableBuyCoins: false,
-    enableWithdraw: true, // <--- បន្ថែមថ្មី: បើក/បិទ ដកលុយ
+    enableWithdraw: true, // Default ON
     exchangeRate: 10000,
     withdrawalOptions: [2, 5, 7, 10],
     adsSettings: {
@@ -244,7 +244,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
         setConfig(prev => ({ ...prev, enableBuyCoins: !prev.enableBuyCoins }));
     };
 
-    // +++ Function បិទ/បើក ដកលុយ +++
     const handleWithdrawToggle = () => {
         setConfig(prev => ({ ...prev, enableWithdraw: !prev.enableWithdraw }));
     };
@@ -279,7 +278,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
             <Card className="p-4 border-l-4 border-blue-500">
                 <h3 className="font-bold text-lg mb-3 text-blue-400 flex items-center"><Settings className="w-5 h-5 mr-2"/> ការកំណត់ទូទៅ (Features)</h3>
                 
-                {/* Buy Coins Toggle */}
                 <div className="flex items-center justify-between bg-purple-900/50 p-4 rounded-lg border border-purple-600 mb-2">
                     <div className="flex flex-col">
                         <span className="text-white font-bold text-base">បើកមុខងារទិញកាក់</span>
@@ -292,7 +290,7 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                     </button>
                 </div>
 
-                {/* +++ Withdraw Toggle +++ */}
+                {/* Withdraw Toggle */}
                 <div className="flex items-center justify-between bg-purple-900/50 p-4 rounded-lg border border-purple-600">
                     <div className="flex flex-col">
                         <span className="text-white font-bold text-base">បើកមុខងារដកលុយ (Withdraw)</span>
@@ -304,7 +302,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                         <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 ${config.enableWithdraw ? 'translate-x-8' : 'translate-x-0'}`}></div>
                     </button>
                 </div>
-
             </Card>
 
             <Card className="p-4 border-l-4 border-yellow-400">
@@ -344,8 +341,9 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                     </div>
                 </div>
             </Card>
-
-            <Card className="p-4 border-l-4 border-green-500">
+            
+            {/* (Other cards: Packages, Ads) */}
+             <Card className="p-4 border-l-4 border-green-500">
                 <h3 className="font-bold text-lg mb-3 text-green-400 flex items-center"><ShoppingCart className="w-5 h-5 mr-2"/> កំណត់កញ្ចប់កាក់ (Sell Coins)</h3>
                 <div className="space-y-3">
                     {config.coinPackages?.map((pkg, idx) => (
@@ -377,7 +375,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                             onChange={handleAdsChange} 
                             className="text-blue-300"
                         />
-                        <p className="text-[10px] text-gray-400 mt-1">ដាក់ Link ពី Adsterra ឬ Monetag នៅទីនេះ</p>
                     </div>
                     
                     <div className="pt-2 border-t border-purple-600 mt-2">
@@ -405,7 +402,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                                 onChange={handleAdsChange} 
                             />
                         </div>
-                        <p className="text-[10px] text-gray-400 mt-1">ដាក់ Link ដែលចង់ឱ្យបើកពេលគេចុច Banner</p>
                     </div>
                 </div>
             </Card>
@@ -2067,18 +2063,36 @@ const MyPlanPage = ({ setPage }) => (
     </div>
 );
 
-// --- 7. AUTH COMPONENT ---
-const AuthForm = ({ onSubmit, btnText, isRegister = false, onGoogleLogin }) => {
+// --- 7. AUTH COMPONENT (MODAL VERSION) ---
+const AuthForm = ({ onSubmit, onGoogleLogin }) => {
     const [email, setEmail] = useState(''); const [pass, setPass] = useState('');
-    const handleSubmit = (e) => { e.preventDefault(); onSubmit(email, pass, null, null); };
+    const handleSubmit = (e) => { e.preventDefault(); onSubmit(email, pass); };
     return (
         <div className="space-y-4">
-            <button onClick={onGoogleLogin} className="w-full bg-white text-gray-800 p-3 rounded font-bold hover:bg-gray-100 transition shadow-lg flex items-center justify-center border border-gray-300">
+             <button onClick={onGoogleLogin} className="w-full bg-white text-gray-800 p-3 rounded-xl font-bold hover:bg-gray-100 transition shadow-md flex items-center justify-center border border-gray-300">
                 <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.04 2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
-                បន្តជាមួយប្រើ Google
+                ចូលដោយប្រើ Google
             </button>
-            <div className="flex items-center justify-center space-x-2 my-4"><div className="h-px bg-purple-600 flex-1"></div><span className="text-purple-300 text-xs font-bold">ឬ ចូលប្រើគណនី (ADMIN/LEGACY)</span><div className="h-px bg-purple-600 flex-1"></div></div>
-            <form onSubmit={handleSubmit} className="space-y-4"><div className="relative"><Mail className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" /><input type="email" placeholder="អ៊ីមែល (Email)" value={email} onChange={e => setEmail(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" /></div><div className="relative"><Lock className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" /><input type="password" placeholder="ពាក្យសម្ងាត់ (Password)" value={pass} onChange={e => setPass(e.target.value)} required className="w-full p-3 pl-10 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-300 focus:outline-none focus:border-yellow-400" /></div><button type="submit" className="w-full bg-teal-500 text-white p-3 rounded font-bold hover:bg-teal-600 transition shadow-lg">ចូលគណនី</button></form>
+
+            <div className="flex items-center justify-center space-x-2 my-2">
+                <div className="h-px bg-gray-300 flex-1"></div>
+                <span className="text-gray-400 text-xs font-bold">ឬ ប្រើ Email</span>
+                <div className="h-px bg-gray-300 flex-1"></div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-3">
+                <div className="relative">
+                    <Mail className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input type="email" placeholder="អ៊ីមែល (Email)" value={email} onChange={e => setEmail(e.target.value)} required className="w-full p-3 pl-10 border border-gray-300 rounded-xl text-black focus:outline-none focus:border-purple-500" />
+                </div>
+                <div className="relative">
+                    <Lock className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input type="password" placeholder="ពាក្យសម្ងាត់ (Password)" value={pass} onChange={e => setPass(e.target.value)} required className="w-full p-3 pl-10 border border-gray-300 rounded-xl text-black focus:outline-none focus:border-purple-500" />
+                </div>
+                <button type="submit" className="w-full bg-purple-600 text-white p-3 rounded-xl font-bold hover:bg-purple-700 transition shadow-lg">
+                    ចូលគណនី (Login)
+                </button>
+            </form>
         </div>
     );
 };
@@ -2087,11 +2101,14 @@ const AuthForm = ({ onSubmit, btnText, isRegister = false, onGoogleLogin }) => {
 const App = () => {
     const [page, setPage] = useState('DASHBOARD');
     const [userId, setUserId] = useState(null);
-    const [userProfile, setUserProfile] = useState({});
+    const [userProfile, setUserProfile] = useState(null); // Null if guest
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [notification, setNotification] = useState(null);
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
     const [googleAccessToken, setGoogleAccessToken] = useState(null);
+
+    // +++ STATE FOR LOGIN MODAL +++
+    const [showLoginModal, setShowLoginModal] = useState(false);
 
     // --- ADMIN CONFIGURATION (UID CHECK) ---
     const ADMIN_UIDS = ["48wx8GPZbVYSxmfws1MxbuEOzsE3"]; 
@@ -2105,7 +2122,14 @@ const App = () => {
     useEffect(() => {
         if (!auth) return;
         return onAuthStateChanged(auth, (user) => {
-            if (user) setUserId(user.uid); else { setUserId(null); setPage('DASHBOARD'); }
+            if (user) {
+                setUserId(user.uid);
+                setShowLoginModal(false); // Close modal on success
+            } else {
+                setUserId(null);
+                setUserProfile(null);
+                setPage('DASHBOARD');
+            }
             setIsAuthReady(true);
         });
     }, []);
@@ -2120,23 +2144,52 @@ const App = () => {
         return onSnapshot(getGlobalConfigDocRef(), (doc) => { if (doc.exists()) setGlobalConfig({ ...defaultGlobalConfig, ...doc.data() }); });
     }, [db]);
 
-    const handleLogin = async (email, password) => { try { await signInWithEmailAndPassword(auth, email, password); showNotification('ចូលគណនីជោគជ័យ', 'success'); } catch (e) { showNotification('បរាជ័យ: ' + e.code, 'error'); } };
+    const handleLogin = async (email, password) => { 
+        try { 
+            await signInWithEmailAndPassword(auth, email, password); 
+            showNotification('ចូលគណនីជោគជ័យ', 'success'); 
+        } catch (e) { 
+            showNotification('បរាជ័យ: ' + e.code, 'error'); 
+        } 
+    };
 
     const handleGoogleLogin = async () => {
         try {
             const provider = new GoogleAuthProvider(); provider.addScope('https://www.googleapis.com/auth/youtube.force-ssl');
-            const result = await signInWithPopup(auth, provider); const credential = GoogleAuthProvider.credentialFromResult(result); const token = credential.accessToken; setGoogleAccessToken(token);
-            const user = result.user; const uid = user.uid; const userDocRef = getProfileDocRef(uid); const userDoc = await getDoc(userDocRef);
+            const result = await signInWithPopup(auth, provider); 
+            const credential = GoogleAuthProvider.credentialFromResult(result); 
+            const token = credential.accessToken; 
+            setGoogleAccessToken(token);
+            
+            const user = result.user; 
+            const uid = user.uid; 
+            const userDocRef = getProfileDocRef(uid); 
+            const userDoc = await getDoc(userDocRef);
+            
             if (!userDoc.exists()) {
                  const shortId = getShortId(uid); const bonusPoints = 5000;
                  await setDoc(userDocRef, { userId: uid, email: user.email, userName: user.displayName || `User_${shortId}`, points: bonusPoints, totalEarned: bonusPoints, shortId, createdAt: serverTimestamp(), referredBy: null });
                  await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
                  showNotification('គណនីថ្មីត្រូវបានបង្កើតដោយជោគជ័យ!', 'success');
-            } else { showNotification('ចូលគណនីជោគជ័យ', 'success'); }
-        } catch (error) { console.error(error); showNotification('បរាជ័យ: ' + error.message, 'error'); }
+            } else { 
+                showNotification('ចូលគណនីជោគជ័យ', 'success'); 
+            }
+        } catch (error) { 
+            console.error(error); 
+            showNotification('បរាជ័យ: ' + error.message, 'error'); 
+        }
     };
 
     const handleLogout = async () => { await signOut(auth); showNotification('បានចាកចេញ', 'success'); };
+
+    // +++ HELPER: Check Auth before Action +++
+    const handleAuthAction = (action) => {
+        if (userId) {
+            action();
+        } else {
+            setShowLoginModal(true);
+        }
+    };
 
     const handleDailyCheckin = async () => {
         try {
@@ -2153,15 +2206,10 @@ const App = () => {
 
     if (!isAuthReady) return <Loading />;
 
-    if (!userId) return (
-        <div className="min-h-screen bg-purple-900 flex items-center justify-center p-4">
-            <Card className="w-full max-w-sm p-6">
-                <div className="text-center mb-6"><h2 className="text-2xl font-bold text-white mb-2">MSL Booster</h2><p className="text-purple-300 text-sm">សូមស្វាគមន៍មកកាន់ MSL Booster</p></div>
-                <AuthForm onSubmit={handleLogin} btnText="ចូល" onGoogleLogin={handleGoogleLogin} />
-            </Card>
-            {notification && <div className={`fixed top-4 left-1/2 transform -translate-x-1/2 p-2 rounded text-white bg-red-500`}>{notification.message}</div>}
-        </div>
-    );
+    // +++ PREPARE DISPLAY DATA (GUEST MODE) +++
+    const displayPoints = userProfile?.points || 0;
+    const displayBalance = userProfile?.balance || 0;
+    const displayShortId = userProfile?.shortId || "GUEST";
 
     let Content;
     switch (page) {
@@ -2178,17 +2226,46 @@ const App = () => {
         default:
             Content = (
                 <div className="min-h-screen bg-purple-900 pb-16 pt-20">
-                    <Header title="MSL Booster" className="z-20" rightContent={<div className="flex space-x-2">{isAdmin && (<button onClick={() => setPage('ADMIN_DASHBOARD')} className="bg-red-500 text-white p-1 rounded shadow"><Settings size={20}/></button>)}<button onClick={handleLogout} className="bg-gray-600 text-white p-1 rounded shadow"><LogOut size={20}/></button></div>} />
+                    <Header 
+                        title="MSL Booster" 
+                        className="z-20" 
+                        rightContent={
+                            <div className="flex space-x-2">
+                                {isAdmin && (<button onClick={() => setPage('ADMIN_DASHBOARD')} className="bg-red-500 text-white p-1 rounded shadow"><Settings size={20}/></button>)}
+                                {/* +++ Login/Logout Logic +++ */}
+                                {userId ? (
+                                    <button onClick={handleLogout} className="bg-gray-600 text-white p-1 rounded shadow"><LogOut size={20}/></button>
+                                ) : (
+                                    <button onClick={() => setShowLoginModal(true)} className="bg-teal-600 text-white px-3 py-1 rounded shadow font-bold text-xs flex items-center">
+                                        <LogIn size={16} className="mr-1"/> ចូល
+                                    </button>
+                                )}
+                            </div>
+                        } 
+                    />
                     <div className="px-4 mb-6">
                         <div className="bg-gradient-to-r from-teal-500 to-teal-700 rounded-xl p-6 text-white shadow-lg text-center relative overflow-hidden border border-teal-400/30">
                             <div className="absolute -top-4 -left-4 w-16 h-16 bg-white opacity-10 rounded-full"></div>
                             <p className="text-sm opacity-80">សមតុល្យរបស់អ្នក</p>
-                            <h1 className="text-4xl font-bold mt-2 mb-1 flex justify-center items-center gap-2">{formatNumber(userProfile.points)} <Coins className="w-8 h-8 text-yellow-300" /></h1>
-                            <div className="flex justify-center items-center mb-4"><div className="bg-black/20 backdrop-blur-sm px-4 py-1 rounded-full flex items-center border border-white/10"><span className="text-green-300 font-bold mr-1 text-lg">$</span><span className="text-white font-bold text-lg tracking-wider">{(userProfile.balance || 0).toFixed(4)}</span></div></div>
-                            <p className="text-xs bg-white bg-opacity-20 inline-block px-3 py-1 rounded-full">ID: {userProfile.shortId}</p>
+                            <h1 className="text-4xl font-bold mt-2 mb-1 flex justify-center items-center gap-2">{formatNumber(displayPoints)} <Coins className="w-8 h-8 text-yellow-300" /></h1>
+                            <div className="flex justify-center items-center mb-4"><div className="bg-black/20 backdrop-blur-sm px-4 py-1 rounded-full flex items-center border border-white/10"><span className="text-green-300 font-bold mr-1 text-lg">$</span><span className="text-white font-bold text-lg tracking-wider">{(displayBalance).toFixed(4)}</span></div></div>
+                            <p className="text-xs bg-white bg-opacity-20 inline-block px-3 py-1 rounded-full">ID: {displayShortId}</p>
                         </div>
                     </div>
-                    <div className="px-4"><Card className="p-4 grid grid-cols-3 gap-3"><IconButton icon={CalendarCheck} title="DAILY TASK" onClick={handleDailyCheckin} iconColor={userProfile.dailyCheckin ? 'text-gray-500' : 'text-blue-400'} textColor={userProfile.dailyCheckin ? 'text-gray-400' : 'text-white'} disabled={!!userProfile.dailyCheckin} /><IconButton icon={UserCheck} title="SUBSCRIBE" onClick={() => setPage('EXPLORE_SUBSCRIPTION')} iconColor="text-pink-400" /><IconButton icon={Film} title="PLAY VIDEO" onClick={() => setPage('EARN_POINTS')} iconColor="text-red-400" /><IconButton icon={Wallet} title="MY BALANCE" onClick={() => setPage('BALANCE_DETAILS')} iconColor="text-orange-400" /><IconButton icon={ShoppingCart} title="BUY COINS" onClick={() => { if(globalConfig.enableBuyCoins) setPage('BUY_COINS'); else showNotification('ឆាប់ៗនេះ (Coming Soon)!', 'info'); }} iconColor="text-purple-400" /><IconButton icon={Target} title="CAMPAIGNS" onClick={() => setPage('MY_CAMPAIGNS')} iconColor="text-teal-400" /><IconButton icon={UserPlus} title="ណែនាំមិត្ត" onClick={() => setPage('REFERRAL_PAGE')} iconColor="text-blue-400" /><IconButton icon={Globe} title="មើល WEBSITE" onClick={() => setPage('EXPLORE_WEBSITE')} iconColor="text-indigo-400" /><IconButton icon={MonitorPlay} title="មើល ADS" onClick={() => setPage('WATCH_ADS')} iconColor="text-pink-400" /></Card></div>
+                    <div className="px-4">
+                        <Card className="p-4 grid grid-cols-3 gap-3">
+                            {/* +++ Updated Buttons with handleAuthAction +++ */}
+                            <IconButton icon={CalendarCheck} title="DAILY TASK" onClick={() => handleAuthAction(handleDailyCheckin)} iconColor={userProfile?.dailyCheckin ? 'text-gray-500' : 'text-blue-400'} textColor={userProfile?.dailyCheckin ? 'text-gray-400' : 'text-white'} disabled={!!userProfile?.dailyCheckin && !!userId} />
+                            <IconButton icon={UserCheck} title="SUBSCRIBE" onClick={() => handleAuthAction(() => setPage('EXPLORE_SUBSCRIPTION'))} iconColor="text-pink-400" />
+                            <IconButton icon={Film} title="PLAY VIDEO" onClick={() => handleAuthAction(() => setPage('EARN_POINTS'))} iconColor="text-red-400" />
+                            <IconButton icon={Wallet} title="MY BALANCE" onClick={() => handleAuthAction(() => setPage('BALANCE_DETAILS'))} iconColor="text-orange-400" />
+                            <IconButton icon={ShoppingCart} title="BUY COINS" onClick={() => handleAuthAction(() => { if(globalConfig.enableBuyCoins) setPage('BUY_COINS'); else showNotification('ឆាប់ៗនេះ (Coming Soon)!', 'info'); })} iconColor="text-purple-400" />
+                            <IconButton icon={Target} title="CAMPAIGNS" onClick={() => handleAuthAction(() => setPage('MY_CAMPAIGNS'))} iconColor="text-teal-400" />
+                            <IconButton icon={UserPlus} title="ណែនាំមិត្ត" onClick={() => handleAuthAction(() => setPage('REFERRAL_PAGE'))} iconColor="text-blue-400" />
+                            <IconButton icon={Globe} title="មើល WEBSITE" onClick={() => handleAuthAction(() => setPage('EXPLORE_WEBSITE'))} iconColor="text-indigo-400" />
+                            <IconButton icon={MonitorPlay} title="មើល ADS" onClick={() => handleAuthAction(() => setPage('WATCH_ADS'))} iconColor="text-pink-400" />
+                        </Card>
+                    </div>
                     <div className="px-4 mt-6">
                         <div className="w-full bg-white h-20 flex flex-col items-center justify-center rounded-lg border-2 border-yellow-500/50 shadow-lg relative overflow-hidden">
                              {globalConfig.adsSettings?.bannerImgUrl ? (<a href={globalConfig.adsSettings.bannerClickUrl || '#'} target="_blank" rel="noopener noreferrer" className="w-full h-full block"><img src={globalConfig.adsSettings.bannerImgUrl} alt="Ads" className="w-full h-full object-cover"/></a>) : (<div className="flex flex-col items-center"><span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-1 rounded mb-1">AD</span><p className="text-xs text-gray-500 font-mono">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p></div>)}
@@ -2197,10 +2274,25 @@ const App = () => {
                 </div>
             );
     }
+
     return (
         <div className="font-sans bg-purple-900 min-h-screen relative">
             {Content}
             {notification && <div className={`fixed bottom-10 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-lg shadow-2xl z-50 text-white font-bold transition-all ${notification.type === 'success' ? 'bg-green-600' : notification.type === 'error' ? 'bg-red-600' : 'bg-gray-800'}`}>{notification.message}</div>}
+            
+            {/* +++ LOGIN MODAL +++ */}
+            {showLoginModal && (
+                <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
+                    <div className="bg-white rounded-2xl w-full max-w-sm p-6 relative shadow-2xl">
+                        <button onClick={() => setShowLoginModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full p-1"><XCircle size={24}/></button>
+                        <div className="text-center mb-6">
+                            <h2 className="text-2xl font-bold text-purple-900">សូមស្វាគមន៍!</h2>
+                            <p className="text-gray-500 text-sm mt-1">សូមចូលគណនីដើម្បីប្រើប្រាស់មុខងារនេះ</p>
+                        </div>
+                        <AuthForm onSubmit={handleLogin} onGoogleLogin={handleGoogleLogin} />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
