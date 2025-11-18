@@ -50,7 +50,7 @@ try {
     console.error("Firebase initialization failed:", error);
 }
 
-// --- 3. HELPER FUNCTIONS & KHQR GENERATOR ---
+// --- 3. HELPER FUNCTIONS & KHQR GENERATOR (FIXED) ---
 const getTodayDateKey = () => {
     const d = new Date();
     const year = d.getFullYear();
@@ -77,50 +77,50 @@ const getEmbedUrl = (url) => {
     return null;
 };
 
+// --- ROBUST KHQR GENERATOR START ---
 const crc16 = (str) => {
     let crc = 0xFFFF;
     for (let c = 0; c < str.length; c++) {
         crc ^= str.charCodeAt(c) << 8;
         for (let i = 0; i < 8; i++) {
-            if (crc & 0x8000) crc = (crc << 1) ^ 0x1021;
-            else crc = crc << 1;
+            if (crc & 0x8000) {
+                crc = (crc << 1) ^ 0x1021;
+            } else {
+                crc = crc << 1;
+            }
+            crc = crc & 0xFFFF; // Mask to 16-bit
         }
     }
-    let hex = (crc & 0xFFFF).toString(16).toUpperCase();
-    return hex.length === 3 ? "0" + hex : hex.length === 2 ? "00" + hex : hex.length === 1 ? "000" + hex : hex;
+    return crc.toString(16).toUpperCase().padStart(4, '0');
 };
 
-// --- NEW KHQR GENERATOR (STANDARD) ---
-const generateKhqr = (bakongId, amount, currency = "840") => {
-    // 840 = USD, 116 = KHR
-    const accountInfo = `0006bakong01${bakongId.length < 10 ? '0' + bakongId.length : bakongId.length}${bakongId}`;
-    const tag29 = `29${accountInfo.length}${accountInfo}`;
-    
-    // Merchant Category
-    const tag52 = "52045999"; 
-    
-    // Currency
-    const tag53 = `5303${currency}`; 
-    
-    // Amount
-    const amountStr = amount.toFixed(2);
-    const tag54 = `54${amountStr.length < 10 ? '0' + amountStr.length : amountStr.length}${amountStr}`;
-    
-    // Country
-    const tag58 = "5802KH";
-    
-    // Name
-    const name = "MSL BOOSTER"; 
-    const tag59 = `59${name.length < 10 ? '0' + name.length : name.length}${name}`;
-    
-    // City
-    const city = "PHNOM PENH";
-    const tag60 = `60${city.length < 10 ? '0' + city.length : city.length}${city}`;
-    
-    let qrString = `000201010212${tag29}${tag52}${tag53}${tag54}${tag58}${tag59}${tag60}6304`;
-    const crc = crc16(qrString);
-    return qrString + crc;
+const formatTag = (id, value) => {
+    const len = value.length;
+    const lenStr = len.toString().padStart(2, '0');
+    return id + lenStr + value;
 };
+
+const generateKhqr = (bakongId, amount) => {
+    // Construct Merchant Account Info (Tag 29)
+    // GUI (Tag 00) for Bakong is "bakong"
+    const tag29Content = formatTag("00", "bakong") + formatTag("01", bakongId);
+    
+    const tags = [
+        formatTag("00", "01"),              // Payload Format Indicator
+        formatTag("01", "12"),              // Point of Initiation Method (12=Dynamic)
+        formatTag("29", tag29Content),      // Merchant Account Info
+        formatTag("52", "5999"),            // Merchant Category Code (General)
+        formatTag("53", "840"),             // Transaction Currency (840=USD, 116=KHR)
+        formatTag("54", amount.toFixed(2)), // Transaction Amount
+        formatTag("58", "KH"),              // Country Code
+        formatTag("59", "MSL BOOSTER"),     // Merchant Name
+        formatTag("60", "PHNOM PENH"),      // Merchant City
+    ];
+
+    let qrString = tags.join("") + "6304";  // Append CRC Tag ID & Length
+    return qrString + crc16(qrString);
+};
+// --- ROBUST KHQR GENERATOR END ---
 
 // Firestore Paths
 const getProfileDocRef = (userId) => db && userId ? doc(db, 'artifacts', appId, 'users', userId, 'profile', 'user_data') : null;
@@ -1569,7 +1569,7 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
     );
 };
 
-// --- BuyCoinsPage (UPDATED WITH BAKONG AUTO CHECK) ---
+// --- BuyCoinsPage (UPDATED WITH ROBUST QR + BAKONG AUTO CHECK) ---
 const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig, userProfile }) => {
     const [selectedPkg, setSelectedPkg] = useState(null);
     const [trxId, setTrxId] = useState('');
@@ -1577,7 +1577,8 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig, use
 
     // --- CONFIGURATION ---
     const BAKONG_ID = "monsela@aclb"; 
-    const BAKONG_API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7ImlkIjoiZmYzNTdjNWRlNjM0NDgwOSJ9LCJpYXQiOjE3NjI2MTM0MjQsImV4cCI6MTc3MDM4OTQyNH0.6CogHoCPR5pqLVP9C1N6zkk4Wj2KgKdcEh9qy3qAXWU"; // សម្រាប់តេស្ត (Production គួរដាក់នៅ Backend)
+    // TOKEN នេះសម្រាប់ការសាកល្បង។ សម្រាប់ Production សូមដាក់នៅ Backend (Firebase Functions) ដើម្បីសុវត្ថិភាព។
+    const BAKONG_API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7ImlkIjoiZmYzNTdjNWRlNjM0NDgwOSJ9LCJpYXQiOjE3NjI2MTM0MjQsImV4cCI6MTc3MDM4OTQyNH0.6CogHoCPR5pqLVP9C1N6zkk4Wj2KgKdcEh9qy3qAXWU"; 
 
     const handleBuyClick = (pkg) => { 
         setSelectedPkg(pkg); 
