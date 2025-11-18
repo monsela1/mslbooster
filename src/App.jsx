@@ -9,7 +9,7 @@ import {
     signInWithPopup
 } from 'firebase/auth';
 import {
-    getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc, deleteDoc, addDoc,
+    getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc, deleteDoc,
     collection, query, where, serverTimestamp, getDocs,
     runTransaction, increment, limit, orderBy
 } from 'firebase/firestore';
@@ -20,8 +20,7 @@ import {
     DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2,
     Settings, Copy, Save, Search, PlusCircle, MinusCircle,
     CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
-    ArrowUpRight, ArrowDownLeft, Clock, ChevronDown, 
-    Banknote, ThumbsUp, ThumbsDown, ArrowRightLeft
+    ArrowUpRight, ArrowDownLeft, Clock, ChevronDown
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -62,7 +61,6 @@ const getTodayDateKey = () => {
 
 const getShortId = (id) => id?.substring(0, 6).toUpperCase() || '------';
 const formatNumber = (num) => num?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') || '0';
-const formatCurrency = (num) => '$' + (num || 0).toFixed(4);
 
 const getYouTubeID = (url) => {
     if (!url) return null;
@@ -87,8 +85,6 @@ const getDailyStatusDocRef = (userId) => db && userId ? doc(db, 'artifacts', app
 const getGlobalConfigDocRef = () => db ? doc(db, 'artifacts', appId, 'public', 'data', 'config', 'global_settings') : null;
 const getShortCodeDocRef = (shortId) => db && shortId ? doc(db, 'artifacts', appId, 'public', 'data', 'short_codes', shortId) : null;
 const getHistoryCollectionRef = (userId) => db && userId ? collection(db, 'artifacts', appId, 'users', userId, 'history') : null;
-// --- FIXED: ADDED MISSING FUNCTION ---
-const getWithdrawalRequestsCollectionRef = () => db ? collection(db, 'artifacts', appId, 'public', 'data', 'withdrawal_requests') : null;
 
 // Default Config
 const defaultGlobalConfig = {
@@ -97,10 +93,7 @@ const defaultGlobalConfig = {
     referredBonus: 500,
     adsReward: 30,
     maxDailyAds: 15,
-    enableBuyCoins: true, 
-    commissionRate: 0.10,
-    minWithdrawal: 1.00,
-    pointsPerDollar: 5000,
+    enableBuyCoins: false, 
     adsSettings: {
         bannerId: "ca-app-pub-xxxxxxxx/yyyyyy",
         interstitialId: "ca-app-pub-xxxxxxxx/zzzzzz",
@@ -193,10 +186,7 @@ const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     const handleChange = (e) => {
         const { name, value } = e.target;
-        const val = (name === 'commissionRate' || name === 'minWithdrawal' || name === 'pointsPerDollar') 
-            ? parseFloat(value) 
-            : parseInt(value) || 0;
-        setConfig(prev => ({ ...prev, [name]: val }));
+        setConfig(prev => ({ ...prev, [name]: parseInt(value) || 0 }));
     };
 
     const handleToggleChange = () => {
@@ -244,7 +234,7 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
             </Card>
 
             <Card className="p-4 border-l-4 border-yellow-400">
-                <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់ & លុយ</h3>
+                <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់</h3>
                 <div className="grid grid-cols-1 gap-3">
                     <div><label className="text-xs font-bold text-purple-300">Daily Check-in Points</label><InputField name="dailyCheckinReward" type="number" min="0" value={config.dailyCheckinReward || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" min="0" value={config.referrerReward || 0} onChange={handleChange} /></div>
@@ -253,18 +243,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                     <div className="pt-3 border-t border-purple-600 mt-2">
                         <label className="text-xs font-bold text-yellow-300">ចំនួនមើលពាណិជ្ជកម្មក្នុងមួយថ្ងៃ (Max Daily Ads)</label>
                         <InputField name="maxDailyAds" type="number" min="1" value={config.maxDailyAds || 15} onChange={handleChange} />
-                    </div>
-                    <div className="pt-3 border-t border-purple-600 mt-2">
-                        <label className="text-xs font-bold text-green-300">Commission Rate (e.g., 0.1 for 10%)</label>
-                        <InputField name="commissionRate" type="number" step="0.01" value={config.commissionRate || 0} onChange={handleChange} />
-                    </div>
-                    <div className="pt-3 border-t border-purple-600 mt-2">
-                        <label className="text-xs font-bold text-green-300">ចំនួនកាក់ស្មើ 1$ (Points per 1 USD)</label>
-                        <InputField name="pointsPerDollar" type="number" step="1" value={config.pointsPerDollar || 5000} onChange={handleChange} />
-                    </div>
-                     <div className="pt-3 border-t border-purple-600 mt-2">
-                        <label className="text-xs font-bold text-green-300">Minimum Withdrawal Amount ($)</label>
-                        <InputField name="minWithdrawal" type="number" step="1" value={config.minWithdrawal || 0} onChange={handleChange} />
                     </div>
                 </div>
             </Card>
@@ -403,8 +381,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
 
                         <p className="font-bold text-lg text-white">{foundUser.userName}</p>
                         <p className="text-purple-300 text-sm">Email: {foundUser.email}</p>
-                        <p className="text-purple-300 text-sm">Current Points: <span className="font-bold text-yellow-400">{formatNumber(foundUser.points)}</span></p>
-                        <p className="text-purple-300 text-sm mb-2">Withdrawable: <span className="font-bold text-green-400">{formatCurrency(foundUser.realBalance)}</span></p>
+                        <p className="text-purple-300 text-sm mb-2">Current Points: <span className="font-bold text-yellow-400">{formatNumber(foundUser.points)}</span></p>
                        
                         <div className="flex items-center space-x-2 mt-4">
                             <button onClick={() => setPointsToAdd(p => p - 100)} className="p-2 bg-red-600 rounded text-white"><MinusCircle size={20}/></button>
@@ -456,200 +433,57 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
     );
 };
 
-const AdminWithdrawalsTab = ({ db, showNotification }) => {
-    const [requests, setRequests] = useState([]);
-    const [loading, setLoading] = useState(true);
+const AdminDashboardPage = ({ db, setPage, showNotification }) => {
+    const [activeTab, setActiveTab] = useState('SETTINGS');
+    const [config, setConfig] = useState(null);
+    const [campaigns, setCampaigns] = useState([]);
 
     useEffect(() => {
-        const q = query(getWithdrawalRequestsCollectionRef(), where('status', '==', 'pending'), orderBy('createdAt', 'desc'));
-        const unsub = onSnapshot(q, (snap) => {
-            setRequests(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-            setLoading(false);
-        });
-        return () => unsub();
+        const fetchConfig = async () => {
+            try {
+                const docSnap = await getDoc(getGlobalConfigDocRef());
+                if (docSnap.exists()) {
+                    setConfig({ ...defaultGlobalConfig, ...docSnap.data() });
+                } else {
+                    setConfig(defaultGlobalConfig);
+                }
+            } catch(e) {
+                setConfig(defaultGlobalConfig);
+            }
+        };
+        fetchConfig();
     }, [db]);
 
-    const handleApprove = async (id) => {
-        if(!window.confirm('តើអ្នកបានផ្ទេរលុយ ($) ឱ្យ User រួចរាល់ហើយឬនៅ?')) return;
-        try {
-            const reqRef = doc(getWithdrawalRequestsCollectionRef(), id);
-            await updateDoc(reqRef, { status: 'completed' });
-            showNotification('Request Approved!', 'success');
-        } catch(e) { showNotification(e.message, 'error'); }
-    };
-
-    const handleReject = async (id, userId, amount) => {
-        if(!window.confirm('តើអ្នកពិតជាចង់បដិសេធ និងបង្វិលលុយចូលគណនី User វិញមែនទេ?')) return;
-        try {
-            await runTransaction(db, async (tx) => {
-                const reqRef = doc(getWithdrawalRequestsCollectionRef(), id);
-                const profileRef = getProfileDocRef(userId);
-
-                tx.update(profileRef, { realBalance: increment(amount) }); // Refund
-                tx.update(reqRef, { status: 'rejected' });
-            });
-            showNotification('Request Rejected (Refunded)!', 'success');
-        } catch(e) { showNotification(e.message, 'error'); }
-    };
-
-    return (
-        <div className="space-y-4 pb-10">
-            {loading && <p className="text-center text-purple-300">Loading requests...</p>}
-            {!loading && requests.length === 0 && <p className="text-center text-purple-400">No pending withdrawal requests.</p>}
-            {requests.map(req => (
-                <Card key={req.id} className="p-4 border-l-4 border-yellow-400">
-                    <p className="font-bold text-lg text-white">Request: {formatCurrency(req.amount)}</p>
-                    <p className="text-sm text-purple-300">User: {req.userName} ({req.shortId})</p>
-                    <p className="text-sm text-purple-300 mb-3">To: {req.paymentInfo}</p>
-                    
-                    <div className="flex space-x-2">
-                        <button 
-                            onClick={() => handleApprove(req.id)}
-                            className="flex-1 bg-green-600 text-white p-2 rounded-lg font-bold flex items-center justify-center space-x-2 hover:bg-green-700"
-                        >
-                            <ThumbsUp size={18} /> <span>Approve</span>
-                        </button>
-                        <button 
-                            onClick={() => handleReject(req.id, req.userId, req.amount)}
-                            className="flex-1 bg-red-600 text-white p-2 rounded-lg font-bold flex items-center justify-center space-x-2 hover:bg-red-700"
-                        >
-                            <ThumbsDown size={18} /> <span>Reject</span>
-                        </button>
-                    </div>
-                </Card>
-            ))}
-        </div>
-    );
-};
-
-// --- NEW: Balance Page with Exchange & Withdraw ---
-const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig, showNotification }) => {
-    const [activeTab, setActiveTab] = useState('HISTORY'); // 'HISTORY', 'EXCHANGE', 'WITHDRAW'
-    const [history, setHistory] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    // Exchange States
-    const [pointsToExchange, setPointsToExchange] = useState('');
-    const [isExchanging, setIsExchanging] = useState(false);
-
-    // Withdraw States
-    const [amount, setAmount] = useState('');
-    const [paymentInfo, setPaymentInfo] = useState('');
-    const [isWithdrawing, setIsWithdrawing] = useState(false);
-
-    // Config
-    const pointsPerDollar = globalConfig.pointsPerDollar || 5000; // Default 5000 if not set
-    const minWithdrawal = globalConfig.minWithdrawal || 1;
-
     useEffect(() => {
-        if (!db || !userId) return;
-        const q = query(getHistoryCollectionRef(userId), orderBy('date', 'desc'), limit(30));
-        const unsub = onSnapshot(q, (snap) => {
-            setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-            setLoading(false);
-        });
-        return () => unsub();
-    }, [db, userId]);
-
-    // --- EXCHANGE ACTION ---
-    const handleExchange = async (e) => {
-        e.preventDefault();
-        const pts = parseInt(pointsToExchange);
-        if (!pts || pts <= 0) return showNotification('Please enter valid points', 'error');
-        if (pts > userProfile.points) return showNotification('Not enough points', 'error');
-
-        setIsExchanging(true);
-        try {
-            const usdValue = pts / pointsPerDollar;
-            
-            await runTransaction(db, async (tx) => {
-                const profileRef = getProfileDocRef(userId);
-                // Deduct Points, Add Real Balance
-                tx.update(profileRef, { 
-                    points: increment(-pts),
-                    realBalance: increment(usdValue)
-                });
-
-                const historyRef = doc(getHistoryCollectionRef(userId));
-                tx.set(historyRef, {
-                    title: `Exchanged ${formatNumber(pts)} Coins`,
-                    amount: usdValue,
-                    date: serverTimestamp(),
-                    type: 'exchange' 
-                });
+        if(activeTab === 'CAMPAIGNS') {
+            const q = query(getCampaignsCollectionRef(), limit(50));
+            return onSnapshot(q, (snap) => {
+                setCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             });
-            showNotification(`Success! Exchanged to ${formatCurrency(usdValue)}`, 'success');
-            setPointsToExchange('');
-        } catch(e) { showNotification(e.message, 'error'); }
-        setIsExchanging(false);
+        }
+    }, [db, activeTab]);
+
+    const handleSaveConfig = async () => {
+        try {
+            await setDoc(getGlobalConfigDocRef(), config);
+            showNotification('Settings saved successfully!', 'success');
+        } catch(e) { showNotification('Failed to save', 'error'); }
     };
 
-    // --- WITHDRAW ACTION ---
-    const handleWithdraw = async (e) => {
-        e.preventDefault();
-        const val = parseFloat(amount);
-        if (!val || val <= 0) return showNotification('Invalid amount', 'error');
-        if (val < minWithdrawal) return showNotification(`Minimum is ${formatCurrency(minWithdrawal)}`, 'error');
-        if (val > userProfile.realBalance) return showNotification('Insufficient balance', 'error');
-        if (!paymentInfo.trim()) return showNotification('Enter Payment Info', 'error');
-
-        setIsWithdrawing(true);
-        try {
-             await runTransaction(db, async (tx) => {
-                const profileRef = getProfileDocRef(userId);
-                
-                // 1. Deduct from user's realBalance
-                tx.update(profileRef, { realBalance: increment(-val) });
-
-                // 2. Create withdrawal request for Admin
-                const reqRef = collection(db, 'artifacts', appId, 'public', 'data', 'withdrawal_requests');
-                // Fixed: using doc() with collection reference automatically generates ID
-                const newDocRef = doc(reqRef); 
-                tx.set(newDocRef, {
-                    userId: userId,
-                    shortId: userProfile.shortId,
-                    userName: userProfile.userName,
-                    amount: val,
-                    paymentInfo: paymentInfo.trim(),
-                    status: 'pending',
-                    createdAt: serverTimestamp()
-                });
-
-                // 3. Add to user's history
-                const historyRef = doc(getHistoryCollectionRef(userId));
-                tx.set(historyRef, {
-                    title: 'Withdrawal Request',
-                    amount: -val,
-                    date: serverTimestamp(),
-                    type: 'withdrawal'
-                });
-            });
-            showNotification('Request sent successfully!', 'success');
-            setAmount('');
-        } catch(e) { showNotification(e.message, 'error'); }
-        setIsWithdrawing(false);
+    const handleDeleteCampaign = async (id) => {
+        if(!window.confirm('Stop this campaign?')) return;
+        try { await deleteDoc(doc(getCampaignsCollectionRef(), id)); showNotification('Deleted!', 'success'); }
+        catch(e) {}
     };
+
+    if (!config) return <Loading />;
 
     return (
-        <div className="min-h-screen bg-purple-900 pb-16 pt-20">
-            <Header title="MY BALANCE" onBack={() => setPage('DASHBOARD')} />
-            <main className="p-4 space-y-4">
-                
-                {/* Balance Cards */}
-                <div className="grid grid-cols-2 gap-3">
-                    <Card className="bg-gradient-to-br from-purple-700 to-purple-900 text-center p-4 text-white border-purple-500">
-                        <p className="text-xs opacity-70 mb-1">Points Balance</p>
-                        <div className="flex justify-center items-center"><Coins className="w-5 h-5 text-yellow-400 mr-1" /><span className="text-xl font-bold">{formatNumber(userProfile.points)}</span></div>
-                    </Card>
-                    <Card className="bg-gradient-to-br from-green-600 to-teal-800 text-center p-4 text-white border-teal-500">
-                        <p className="text-xs opacity-70 mb-1">Withdrawable ($)</p>
-                        <div className="flex justify-center items-center"><Banknote className="w-5 h-5 text-white mr-1" /><span className="text-xl font-bold">{formatCurrency(userProfile.realBalance)}</span></div>
-                    </Card>
-                </div>
-
-                {/* Navigation Tabs */}
-                <div className="flex bg-purple-800 p-1 rounded-lg">
-                     {['HISTORY', 'EXCHANGE', 'WITHDRAW'].map(tab => (
+        <div className="min-h-screen bg-purple-950 pb-16 pt-20">
+            <Header title="ADMIN PANEL" onBack={() => setPage('DASHBOARD')} className="bg-purple-900" />
+            <main className="p-4">
+                <div className="flex space-x-1 mb-4 bg-purple-800 p-1 rounded-lg">
+                    {['SETTINGS', 'USERS', 'CAMPAIGNS'].map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
@@ -660,104 +494,681 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig, sh
                     ))}
                 </div>
 
-                {/* --- TAB CONTENT --- */}
-                
-                {/* 1. HISTORY TAB */}
-                {activeTab === 'HISTORY' && (
-                    <Card className="p-4">
-                        <h3 className="font-bold text-white mb-3 border-b border-purple-600 pb-2 flex items-center"><Clock className="w-4 h-4 mr-2"/> ប្រវត្តិ (History)</h3>
-                        {loading ? <div className="text-center text-purple-300">Loading...</div> : 
-                         history.length > 0 ? (
-                            <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
-                                {history.map((item) => (
-                                    <div key={item.id} className="flex justify-between items-center bg-purple-800 p-3 rounded-lg border border-purple-700">
-                                        <div>
-                                            <p className="text-white text-sm font-bold">{item.title}</p>
-                                            <p className="text-[10px] text-purple-300 opacity-70">{item.date?.toDate().toLocaleDateString()}</p>
-                                        </div>
-                                        <span className={`font-bold ${item.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                            {/* Conditional Formatting: Money vs Points */}
-                                            {['exchange', 'withdrawal', 'commission'].includes(item.type) 
-                                                ? formatCurrency(item.amount) 
-                                                : (item.amount > 0 ? '+' : '') + formatNumber(item.amount)}
+                {activeTab === 'SETTINGS' && <AdminSettingsTab config={config} setConfig={setConfig} onSave={handleSaveConfig} />}
+                {activeTab === 'USERS' && <AdminUserManagerTab db={db} showNotification={showNotification} />}
+               
+                {activeTab === 'CAMPAIGNS' && (
+                    <div className="space-y-2 pb-10">
+                        {campaigns.map(c => (
+                            <div key={c.id} className={`bg-purple-800 p-3 rounded-lg shadow flex justify-between items-center border-l-4 ${c.remaining > 0 ? 'border-green-500' : 'border-red-500'}`}>
+                                <div className='overflow-hidden'>
+                                    <p className="font-bold text-sm truncate text-white w-48">{c.link}</p>
+                                    <div className='flex space-x-2 text-xs mt-1'>
+                                        <span className='bg-purple-900 px-2 py-0.5 rounded text-purple-200'>{c.type}</span>
+                                        <span className={`${c.remaining > 0 ? 'text-green-400' : 'text-red-400'} font-bold`}>
+                                            Rem: {c.remaining}
                                         </span>
                                     </div>
-                                ))}
+                                </div>
+                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 shadow">
+                                    <Trash2 size={18}/>
+                                </button>
                             </div>
-                        ) : <div className="text-center text-purple-400 py-4">No history yet.</div>}
-                    </Card>
+                        ))}
+                        {campaigns.length === 0 && <p className="text-purple-300 text-center opacity-50">No campaigns found.</p>}
+                    </div>
                 )}
+            </main>
+        </div>
+    );
+};
 
-                {/* 2. EXCHANGE TAB */}
-                {activeTab === 'EXCHANGE' && (
-                    <Card className="p-4">
-                        <h3 className="font-bold text-white mb-3 flex items-center"><ArrowRightLeft className="w-5 h-5 mr-2 text-yellow-400"/> ប្តូរកាក់ជាលុយ</h3>
-                        <div className="bg-purple-900/50 p-3 rounded mb-4 text-center border border-purple-600">
-                             <p className="text-purple-300 text-sm">Rate: <span className="text-white font-bold">{formatNumber(pointsPerDollar)} Points = $1.00</span></p>
+// --- 6. USER PAGES ---
+
+const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, globalConfig }) => {
+    const [referrals, setReferrals] = useState([]);
+    const [inputCode, setInputCode] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const shortId = getShortId(userId);
+
+    useEffect(() => {
+        if (!db || !userId) return;
+        const q = query(getReferralCollectionRef(), where('referrerId', '==', userId));
+        const unsub = onSnapshot(q, (snap) => {
+            setReferrals(snap.docs.map(d => d.data()));
+        });
+        return () => unsub();
+    }, [db, userId]);
+
+    const handleSubmitCode = async () => {
+        const code = inputCode.toUpperCase().trim();
+       
+        if (code.length !== 6) return showNotification('កូដត្រូវតែមាន ៦ ខ្ទង់', 'error');
+        if (code === shortId) return showNotification('មិនអាចដាក់កូដខ្លួនឯងបានទេ!', 'error');
+        if (userProfile.referredBy) return showNotification('អ្នកមានអ្នកណែនាំរួចហើយ', 'error');
+
+        setIsSubmitting(true);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const shortCodeRef = getShortCodeDocRef(code);
+                const shortCodeDoc = await transaction.get(shortCodeRef);
+                if (!shortCodeDoc.exists()) throw new Error("កូដអ្នកណែនាំមិនត្រឹមត្រូវ");
+
+                const referrerId = shortCodeDoc.data().fullUserId;
+               
+                const userRef = getProfileDocRef(userId);
+                const userDoc = await transaction.get(userRef);
+                if (userDoc.data().referredBy) throw new Error("អ្នកមានអ្នកណែនាំរួចហើយ");
+
+                const referrerRef = getProfileDocRef(referrerId);
+                
+                // UPDATE TOTAL EARNED FOR REFERRER
+                transaction.update(referrerRef, {
+                    points: increment(globalConfig.referrerReward),
+                    totalEarned: increment(globalConfig.referrerReward)
+                });
+                
+                const referrerHistoryRef = doc(collection(db, 'artifacts', appId, 'users', referrerId, 'history'));
+                transaction.set(referrerHistoryRef, {
+                    title: 'Referral Reward',
+                    amount: globalConfig.referrerReward,
+                    date: serverTimestamp(),
+                    type: 'referral'
+                });
+
+                const bonus = globalConfig.referredBonus || 500;
+                // UPDATE TOTAL EARNED FOR CURRENT USER
+                transaction.update(userRef, {
+                    referredBy: code,
+                    points: increment(bonus),
+                    totalEarned: increment(bonus)
+                });
+                const myHistoryRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                transaction.set(myHistoryRef, {
+                    title: 'Entered Code Bonus',
+                    amount: bonus,
+                    date: serverTimestamp(),
+                    type: 'referral_code'
+                });
+
+                const newReferralRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'referrals'));
+                transaction.set(newReferralRef, {
+                    referrerId: referrerId,
+                    referredUserId: userId,
+                    referredName: userProfile.userName || 'Unknown',
+                    reward: globalConfig.referrerReward,
+                    timestamp: serverTimestamp()
+                });
+            });
+            
+            showNotification(`ជោគជ័យ! ទទួលបាន +${formatNumber(globalConfig.referredBonus || 500)} Points`, 'success');
+            setInputCode('');
+        } catch (e) {
+            showNotification(e.message, 'error');
+        }
+        setIsSubmitting(false);
+    };
+
+    return (
+        <div className="min-h-screen bg-purple-900 pb-16 pt-20">
+            <Header title="ណែនាំមិត្ត" onBack={() => setPage('DASHBOARD')} />
+            <main className="p-4 space-y-4">
+               
+                {/* YOUR CODE */}
+                <Card className="p-6 text-center bg-purple-800 border-2 border-yellow-500/50">
+                    <h3 className="font-bold text-white text-lg">កូដណែនាំរបស់អ្នក</h3>
+                    <div className="text-4xl font-mono font-extrabold text-yellow-400 my-4 tracking-widest bg-purple-900 p-2 rounded-lg shadow-inner">{shortId}</div>
+                    <p className="text-sm text-purple-200 font-medium">ទទួលបាន <span className='text-green-400 font-bold'>{formatNumber(globalConfig.referrerReward)} ពិន្ទុ!</span> ក្នុងម្នាក់</p>
+                    <button onClick={() => {navigator.clipboard.writeText(shortId); showNotification('ចម្លងរួចរាល់!', 'success')}} className="mt-5 bg-teal-600 hover:bg-teal-700 text-white px-6 py-2 rounded-full text-sm font-bold flex items-center justify-center mx-auto shadow-lg active:scale-95 transition">
+                        <Copy className='w-4 h-4 mr-2'/> ចម្លងកូដ
+                    </button>
+                </Card>
+
+                {/* INPUT REFERRER CODE */}
+                <Card className="p-4 border border-teal-500/30 bg-gradient-to-br from-purple-800 to-purple-900">
+                    <h3 className="font-bold text-white mb-2 flex items-center"><UserPlus className="w-4 h-4 mr-2"/> ដាក់កូដអ្នកណែនាំ</h3>
+                   
+                    {userProfile.referredBy ? (
+                        <div className="bg-purple-950/50 p-3 rounded border border-purple-700 text-center">
+                            <p className="text-purple-300 text-sm">អ្នកត្រូវបានណែនាំដោយ៖</p>
+                            <p className="text-xl font-mono font-bold text-yellow-400 mt-1">{userProfile.referredBy}</p>
+                            <p className="text-xs text-green-400 mt-1 flex justify-center items-center"><CheckCircle size={12} className="mr-1"/> បានទទួលរង្វាន់រួចរាល់</p>
                         </div>
-                        <form onSubmit={handleExchange} className="space-y-4">
-                            <div>
-                                <label className="text-xs text-purple-300">ចំនួនកាក់ចង់ប្តូរ</label>
-                                <InputField 
-                                    type="number" 
-                                    placeholder="0" 
-                                    value={pointsToExchange}
-                                    onChange={e => setPointsToExchange(e.target.value)}
+                    ) : (
+                        <div>
+                            <p className="text-xs text-purple-200 mb-3">ដាក់កូដដើម្បីទទួលបាន <span className="text-yellow-400 font-bold">+{formatNumber(globalConfig.referredBonus || 500)} Points</span> បន្ថែម!</p>
+                            <div className="flex">
+                                {/* UPDATED: White Background, Black Text */}
+                                <input
+                                    value={inputCode}
+                                    onChange={(e) => setInputCode(e.target.value.toUpperCase())}
+                                    placeholder="បញ្ចូលកូដ ៦ ខ្ទង់"
+                                    maxLength={6}
+                                    disabled={isSubmitting}
+                                    className="flex-1 p-3 bg-white text-black font-bold placeholder-gray-500 rounded-l-lg focus:outline-none uppercase"
                                 />
+                                <button
+                                    onClick={handleSubmitCode}
+                                    disabled={isSubmitting || inputCode.length !== 6}
+                                    className={`px-6 font-bold text-white rounded-r-lg transition ${isSubmitting || inputCode.length !== 6 ? 'bg-gray-500' : 'bg-yellow-600 hover:bg-yellow-700'}`}
+                                >
+                                    {isSubmitting ? '...' : 'OK'}
+                                </button>
                             </div>
-                            <div className="text-right text-sm text-green-400 font-bold">
-                                នឹងទទួលបាន: {formatCurrency((parseInt(pointsToExchange) || 0) / pointsPerDollar)}
+                        </div>
+                    )}
+                </Card>
+
+                {/* REFERRAL LIST */}
+                <Card className="p-4">
+                    <h3 className="font-bold mb-4 text-white border-b border-purple-600 pb-2">បញ្ជីអ្នកដែលបានណែនាំ ({referrals.length})</h3>
+                    <div className="max-h-60 overflow-y-auto space-y-2">
+                        {referrals.length > 0 ? referrals.map((r, i) => (
+                            <div key={i} className="flex justify-between items-center bg-purple-700 p-3 rounded-lg border border-purple-600">
+                                <span className="text-white font-semibold text-sm">{i+1}. {r.referredName || 'User'}</span>
+                                <span className="text-green-400 font-bold text-sm">+{formatNumber(r.reward)}</span>
                             </div>
-                            <button 
-                                disabled={isExchanging}
-                                className="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 rounded-lg shadow transition"
-                            >
-                                {isExchanging ? 'កំពុងប្តូរ...' : 'ប្តូរឥឡូវនេះ (EXCHANGE)'}
-                            </button>
-                        </form>
-                    </Card>
+                        )) : <div className="text-center py-8 text-purple-400 text-sm">មិនទាន់មានការណែនាំ</div>}
+                    </div>
+                </Card>
+            </main>
+        </div>
+    );
+};
+
+const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification }) => {
+    const [type, setType] = useState('view');
+    const [link, setLink] = useState('');
+    const [count, setCount] = useState(10);
+    const [time, setTime] = useState(60);
+    const [userCampaigns, setUserCampaigns] = useState([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isLinkVerified, setIsLinkVerified] = useState(false);
+    const [previewUrl, setPreviewUrl] = useState(null);
+
+    // Modal Control States
+    const [showViewPicker, setShowViewPicker] = useState(false);
+    const [showTimePicker, setShowTimePicker] = useState(false);
+
+    // PREDEFINED OPTIONS
+    const VIEW_OPTIONS = [10, 20, 30, 40, 50, 100, 200, 500, 1000];
+    const TIME_OPTIONS = [60, 90, 120, 150, 180, 210, 240, 300, 600];
+
+    useEffect(() => {
+        const q = query(getCampaignsCollectionRef(), where('userId', '==', userId));
+        return onSnapshot(q, (snap) => {
+            setUserCampaigns(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds));
+        });
+    }, [db, userId]);
+
+    const calculateCost = useCallback(() => {
+        const c = parseInt(count) || 0;
+        const t = parseInt(time) || 0;
+        return type === 'sub' ? c * 50 : c * t * 1;
+    }, [type, count, time]);
+
+    const handleCheckLink = (e) => {
+        e.preventDefault();
+        if(!link.trim()) return showNotification('សូមបញ្ចូល Link ជាមុនសិន', 'error');
+       
+        if (type === 'view' || type === 'sub') {
+            const embed = getEmbedUrl(link);
+            if(!embed) return showNotification('Link YouTube មិនត្រឹមត្រូវ', 'error');
+            setPreviewUrl(embed);
+        } else {
+            if(!link.startsWith('http')) return showNotification('Link ត្រូវតែមាន http:// ឬ https://', 'error');
+            setPreviewUrl(null);
+        }
+       
+        setIsLinkVerified(true);
+        showNotification('Link ត្រឹមត្រូវ!', 'success');
+    };
+
+    const handleResetLink = () => {
+        setLink('');
+        setIsLinkVerified(false);
+        setPreviewUrl(null);
+    }
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        const cost = calculateCost();
+        if (!link.trim() || count < 1 || cost > userProfile.points) {
+            showNotification('សូមពិនិត្យ Link ឬពិន្ទុរបស់អ្នក!', 'error');
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const profileRef = getProfileDocRef(userId);
+                const profileDoc = await transaction.get(profileRef);
+                if (!profileDoc.exists() || profileDoc.data().points < cost) throw new Error("Insufficient points");
+                
+                transaction.update(profileRef, { points: increment(-cost) });
+                
+                const newCampRef = doc(getCampaignsCollectionRef());
+                transaction.set(newCampRef, { 
+                    userId, 
+                    type, 
+                    link: link.trim(), 
+                    costPerUnit: type === 'sub' ? 50 : 1, 
+                    requiredDuration: type === 'sub' ? 60 : (parseInt(time) || 60), 
+                    initialCount: parseInt(count), 
+                    remaining: parseInt(count), 
+                    totalCost: cost, 
+                    createdAt: serverTimestamp(), 
+                    isActive: true 
+                });
+               
+                // SAVE HISTORY
+                const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                transaction.set(historyRef, {
+                    title: `Create ${type.toUpperCase()} Campaign`,
+                    amount: -cost,
+                    date: serverTimestamp(),
+                    type: 'campaign'
+                });
+            });
+            showNotification('ដាក់យុទ្ធនាការជោគជ័យ!', 'success');
+            setLink('');
+            setIsLinkVerified(false);
+            setPreviewUrl(null);
+            setCount(10);
+        } catch (error) { showNotification(error.message, 'error'); } finally { setIsSubmitting(false); }
+    };
+
+    return (
+        <div className="min-h-screen bg-[#0f172a] pb-16 pt-20">
+            <Header title="យុទ្ធនាការខ្ញុំ" onBack={() => setPage('DASHBOARD')} />
+            <main className="p-0">
+                {isLinkVerified && previewUrl && (
+                    <div className="w-full aspect-video bg-black mb-4">
+                        <iframe src={previewUrl} className="w-full h-full" frameBorder="0" allowFullScreen title="preview" />
+                    </div>
                 )}
 
-                {/* 3. WITHDRAW TAB */}
-                {activeTab === 'WITHDRAW' && (
-                    <Card className="p-4">
-                        <h3 className="font-bold text-white mb-3 flex items-center"><Banknote className="w-5 h-5 mr-2 text-green-400"/> ស្នើសុំដកប្រាក់</h3>
-                        <form onSubmit={handleWithdraw} className="space-y-4">
-                             <div>
-                                <label className="text-xs text-purple-300">ចំនួនទឹកប្រាក់ ($)</label>
-                                <InputField 
-                                    type="number" 
-                                    step="0.01"
-                                    placeholder={`Min: ${formatCurrency(minWithdrawal)}`}
-                                    value={amount}
-                                    onChange={e => setAmount(e.target.value)}
+                <div className="px-4 space-y-4">
+                    <div className="bg-[#0f172a] p-2">
+                        <div className="flex space-x-2 mb-4">
+                            {['view', 'sub', 'website'].map(t => (
+                                <button key={t} onClick={() => {setType(t); setIsLinkVerified(false); setPreviewUrl(null);}} className={`flex-1 py-2 rounded font-bold text-xs ${type === t ? 'bg-[#4c1d95] text-white border-b-2 border-teal-400' : 'bg-gray-800 text-gray-400'}`}>{t.toUpperCase()}</button>
+                            ))}
+                        </div>
+
+                        <form onSubmit={isLinkVerified ? handleSubmit : handleCheckLink} className="space-y-3">
+                            <div className="flex">
+                                <input
+                                    value={link}
+                                    onChange={e => {setLink(e.target.value); setIsLinkVerified(false);}}
+                                    placeholder={type === 'website' ? "https://yoursite.com" : "https://youtu.be/..."}
+                                    required
+                                    disabled={isLinkVerified}
+                                    className="flex-1 p-3 bg-white text-black placeholder-gray-500 border-none rounded-l-md focus:outline-none focus:ring-1 focus:ring-teal-500"
                                 />
+                                <button
+                                    type={isLinkVerified ? 'button' : 'submit'}
+                                    onClick={isLinkVerified ? handleResetLink : undefined}
+                                    className={`px-6 font-bold text-white rounded-r-md transition ${isLinkVerified ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 hover:bg-red-700'}`}
+                                >
+                                    {isLinkVerified ? 'X' : 'CHECK'}
+                                </button>
                             </div>
-                            <div>
-                                <label className="text-xs text-purple-300">ព័ត៌មានគណនី (ABA/Wing/Tell)</label>
-                                <InputField 
-                                    type="text" 
-                                    placeholder="Example: 000 123 456 (John Doe)"
-                                    value={paymentInfo}
-                                    onChange={e => setPaymentInfo(e.target.value)}
-                                />
-                            </div>
-                             <button 
-                                disabled={isWithdrawing}
-                                className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-lg shadow transition"
-                            >
-                                {isWithdrawing ? 'កំពុងស្នើសុំ...' : 'ស្នើសុំដកប្រាក់ (REQUEST)'}
-                            </button>
+
+                            {isLinkVerified && (
+                                <div className='mt-4 space-y-4'>
+                                    <h3 className='text-white font-bold text-sm border-b border-gray-600 pb-2'>Campaigns Setting</h3>
+                                   
+                                    <div className="flex justify-between items-center mb-2">
+                                        <label className="text-white font-bold text-sm">Number of views</label>
+                                        <div 
+                                            onClick={() => setShowViewPicker(true)}
+                                            className="w-32 p-2 bg-white text-black text-center font-bold rounded-full border-none cursor-pointer flex items-center justify-center active:scale-95 transition"
+                                        >
+                                            {count} <ChevronDown size={16} className="ml-1"/>
+                                        </div>
+                                    </div>
+
+                                    {type !== 'sub' && (
+                                        <div className="flex justify-between items-center mb-4">
+                                            <label className="text-white font-bold text-sm">Time Required (sec.)</label>
+                                            <div 
+                                                onClick={() => setShowTimePicker(true)}
+                                                className="w-32 p-2 bg-white text-black text-center font-bold rounded-full border-none cursor-pointer flex items-center justify-center active:scale-95 transition"
+                                            >
+                                                {time} <ChevronDown size={16} className="ml-1"/>
+                                            </div>
+                                        </div>
+                                    )}
+                                   
+                                    <div className="flex justify-between items-center mb-4 pt-2 border-t border-gray-600">
+                                        <label className="text-white font-bold text-sm">Campaign Cost</label>
+                                        <span className='text-xl font-bold text-yellow-500'>{formatNumber(calculateCost())}</span>
+                                    </div>
+
+                                    <button type="submit" disabled={isSubmitting} className="w-full bg-yellow-600 text-white py-3 rounded-full font-bold shadow-lg hover:bg-yellow-700 transition mt-4">
+                                        {isSubmitting ? 'Processing...' : 'DONE'}
+                                    </button>
+                                </div>
+                            )}
                         </form>
-                    </Card>
-                )}
+                    </div>
+
+                    <div className="space-y-2 mt-6">
+                        <h3 className="text-gray-400 font-bold text-xs uppercase">Recent Campaigns</h3>
+                        {userCampaigns.map(c => (
+                            <div key={c.id} className="bg-gray-800 p-3 rounded shadow flex justify-between items-center border-l-4 border-teal-500">
+                                <div className='w-2/3'><p className="font-bold text-xs truncate text-gray-300">{c.link}</p><p className="text-[10px] text-gray-500">{c.type.toUpperCase()} - Rem: {c.remaining}</p></div>
+                                <span className={`text-xs font-bold ${c.remaining > 0 ? 'text-green-400' : 'text-red-400'}`}>{c.remaining > 0 ? 'Active' : 'Finished'}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <SelectionModal 
+                    isOpen={showViewPicker} 
+                    onClose={() => setShowViewPicker(false)} 
+                    title="Choose Number of views" 
+                    options={VIEW_OPTIONS}
+                    onSelect={setCount}
+                />
+
+                <SelectionModal 
+                    isOpen={showTimePicker} 
+                    onClose={() => setShowTimePicker(false)} 
+                    title="Choose Number of Seconds" 
+                    options={TIME_OPTIONS}
+                    onSelect={setTime}
+                />
 
             </main>
         </div>
     );
 };
 
-// ... (BuyCoinsPage, WatchAdsPage, MyPlanPage, AuthForm, App components remain unchanged from previous context)
+const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, googleAccessToken }) => {
+    const [campaigns, setCampaigns] = useState([]);
+    const [current, setCurrent] = useState(null);
+    
+    // UPDATE: Start timer at -1 to prevent instant claim on video switch
+    const [timer, setTimer] = useState(-1); 
+    const [claimed, setClaimed] = useState(false);
+    const [autoPlay, setAutoPlay] = useState(true);
+    const isMounted = useRef(true);
+
+    // --- ADDED: WATCHED LIST ---
+    const [watchedIds, setWatchedIds] = useState(new Set());
+
+    // Fetch Watched Campaigns on Mount
+    useEffect(() => {
+        if (!userId) return;
+        const fetchWatched = async () => {
+            try {
+                const watchedSnap = await getDocs(collection(db, 'artifacts', appId, 'users', userId, 'watched'));
+                const ids = new Set(watchedSnap.docs.map(d => d.id));
+                setWatchedIds(ids);
+            } catch(e) { console.error(e); }
+        };
+        fetchWatched();
+    }, [userId, db]);
+
+    useEffect(() => {
+        isMounted.current = true;
+        return () => { isMounted.current = false; };
+    }, []);
+
+    useEffect(() => {
+        const q = query(getCampaignsCollectionRef(), where('type', '==', type), limit(50));
+        return onSnapshot(q, (snap) => {
+            if(!isMounted.current) return;
+            const list = snap.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                // FILTER: Exclude own campaigns AND watched campaigns
+                .filter(c => c.userId !== userId && c.remaining > 0 && c.isActive !== false && !watchedIds.has(c.id));
+            
+            setCampaigns(list);
+            // Only set current if not already playing or if current was removed
+            if (!current && list.length > 0) setCurrent(list[0]);
+        });
+    }, [db, userId, type, watchedIds]); // Add watchedIds to dependency
+
+    useEffect(() => {
+        if (current) { 
+            setTimer(current.requiredDuration || 30); 
+            setClaimed(false); 
+        }
+    }, [current]);
+   
+    useEffect(() => {
+        let interval = null;
+        // Only countdown if timer > 0
+        if (timer > 0 && !claimed) {
+            interval = setInterval(() => {
+                setTimer(t => Math.max(0, t - 1));
+            }, 1000);
+        } else if (timer === 0 && !claimed && current) {
+            // Auto Claim Logic (Only for View/Website)
+            if (type !== 'sub') handleClaim();
+        }
+        
+        return () => clearInterval(interval);
+    }, [timer, claimed, current, type]);
+
+    const handleClaim = async () => {
+        if (claimed || !current) return;
+        
+        // Prevent claim if timer is not 0 (or if it's -1 loading state)
+        if (timer !== 0) {
+            return; 
+        }
+
+        setClaimed(true);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const campRef = doc(getCampaignsCollectionRef(), current.id);
+                const campDoc = await transaction.get(campRef);
+                if (!campDoc.exists() || campDoc.data().remaining <= 0) throw new Error("Campaign finished");
+               
+                transaction.update(getProfileDocRef(userId), {
+                    points: increment(current.requiredDuration || 50),
+                    totalEarned: increment(current.requiredDuration || 50)
+                });
+                transaction.update(campRef, { remaining: increment(-1) });
+
+                // SAVE HISTORY
+                const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                transaction.set(historyRef, {
+                    title: type === 'view' ? 'Watched Video' : type === 'sub' ? 'Subscribed Channel' : 'Visited Website',
+                    amount: current.requiredDuration || 50,
+                    date: serverTimestamp(),
+                    type: 'earn'
+                });
+
+                // --- ADD TO WATCHED LIST ---
+                const watchedRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'watched'), current.id);
+                transaction.set(watchedRef, { date: serverTimestamp() });
+            });
+            
+            // Update local state to hide this video immediately
+            setWatchedIds(prev => new Set(prev).add(current.id));
+
+            if(isMounted.current) showNotification('Success! Points Added.', 'success');
+           
+            // AUTO NEXT
+            if(autoPlay && isMounted.current) {
+                handleNext();
+            }
+        } catch (e) { if(isMounted.current) showNotification('បរាជ័យ: ' + e.message, 'error'); }
+    };
+
+    const handleNext = () => {
+        setTimer(-1); // Reset Timer immediately
+        setClaimed(false);
+        
+        // Re-filter logic with updated watchedIds
+        const nextList = campaigns.filter(c => c.id !== current?.id && !watchedIds.has(c.id));
+        setCurrent(nextList[0] || null);
+    }
+
+    const handleSubscribeClick = async () => {
+        if(!current) return;
+
+        if (timer > 0) {
+            showNotification(`សូមរង់ចាំ ${timer} វិនាទីទៀត!`, 'error');
+            return;
+        }
+
+        if (!googleAccessToken) {
+            showNotification('សូម Login តាម Google ម្តងទៀតដើម្បីផ្តល់សិទ្ធិ!', 'error');
+            return;
+        }
+
+        try {
+            const videoId = getYouTubeID(current.link);
+            if (!videoId) throw new Error("Invalid Video Link");
+
+            const videoResponse = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&access_token=${googleAccessToken}`);
+            const videoData = await videoResponse.json();
+            
+            if (!videoData.items || videoData.items.length === 0) throw new Error("រកវីដេអូមិនឃើញ");
+            const channelId = videoData.items[0].snippet.channelId;
+
+            const subResponse = await fetch(`https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&access_token=${googleAccessToken}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    snippet: {
+                        resourceId: { kind: 'youtube#channel', channelId: channelId }
+                    }
+                })
+            });
+
+            if (subResponse.ok) {
+                showNotification('បាន Subscribe ដោយជោគជ័យ!', 'success');
+                handleClaim(); 
+            } else {
+                const errorData = await subResponse.json();
+                if (errorData.error?.errors?.[0]?.reason === 'subscriptionDuplicate') {
+                    showNotification('អ្នកបាន Subscribe រួចហើយ!', 'success');
+                    handleClaim();
+                } else {
+                    throw new Error(errorData.error?.message || 'Subscribe Failed');
+                }
+            }
+
+        } catch (error) {
+            console.error(error);
+            showNotification('បរាជ័យ៖ ' + error.message, 'error');
+        }
+    };
+
+    const isVideo = type === 'view' || type === 'sub';
+    const iframeSrc = current ? (isVideo ? getEmbedUrl(current.link) : current.link) : null;
+
+    return (
+        <div className="h-screen bg-[#0f172a] flex flex-col relative">
+            <Header title={type === 'view' ? 'មើលវីដេអូ' : type === 'website' ? 'មើល Website' : 'Subscribe'} onBack={() => setPage('DASHBOARD')} className="relative" />
+           
+            <div className="flex-1 relative bg-black">
+                {current ? (
+                    iframeSrc ? (
+                        <>
+                            <iframe
+                                src={iframeSrc}
+                                className="w-full h-full absolute top-0 left-0"
+                                frameBorder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                                title="content-viewer"
+                                sandbox={!isVideo ? "allow-scripts allow-same-origin allow-forms" : undefined}
+                            />
+                            {!isVideo && (
+                                <button onClick={() => window.open(current.link)} className="absolute top-4 right-4 bg-black/60 hover:bg-black text-white px-3 py-1 rounded text-xs flex items-center backdrop-blur-sm border border-white/20">
+                                    <ExternalLink size={14} className="mr-1"/> Open External
+                                </button>
+                            )}
+                        </>
+                    ) : (
+                        <div className="flex items-center justify-center h-full text-white"><p>Invalid Link</p></div>
+                    )
+                ) : (
+                     <div className="flex flex-col items-center justify-center h-full text-white"><RefreshCw className="animate-spin mb-4"/>កំពុងស្វែងរក...</div>
+                )}
+            </div>
+
+            <div className="bg-white p-3 border-t border-gray-200 shadow-lg z-20 pb-24"> 
+                 {current ? (
+                    <div className="flex flex-col space-y-2">
+                         <div className="flex justify-between items-center">
+                            <div className="flex items-center space-x-2">
+                                <span className="text-lg font-bold text-yellow-600 flex items-center"><Coins className="w-5 h-5 mr-1" /> {current.requiredDuration}</span>
+                                
+                                {/* --- UPDATED: Better looking Timer Button --- */}
+                                {timer > 0 ? (
+                                    <div className="flex items-center bg-gradient-to-r from-red-100 to-pink-100 px-3 py-1 rounded-full border border-red-200">
+                                        <Zap className="w-4 h-4 mr-1 text-red-500 animate-pulse" /> 
+                                        <span className="text-red-600 font-bold text-sm">{timer}s</span>
+                                    </div>
+                                ) : (
+                                    timer === -1 ? 
+                                    <span className="text-gray-500 font-bold flex items-center bg-gray-200 px-2 py-0.5 rounded-full text-sm">...</span> :
+                                    <span className="text-green-600 font-bold flex items-center bg-green-100 px-3 py-1 rounded-full text-sm border border-green-200"><CheckCircle className="w-4 h-4 mr-1" /> Ready</span>
+                                )}
+                            </div>
+                           
+                            {/* --- UPDATED: Better Toggle Button --- */}
+                            <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setAutoPlay(!autoPlay)}>
+                                <span className={`text-xs font-bold ${autoPlay ? 'text-green-600' : 'text-gray-400'}`}>
+                                    Auto Play {autoPlay ? 'ON' : 'OFF'}
+                                </span>
+                                <div className={`w-10 h-5 rounded-full p-1 transition-colors duration-300 flex items-center ${autoPlay ? 'bg-green-500' : 'bg-gray-300'}`}>
+                                    <div className={`w-4 h-4 bg-white rounded-full shadow-md transform transition-transform duration-300 ${autoPlay ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex space-x-2">
+                            {type === 'sub' ? (
+                                <button 
+                                    onClick={handleSubscribeClick} 
+                                    className={`flex-1 text-white py-3 rounded-lg font-bold shadow transition text-sm 
+                                        bg-red-600 hover:bg-red-700 
+                                        ${(timer > 0 || claimed || timer === -1) ? 'opacity-80 cursor-not-allowed' : 'active:scale-95'}`}
+                                    disabled={timer > 0 || claimed || timer === -1}
+                                >
+                                    {/* CHANGE: Show Text */}
+                                    {claimed ? 'CLAIMED' : `SUBSCRIBE ${timer > 0 ? `(${timer}s)` : ''}`}
+                                </button>
+                            ) : (
+                                <button 
+                                    onClick={handleClaim} 
+                                    disabled={timer > 0 || claimed || timer === -1} 
+                                    // CHANGE: Always Blue
+                                    className={`flex-1 py-3 rounded-lg font-bold shadow text-sm text-white transition 
+                                        ${claimed ? 'bg-green-500' : 'bg-blue-600 hover:bg-blue-700'}
+                                        ${(timer > 0 || timer === -1) ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
+                                >
+                                    {claimed ? 'SUCCESS' : timer > 0 ? `WAIT ${timer}s` : timer === -1 ? 'LOADING...' : 'CLAIM REWARD'}
+                                </button>
+                            )}
+                            <button onClick={handleNext} className="px-4 bg-yellow-500 hover:bg-yellow-600 text-white font-bold rounded-lg shadow active:scale-95 transition">
+                                SKIP
+                            </button>
+                        </div>
+                    </div>
+                 ) : <div className="text-center text-gray-400 text-sm py-2">No active campaigns</div>}
+            </div>
+
+            <div className="absolute bottom-0 w-full bg-gray-100 border-t border-gray-300 h-16 flex items-center justify-center z-30">
+                 <div className="flex flex-col items-center">
+                    <span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-1 rounded mb-1">AD</span>
+                    <p className="text-xs text-gray-500 font-mono">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// ... (BuyCoinsPage, BalanceDetailsPage, WatchAdsPage, MyPlanPage, AuthForm, App components remain unchanged)
 const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
     const handlePurchase = async (pkg) => {
         try {
@@ -791,6 +1202,68 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
                         <div className="bg-white text-gray-800 font-bold px-4 py-2 rounded-lg">{pkg.price}</div>
                     </button>
                 ))}
+            </main>
+        </div>
+    );
+};
+
+const BalanceDetailsPage = ({ db, userId, setPage, userProfile }) => {
+    const [history, setHistory] = useState([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!db || !userId) return;
+        const q = query(getHistoryCollectionRef(userId), orderBy('date', 'desc'), limit(30));
+       
+        const unsub = onSnapshot(q, (snap) => {
+            setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setLoading(false);
+        });
+        return () => unsub();
+    }, [db, userId]);
+
+    return (
+        <div className="min-h-screen bg-purple-900 pb-16 pt-20">
+            <Header title="MY BALANCE" onBack={() => setPage('DASHBOARD')} />
+            <main className="p-4 space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                    <Card className="bg-gradient-to-br from-purple-700 to-purple-900 text-center p-4 text-white border-purple-500">
+                        <p className="text-xs opacity-70 mb-1">Current Balance</p>
+                        <div className="flex justify-center items-center"><Coins className="w-5 h-5 text-yellow-400 mr-1" /><span className="text-xl font-bold">{formatNumber(userProfile.points)}</span></div>
+                    </Card>
+                    <Card className="bg-gradient-to-br from-teal-600 to-teal-800 text-center p-4 text-white border-teal-500">
+                        <p className="text-xs opacity-70 mb-1">Total Earned</p>
+                        <div className="flex justify-center items-center"><TrendingUp className="w-5 h-5 text-white mr-1" /><span className="text-xl font-bold">{formatNumber(userProfile.totalEarned || 0)}</span></div>
+                    </Card>
+                </div>
+
+                <Card className="p-4">
+                    <h3 className="font-bold text-white mb-3 border-b border-purple-600 pb-2 flex items-center"><Clock className="w-4 h-4 mr-2"/> ប្រវត្តិពិន្ទុ (History)</h3>
+                    {loading ? (
+                        <div className="text-center text-purple-300 py-4">Loading...</div>
+                    ) : history.length > 0 ? (
+                        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                            {history.map((item) => (
+                                <div key={item.id} className="flex justify-between items-center bg-purple-800 p-3 rounded-lg border border-purple-700">
+                                    <div className="flex items-center">
+                                        <div className={`p-2 rounded-full mr-3 ${item.amount > 0 ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`}>
+                                            {item.amount > 0 ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
+                                        </div>
+                                        <div>
+                                            <p className="text-white text-sm font-bold">{item.title || 'Unknown'}</p>
+                                            <p className="text-[10px] text-purple-300 opacity-70">{item.date?.toDate().toLocaleDateString()} {item.date?.toDate().toLocaleTimeString()}</p>
+                                        </div>
+                                    </div>
+                                    <span className={`font-bold ${item.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                        {item.amount > 0 ? '+' : ''}{formatNumber(item.amount)}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center text-purple-400 py-8 opacity-50">មិនទាន់មានប្រវត្តិ</div>
+                    )}
+                </Card>
             </main>
         </div>
     );
@@ -1006,7 +1479,6 @@ const App = () => {
                     userName: user.displayName || `User_${shortId}`,
                     points: bonusPoints,
                     totalEarned: bonusPoints,
-                    realBalance: 0, 
                     shortId,
                     createdAt: serverTimestamp(),
                     referredBy: null
@@ -1080,7 +1552,7 @@ const App = () => {
         case 'MY_CAMPAIGNS': Content = <MyCampaignsPage db={db} userId={userId} userProfile={userProfile} setPage={setPage} showNotification={showNotification} />; break;
         case 'REFERRAL_PAGE': Content = <ReferralPage db={db} userId={userId} userProfile={userProfile} showNotification={showNotification} setPage={setPage} globalConfig={globalConfig} />; break;
         case 'BUY_COINS': Content = <BuyCoinsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
-        case 'BALANCE_DETAILS': Content = <BalanceDetailsPage db={db} userId={userId} setPage={setPage} userProfile={userProfile} globalConfig={globalConfig} showNotification={showNotification} />; break;
+        case 'BALANCE_DETAILS': Content = <BalanceDetailsPage db={db} userId={userId} setPage={setPage} userProfile={userProfile} />; break;
         case 'WATCH_ADS': Content = <WatchAdsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'MY_PLAN': Content = <MyPlanPage setPage={setPage} />; break;
         case 'ADMIN_DASHBOARD': Content = <AdminDashboardPage db={db} setPage={setPage} showNotification={showNotification} />; break;
