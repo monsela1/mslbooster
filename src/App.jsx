@@ -20,7 +20,8 @@ import {
     DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2,
     Settings, Copy, Save, Search, PlusCircle, MinusCircle,
     CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
-    ArrowUpRight, ArrowDownLeft, Clock, ChevronDown, Image as ImageIcon, LogIn
+    ArrowUpRight, ArrowDownLeft, Clock, ChevronDown, Image as ImageIcon, LogIn,
+    Youtube, Bell // <--- Added new Icons here
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -278,6 +279,7 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
             <Card className="p-4 border-l-4 border-blue-500">
                 <h3 className="font-bold text-lg mb-3 text-blue-400 flex items-center"><Settings className="w-5 h-5 mr-2"/> ការកំណត់ទូទៅ (Features)</h3>
                 
+                {/* Buy Coins Toggle */}
                 <div className="flex items-center justify-between bg-purple-900/50 p-4 rounded-lg border border-purple-600 mb-2">
                     <div className="flex flex-col">
                         <span className="text-white font-bold text-base">បើកមុខងារទិញកាក់</span>
@@ -342,7 +344,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                 </div>
             </Card>
             
-            {/* (Other cards: Packages, Ads) */}
              <Card className="p-4 border-l-4 border-green-500">
                 <h3 className="font-bold text-lg mb-3 text-green-400 flex items-center"><ShoppingCart className="w-5 h-5 mr-2"/> កំណត់កញ្ចប់កាក់ (Sell Coins)</h3>
                 <div className="space-y-3">
@@ -1513,6 +1514,9 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
 };
 
 const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) => {
+    // +++ GUEST CHECK +++
+    if (!userId) return <div className="p-10 text-white text-center">Please Login to view details.</div>;
+
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     
@@ -1786,6 +1790,9 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
 
 // --- BuyCoinsPage (UPDATED WITH ROBUST QR + BAKONG AUTO CHECK) ---
 const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig, userProfile }) => {
+    // +++ GUEST CHECK +++
+    if (!userId) return <div className="p-10 text-white text-center">Please Login to buy coins.</div>;
+
     const [selectedPkg, setSelectedPkg] = useState(null);
     const [trxId, setTrxId] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -2243,15 +2250,60 @@ const App = () => {
                             </div>
                         } 
                     />
+                    
+                    {/* --- Balance Card with Background Icons --- */}
                     <div className="px-4 mb-6">
-                        <div className="bg-gradient-to-r from-teal-500 to-teal-700 rounded-xl p-6 text-white shadow-lg text-center relative overflow-hidden border border-teal-400/30">
-                            <div className="absolute -top-4 -left-4 w-16 h-16 bg-white opacity-10 rounded-full"></div>
-                            <p className="text-sm opacity-80">សមតុល្យរបស់អ្នក</p>
-                            <h1 className="text-4xl font-bold mt-2 mb-1 flex justify-center items-center gap-2">{formatNumber(displayPoints)} <Coins className="w-8 h-8 text-yellow-300" /></h1>
-                            <div className="flex justify-center items-center mb-4"><div className="bg-black/20 backdrop-blur-sm px-4 py-1 rounded-full flex items-center border border-white/10"><span className="text-green-300 font-bold mr-1 text-lg">$</span><span className="text-white font-bold text-lg tracking-wider">{(displayBalance).toFixed(4)}</span></div></div>
-                            <p className="text-xs bg-white bg-opacity-20 inline-block px-3 py-1 rounded-full">ID: {displayShortId}</p>
+                        <div className="bg-gradient-to-br from-[#5b247a] to-[#1bcedf] rounded-2xl p-6 text-white shadow-2xl text-center relative overflow-hidden border border-white/10">
+                            
+                            {/* --- BACKGROUND DECORATIONS --- */}
+                            {/* 1. Light Circle Top-Left */}
+                            <div className="absolute -top-10 -left-10 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
+                            
+                            {/* 2. YouTube Icon Top-Right */}
+                            <div className="absolute top-2 right-[-10px] opacity-10 transform rotate-12 z-0">
+                                <Youtube size={80} className="text-white" />
+                            </div>
+
+                            {/* 3. Dollar Icon Bottom-Left */}
+                            <div className="absolute -bottom-4 -left-2 opacity-10 transform -rotate-12 z-0">
+                                <DollarSign size={90} className="text-yellow-300" />
+                            </div>
+
+                            {/* 4. Bell Icon Center-Left */}
+                            <div className="absolute top-1/2 left-10 opacity-5 transform -rotate-45 z-0">
+                                <Bell size={50} className="text-pink-300" />
+                            </div>
+
+                            {/* --- CONTENT LAYER --- */}
+                            <div className="relative z-10">
+                                <p className="text-sm font-medium opacity-90 tracking-wide">សមតុល្យរបស់អ្នក</p>
+                                
+                                {/* Points */}
+                                <h1 className="text-5xl font-extrabold mt-3 mb-3 flex justify-center items-center gap-2 text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-300 drop-shadow-sm">
+                                    {formatNumber(displayPoints)} 
+                                    <Coins className="w-8 h-8 text-yellow-400 drop-shadow" fill="currentColor" />
+                                </h1>
+                                
+                                {/* Balance */}
+                                <div className="flex justify-center items-center mb-5">
+                                    <div className="bg-white/10 backdrop-blur-md px-6 py-2 rounded-full flex items-center border border-white/20 shadow-inner">
+                                        <span className="text-green-400 font-bold mr-1 text-xl">$</span>
+                                        <span className="text-white font-bold text-xl tracking-widest font-mono">
+                                            {(displayBalance).toFixed(4)}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                {/* ID */}
+                                <div className="inline-block">
+                                    <p className="text-xs font-bold text-white/70 bg-black/20 px-4 py-1.5 rounded-lg uppercase tracking-wider">
+                                        ID: {displayShortId}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     </div>
+
                     <div className="px-4">
                         <Card className="p-4 grid grid-cols-3 gap-3">
                             {/* +++ Updated Buttons with handleAuthAction +++ */}
