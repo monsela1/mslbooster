@@ -9,7 +9,7 @@ import {
     signInWithPopup
 } from 'firebase/auth';
 import {
-    getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc, deleteDoc,
+    getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc, deleteDoc, addDoc,
     collection, query, where, serverTimestamp, getDocs,
     runTransaction, increment, limit, orderBy
 } from 'firebase/firestore';
@@ -21,7 +21,7 @@ import {
     Settings, Copy, Save, Search, PlusCircle, MinusCircle,
     CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
     ArrowUpRight, ArrowDownLeft, Clock, ChevronDown, 
-    Banknote, ThumbsUp, ThumbsDown, ArrowRightLeft, History
+    Banknote, ThumbsUp, ThumbsDown, ArrowRightLeft
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -62,7 +62,7 @@ const getTodayDateKey = () => {
 
 const getShortId = (id) => id?.substring(0, 6).toUpperCase() || '------';
 const formatNumber = (num) => num?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') || '0';
-const formatCurrency = (num) => '$' + (num || 0).toFixed(4); // Show 4 decimals for small amounts
+const formatCurrency = (num) => '$' + (num || 0).toFixed(4);
 
 const getYouTubeID = (url) => {
     if (!url) return null;
@@ -87,6 +87,7 @@ const getDailyStatusDocRef = (userId) => db && userId ? doc(db, 'artifacts', app
 const getGlobalConfigDocRef = () => db ? doc(db, 'artifacts', appId, 'public', 'data', 'config', 'global_settings') : null;
 const getShortCodeDocRef = (shortId) => db && shortId ? doc(db, 'artifacts', appId, 'public', 'data', 'short_codes', shortId) : null;
 const getHistoryCollectionRef = (userId) => db && userId ? collection(db, 'artifacts', appId, 'users', userId, 'history') : null;
+// --- FIXED: ADDED MISSING FUNCTION ---
 const getWithdrawalRequestsCollectionRef = () => db ? collection(db, 'artifacts', appId, 'public', 'data', 'withdrawal_requests') : null;
 
 // Default Config
@@ -97,9 +98,9 @@ const defaultGlobalConfig = {
     adsReward: 30,
     maxDailyAds: 15,
     enableBuyCoins: true, 
-    commissionRate: 0.10, // 10%
-    minWithdrawal: 1.00, // $1
-    pointsPerDollar: 5000, // 5000 Points = $1 (New Exchange Rate Setting)
+    commissionRate: 0.10,
+    minWithdrawal: 1.00,
+    pointsPerDollar: 5000,
     adsSettings: {
         bannerId: "ca-app-pub-xxxxxxxx/yyyyyy",
         interstitialId: "ca-app-pub-xxxxxxxx/zzzzzz",
@@ -192,8 +193,7 @@ const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     const handleChange = (e) => {
         const { name, value } = e.target;
-        // Allow float for rates, int for others
-        const val = (name === 'commissionRate' || name === 'minWithdrawal') 
+        const val = (name === 'commissionRate' || name === 'minWithdrawal' || name === 'pointsPerDollar') 
             ? parseFloat(value) 
             : parseInt(value) || 0;
         setConfig(prev => ({ ...prev, [name]: val }));
@@ -258,7 +258,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                         <label className="text-xs font-bold text-green-300">Commission Rate (e.g., 0.1 for 10%)</label>
                         <InputField name="commissionRate" type="number" step="0.01" value={config.commissionRate || 0} onChange={handleChange} />
                     </div>
-                    {/* NEW EXCHANGE RATE SETTING */}
                     <div className="pt-3 border-t border-purple-600 mt-2">
                         <label className="text-xs font-bold text-green-300">ចំនួនកាក់ស្មើ 1$ (Points per 1 USD)</label>
                         <InputField name="pointsPerDollar" type="number" step="1" value={config.pointsPerDollar || 5000} onChange={handleChange} />
@@ -576,7 +575,7 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig, sh
                     title: `Exchanged ${formatNumber(pts)} Coins`,
                     amount: usdValue,
                     date: serverTimestamp(),
-                    type: 'exchange' // Special type for exchange
+                    type: 'exchange' 
                 });
             });
             showNotification(`Success! Exchanged to ${formatCurrency(usdValue)}`, 'success');
@@ -604,7 +603,9 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig, sh
 
                 // 2. Create withdrawal request for Admin
                 const reqRef = collection(db, 'artifacts', appId, 'public', 'data', 'withdrawal_requests');
-                tx.set(doc(reqRef), {
+                // Fixed: using doc() with collection reference automatically generates ID
+                const newDocRef = doc(reqRef); 
+                tx.set(newDocRef, {
                     userId: userId,
                     shortId: userProfile.shortId,
                     userName: userProfile.userName,
@@ -1005,7 +1006,6 @@ const App = () => {
                     userName: user.displayName || `User_${shortId}`,
                     points: bonusPoints,
                     totalEarned: bonusPoints,
-                    // NEW: Initialize realBalance for money
                     realBalance: 0, 
                     shortId,
                     createdAt: serverTimestamp(),
