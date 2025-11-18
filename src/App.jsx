@@ -895,6 +895,22 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     const [autoPlay, setAutoPlay] = useState(true);
     const isMounted = useRef(true);
 
+    // --- ADDED: WATCHED LIST ---
+    const [watchedIds, setWatchedIds] = useState(new Set());
+
+    // Fetch Watched Campaigns on Mount
+    useEffect(() => {
+        if (!userId) return;
+        const fetchWatched = async () => {
+            try {
+                const watchedSnap = await getDocs(collection(db, 'artifacts', appId, 'users', userId, 'watched'));
+                const ids = new Set(watchedSnap.docs.map(d => d.id));
+                setWatchedIds(ids);
+            } catch(e) { console.error(e); }
+        };
+        fetchWatched();
+    }, [userId, db]);
+
     useEffect(() => {
         isMounted.current = true;
         return () => { isMounted.current = false; };
@@ -904,11 +920,16 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
         const q = query(getCampaignsCollectionRef(), where('type', '==', type), limit(50));
         return onSnapshot(q, (snap) => {
             if(!isMounted.current) return;
-            const list = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.userId !== userId && c.remaining > 0 && c.isActive !== false);
+            const list = snap.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                // FILTER: Exclude own campaigns AND watched campaigns
+                .filter(c => c.userId !== userId && c.remaining > 0 && c.isActive !== false && !watchedIds.has(c.id));
+            
             setCampaigns(list);
+            // Only set current if not already playing or if current was removed
             if (!current && list.length > 0) setCurrent(list[0]);
         });
-    }, [db, userId, type]); 
+    }, [db, userId, type, watchedIds]); // Add watchedIds to dependency
 
     useEffect(() => {
         if (current) { 
@@ -961,10 +982,18 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                     date: serverTimestamp(),
                     type: 'earn'
                 });
+
+                // --- ADD TO WATCHED LIST ---
+                const watchedRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'watched'), current.id);
+                transaction.set(watchedRef, { date: serverTimestamp() });
             });
+            
+            // Update local state to hide this video immediately
+            setWatchedIds(prev => new Set(prev).add(current.id));
+
             if(isMounted.current) showNotification('Success! Points Added.', 'success');
            
-            // AUTO NEXT: Immediately go to next video if Auto Play is ON
+            // AUTO NEXT
             if(autoPlay && isMounted.current) {
                 handleNext();
             }
@@ -975,8 +1004,9 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
         setTimer(-1); // Reset Timer immediately
         setClaimed(false);
         
-        const next = campaigns.filter(c => c.id !== current?.id && c.remaining > 0)[0];
-        setCurrent(next || null);
+        // Re-filter logic with updated watchedIds
+        const nextList = campaigns.filter(c => c.id !== current?.id && !watchedIds.has(c.id));
+        setCurrent(nextList[0] || null);
     }
 
     const handleSubscribeClick = async () => {
@@ -1102,7 +1132,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                                     onClick={handleSubscribeClick} 
                                     className={`flex-1 text-white py-3 rounded-lg font-bold shadow transition text-sm 
                                         bg-red-600 hover:bg-red-700 
-                                        ${(timer > 0 || claimed || timer === -1) ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
+                                        ${(timer > 0 || claimed || timer === -1) ? 'opacity-80 cursor-not-allowed' : 'active:scale-95'}`}
                                     disabled={timer > 0 || claimed || timer === -1}
                                 >
                                     {/* CHANGE: Show Text */}
