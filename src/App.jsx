@@ -1832,11 +1832,28 @@ const App = () => {
                     <div className="px-4 mb-6">
                         <div className="bg-gradient-to-r from-teal-500 to-teal-700 rounded-xl p-6 text-white shadow-lg text-center relative overflow-hidden border border-teal-400/30">
                             <div className="absolute -top-4 -left-4 w-16 h-16 bg-white opacity-10 rounded-full"></div>
+                            
                             <p className="text-sm opacity-80">សមតុល្យរបស់អ្នក</p>
-                            <h1 className="text-4xl font-bold my-2 flex justify-center items-center gap-2">{formatNumber(userProfile.points)} <Coins className="w-6 h-6 text-yellow-300" /></h1>
+                            
+                            {/* COINS DISPLAY */}
+                            <h1 className="text-4xl font-bold mt-2 mb-1 flex justify-center items-center gap-2">
+                                {formatNumber(userProfile.points)} <Coins className="w-8 h-8 text-yellow-300" />
+                            </h1>
+
+                            {/* NEW CASH DISPLAY */}
+                            <div className="flex justify-center items-center mb-4">
+                                <div className="bg-black/20 backdrop-blur-sm px-4 py-1 rounded-full flex items-center border border-white/10">
+                                    <span className="text-green-300 font-bold mr-1 text-lg">$</span>
+                                    <span className="text-white font-bold text-lg tracking-wider">
+                                        {(userProfile.balance || 0).toFixed(4)}
+                                    </span>
+                                </div>
+                            </div>
+
                             <p className="text-xs bg-white bg-opacity-20 inline-block px-3 py-1 rounded-full">ID: {userProfile.shortId}</p>
                         </div>
                     </div>
+
                     <div className="px-4">
                         <Card className="p-4 grid grid-cols-3 gap-3">
                             <IconButton 
