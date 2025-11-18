@@ -101,23 +101,21 @@ const formatTag = (id, value) => {
 };
 
 const generateKhqr = (bakongId, amount) => {
-    // Tag 29: Merchant Account Information
-    // GUI (Tag 00) for Bakong is "bakong", Account ID (Tag 01) is the Bakong ID
     const tag29Content = formatTag("00", "bakong") + formatTag("01", bakongId);
     
     const tags = [
-        formatTag("00", "01"),              // Payload Format Indicator
-        formatTag("01", "12"),              // Point of Initiation Method (12=Dynamic)
-        formatTag("29", tag29Content),      // Merchant Account Info
-        formatTag("52", "5999"),            // Merchant Category Code
-        formatTag("53", "840"),             // Currency (840=USD)
-        formatTag("54", amount.toFixed(2)), // Amount (Must have 2 decimals)
-        formatTag("58", "KH"),              // Country Code
-        formatTag("59", "MSL BOOSTER"),     // Merchant Name
-        formatTag("60", "PHNOM PENH"),      // Merchant City
+        formatTag("00", "01"),              
+        formatTag("01", "12"),              
+        formatTag("29", tag29Content),      
+        formatTag("52", "5999"),            
+        formatTag("53", "840"),             
+        formatTag("54", amount.toFixed(2)), 
+        formatTag("58", "KH"),              
+        formatTag("59", "MSL BOOSTER"),     
+        formatTag("60", "PHNOM PENH"),      
     ];
 
-    let qrString = tags.join("") + "6304"; // Append CRC Tag ID & Length
+    let qrString = tags.join("") + "6304"; 
     return qrString + crc16(qrString);
 };
 // --- KHQR LOGIC END ---
@@ -957,6 +955,7 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
     );
 };
 
+// --- MY CAMPAIGNS PAGE (UPDATED UI LIKE IMAGE) ---
 const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification }) => {
     const [type, setType] = useState('view');
     const [link, setLink] = useState('');
@@ -1062,86 +1061,129 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
         <div className="min-h-screen bg-[#0f172a] pb-16 pt-20">
             <Header title="យុទ្ធនាការខ្ញុំ" onBack={() => setPage('DASHBOARD')} />
             <main className="p-0">
-                {isLinkVerified && previewUrl && (
-                    <div className="w-full aspect-video bg-black mb-4">
-                        <iframe src={previewUrl} className="w-full h-full" frameBorder="0" allowFullScreen title="preview" />
-                    </div>
-                )}
-
+                {/* CREATE CAMPAIGN FORM */}
                 <div className="px-4 space-y-4">
-                    <div className="bg-[#0f172a] p-2">
+                     {isLinkVerified && previewUrl && (
+                        <div className="w-full aspect-video bg-black mb-4 rounded-lg overflow-hidden shadow-lg">
+                            <iframe src={previewUrl} className="w-full h-full" frameBorder="0" allowFullScreen title="preview" />
+                        </div>
+                    )}
+
+                    <div className="bg-[#1e293b] p-4 rounded-xl border border-gray-700 shadow-lg">
+                        <h3 className="text-white font-bold mb-3 text-sm uppercase tracking-wider text-center">បង្កើតយុទ្ធនាការថ្មី</h3>
                         <div className="flex space-x-2 mb-4">
                             {['view', 'sub', 'website'].map(t => (
-                                <button key={t} onClick={() => {setType(t); setIsLinkVerified(false); setPreviewUrl(null);}} className={`flex-1 py-2 rounded font-bold text-xs ${type === t ? 'bg-[#4c1d95] text-white border-b-2 border-teal-400' : 'bg-gray-800 text-gray-400'}`}>{t.toUpperCase()}</button>
+                                <button key={t} onClick={() => {setType(t); setIsLinkVerified(false); setPreviewUrl(null);}} className={`flex-1 py-2 rounded font-bold text-xs transition ${type === t ? 'bg-teal-500 text-white shadow-lg transform scale-105' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'}`}>{t.toUpperCase()}</button>
                             ))}
                         </div>
 
                         <form onSubmit={isLinkVerified ? handleSubmit : handleCheckLink} className="space-y-3">
-                            <div className="flex">
+                            <div className="flex shadow-sm">
                                 <input
                                     value={link}
                                     onChange={e => {setLink(e.target.value); setIsLinkVerified(false);}}
                                     placeholder={type === 'website' ? "https://yoursite.com" : "https://youtu.be/..."}
                                     required
                                     disabled={isLinkVerified}
-                                    className="flex-1 p-3 bg-white text-black placeholder-gray-500 border-none rounded-l-md focus:outline-none focus:ring-1 focus:ring-teal-500"
+                                    className="flex-1 p-3 bg-white text-black placeholder-gray-500 border-none rounded-l-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                                 />
                                 <button
                                     type={isLinkVerified ? 'button' : 'submit'}
                                     onClick={isLinkVerified ? handleResetLink : undefined}
-                                    className={`px-6 font-bold text-white rounded-r-md transition ${isLinkVerified ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 hover:bg-red-700'}`}
+                                    className={`px-4 font-bold text-white rounded-r-lg transition flex items-center justify-center ${isLinkVerified ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
                                 >
-                                    {isLinkVerified ? 'X' : 'CHECK'}
+                                    {isLinkVerified ? <XCircle size={20}/> : <Search size={20}/>}
                                 </button>
                             </div>
 
                             {isLinkVerified && (
-                                <div className='mt-4 space-y-4'>
-                                    <h3 className='text-white font-bold text-sm border-b border-gray-600 pb-2'>Campaigns Setting</h3>
-                                    
-                                    <div className="flex justify-between items-center mb-2">
-                                        <label className="text-white font-bold text-sm">Number of views</label>
-                                        <div 
-                                            onClick={() => setShowViewPicker(true)}
-                                            className="w-32 p-2 bg-white text-black text-center font-bold rounded-full border-none cursor-pointer flex items-center justify-center active:scale-95 transition"
-                                        >
-                                            {count} <ChevronDown size={16} className="ml-1"/>
+                                <div className='mt-4 space-y-4 animate-in fade-in slide-in-from-top-4 duration-300'>
+                                    <div className="flex justify-between items-center bg-gray-800 p-3 rounded-lg border border-gray-600">
+                                        <label className="text-gray-300 font-bold text-sm">ចំនួន (Views/Subs)</label>
+                                        <div onClick={() => setShowViewPicker(true)} className="flex items-center text-teal-400 font-bold cursor-pointer hover:text-teal-300">
+                                            <span className="text-lg mr-1">{count}</span> <ChevronDown size={16}/>
                                         </div>
                                     </div>
 
                                     {type !== 'sub' && (
-                                        <div className="flex justify-between items-center mb-4">
-                                            <label className="text-white font-bold text-sm">Time Required (sec.)</label>
-                                            <div 
-                                                onClick={() => setShowTimePicker(true)}
-                                                className="w-32 p-2 bg-white text-black text-center font-bold rounded-full border-none cursor-pointer flex items-center justify-center active:scale-95 transition"
-                                            >
-                                                {time} <ChevronDown size={16} className="ml-1"/>
+                                        <div className="flex justify-between items-center bg-gray-800 p-3 rounded-lg border border-gray-600">
+                                            <label className="text-gray-300 font-bold text-sm">រយៈពេល (Seconds)</label>
+                                            <div onClick={() => setShowTimePicker(true)} className="flex items-center text-teal-400 font-bold cursor-pointer hover:text-teal-300">
+                                                <span className="text-lg mr-1">{time}s</span> <ChevronDown size={16}/>
                                             </div>
                                         </div>
                                     )}
                                     
-                                    <div className="flex justify-between items-center mb-4 pt-2 border-t border-gray-600">
-                                        <label className="text-white font-bold text-sm">Campaign Cost</label>
-                                        <span className='text-xl font-bold text-yellow-500'>{formatNumber(calculateCost())}</span>
+                                    <div className="flex justify-between items-center pt-2 border-t border-gray-600">
+                                        <label className="text-gray-400 text-sm">ចំណាយសរុប</label>
+                                        <span className='text-xl font-bold text-yellow-400 flex items-center'>{formatNumber(calculateCost())} <Coins size={16} className="ml-1"/></span>
                                     </div>
 
-                                    <button type="submit" disabled={isSubmitting} className="w-full bg-yellow-600 text-white py-3 rounded-full font-bold shadow-lg hover:bg-yellow-700 transition mt-4">
-                                        {isSubmitting ? 'Processing...' : 'DONE'}
+                                    <button type="submit" disabled={isSubmitting} className="w-full bg-gradient-to-r from-teal-500 to-blue-600 text-white py-3 rounded-lg font-bold shadow-lg hover:from-teal-600 hover:to-blue-700 transition transform active:scale-95">
+                                        {isSubmitting ? 'កំពុងដំណើរការ...' : 'បង្កើតយុទ្ធនាការ (CREATE)'}
                                     </button>
                                 </div>
                             )}
                         </form>
                     </div>
 
-                    <div className="space-y-2 mt-6">
-                        <h3 className="text-gray-400 font-bold text-xs uppercase">Recent Campaigns</h3>
-                        {userCampaigns.map(c => (
-                            <div key={c.id} className="bg-gray-800 p-3 rounded shadow flex justify-between items-center border-l-4 border-teal-500">
-                                <div className='w-2/3'><p className="font-bold text-xs truncate text-gray-300">{c.link}</p><p className="text-[10px] text-gray-500">{c.type.toUpperCase()} - Rem: {c.remaining}</p></div>
-                                <span className={`text-xs font-bold ${c.remaining > 0 ? 'text-green-400' : 'text-red-400'}`}>{c.remaining > 0 ? 'Active' : 'Finished'}</span>
-                            </div>
-                        ))}
+                    {/* --- RECENT CAMPAIGNS LIST (UPDATED TO MATCH IMAGE) --- */}
+                    <div className="space-y-0">
+                        <div className="bg-teal-600 text-white p-2 px-4 font-bold text-sm flex justify-between items-center rounded-t-lg shadow-md">
+                            <span>Total: {userCampaigns.length}</span>
+                            <span>Campaigns</span>
+                        </div>
+                        
+                        <div className="space-y-1 bg-gray-200 p-1 rounded-b-lg min-h-[200px]">
+                            {userCampaigns.map(c => {
+                                // Get Thumbnail Logic
+                                const videoId = getYouTubeID(c.link);
+                                const thumbnailUrl = videoId 
+                                    ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` 
+                                    : 'https://via.placeholder.com/150x100?text=No+Image';
+                                
+                                const viewsDone = c.initialCount - c.remaining;
+                                const isFinished = c.remaining <= 0;
+
+                                return (
+                                    <div key={c.id} className="bg-white p-2 flex gap-3 shadow-sm border-b border-gray-300 last:border-0">
+                                        {/* Left: Thumbnail */}
+                                        <div className="w-28 h-20 flex-shrink-0 bg-black">
+                                            <img 
+                                                src={thumbnailUrl} 
+                                                alt="Thumbnail" 
+                                                className="w-full h-full object-cover"
+                                                onError={(e) => {e.target.src = 'https://via.placeholder.com/150x100?text=Error'}}
+                                            />
+                                        </div>
+
+                                        {/* Right: Content */}
+                                        <div className="flex-1 flex flex-col justify-between py-0.5">
+                                            {/* Title */}
+                                            <h4 className="text-gray-800 font-bold text-xs line-clamp-2 leading-tight">
+                                                {c.link}
+                                            </h4>
+
+                                            {/* Details */}
+                                            <div className="text-gray-500 text-[10px] space-y-0.5 mt-1">
+                                                <p>Seconds: <span className="font-medium text-gray-700">{c.requiredDuration}</span></p>
+                                                <p>{viewsDone} of {c.initialCount} views</p>
+                                            </div>
+
+                                            {/* Status */}
+                                            <div className="text-right mt-auto">
+                                                <span className={`text-[10px] font-bold ${isFinished ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {isFinished ? 'Completed' : 'In progress'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            {userCampaigns.length === 0 && (
+                                <div className="text-center text-gray-400 py-10">No campaigns yet.</div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
