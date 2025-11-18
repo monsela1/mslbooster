@@ -86,14 +86,15 @@ const getGlobalConfigDocRef = () => db ? doc(db, 'artifacts', appId, 'public', '
 const getShortCodeDocRef = (shortId) => db && shortId ? doc(db, 'artifacts', appId, 'public', 'data', 'short_codes', shortId) : null;
 const getHistoryCollectionRef = (userId) => db && userId ? collection(db, 'artifacts', appId, 'users', userId, 'history') : null;
 
-// Default Config
+// Default Config (UPDATED WITH EXCHANGE RATE)
 const defaultGlobalConfig = {
     dailyCheckinReward: 200,
     referrerReward: 1000,
     referredBonus: 500,
     adsReward: 30,
     maxDailyAds: 15,
-    enableBuyCoins: false, 
+    enableBuyCoins: false,
+    exchangeRate: 10000, // 10,000 Coins = $1.00
     adsSettings: {
         bannerId: "ca-app-pub-xxxxxxxx/yyyyyy",
         interstitialId: "ca-app-pub-xxxxxxxx/zzzzzz",
@@ -181,7 +182,7 @@ const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
     );
 };
 
-// --- 5. ADMIN PAGES ---
+// --- 5. ADMIN PAGES (UPDATED) ---
 
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     const handleChange = (e) => {
@@ -234,12 +235,23 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
             </Card>
 
             <Card className="p-4 border-l-4 border-yellow-400">
-                <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់</h3>
+                <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់ & អត្រាប្តូរ</h3>
                 <div className="grid grid-cols-1 gap-3">
                     <div><label className="text-xs font-bold text-purple-300">Daily Check-in Points</label><InputField name="dailyCheckinReward" type="number" min="0" value={config.dailyCheckinReward || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" min="0" value={config.referrerReward || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referred User Bonus</label><InputField name="referredBonus" type="number" min="0" value={config.referredBonus || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" min="0" value={config.adsReward || 0} onChange={handleChange} /></div>
+                    
+                    {/* NEW EXCHANGE RATE CONFIG */}
+                    <div className="pt-3 border-t border-purple-600 mt-2 bg-purple-900/30 p-2 rounded">
+                        <label className="text-xs font-bold text-green-400 flex justify-between">
+                            <span>អត្រាប្ដូរប្រាក់ (Exchange Rate)</span>
+                            <span className="text-white opacity-70">Coins to $1.00</span>
+                        </label>
+                        <p className="text-[10px] text-gray-400 mb-1">ចំនួនកាក់ដែលស្មើនឹង $1 (Default: 10000)</p>
+                        <InputField name="exchangeRate" type="number" min="1" value={config.exchangeRate || 10000} onChange={handleChange} className="border-green-500 text-green-300" />
+                    </div>
+
                     <div className="pt-3 border-t border-purple-600 mt-2">
                         <label className="text-xs font-bold text-yellow-300">ចំនួនមើលពាណិជ្ជកម្មក្នុងមួយថ្ងៃ (Max Daily Ads)</label>
                         <InputField name="maxDailyAds" type="number" min="1" value={config.maxDailyAds || 15} onChange={handleChange} />
@@ -294,7 +306,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
             const shortCodesRef = collection(db, 'artifacts', appId, 'public', 'data', 'short_codes');
             const q = query(shortCodesRef, limit(20));
             const snap = await getDocs(q);
-            
+           
             const usersData = await Promise.all(snap.docs.map(async (docSnap) => {
                 const { fullUserId } = docSnap.data();
                 if(!fullUserId) return null;
@@ -304,7 +316,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                 }
                 return null;
             }));
-            
+           
             setAllUsers(usersData.filter(u => u !== null));
         } catch (e) { console.error(e); }
         setLoadingList(false);
@@ -382,7 +394,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                         <p className="font-bold text-lg text-white">{foundUser.userName}</p>
                         <p className="text-purple-300 text-sm">Email: {foundUser.email}</p>
                         <p className="text-purple-300 text-sm mb-2">Current Points: <span className="font-bold text-yellow-400">{formatNumber(foundUser.points)}</span></p>
-                       
+                        
                         <div className="flex items-center space-x-2 mt-4">
                             <button onClick={() => setPointsToAdd(p => p - 100)} className="p-2 bg-red-600 rounded text-white"><MinusCircle size={20}/></button>
                             <InputField
@@ -561,13 +573,13 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
                 if (userDoc.data().referredBy) throw new Error("អ្នកមានអ្នកណែនាំរួចហើយ");
 
                 const referrerRef = getProfileDocRef(referrerId);
-                
+              
                 // UPDATE TOTAL EARNED FOR REFERRER
                 transaction.update(referrerRef, {
                     points: increment(globalConfig.referrerReward),
                     totalEarned: increment(globalConfig.referrerReward)
                 });
-                
+              
                 const referrerHistoryRef = doc(collection(db, 'artifacts', appId, 'users', referrerId, 'history'));
                 transaction.set(referrerHistoryRef, {
                     title: 'Referral Reward',
@@ -600,7 +612,7 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
                     timestamp: serverTimestamp()
                 });
             });
-            
+           
             showNotification(`ជោគជ័យ! ទទួលបាន +${formatNumber(globalConfig.referredBonus || 500)} Points`, 'success');
             setInputCode('');
         } catch (e) {
@@ -638,7 +650,6 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
                         <div>
                             <p className="text-xs text-purple-200 mb-3">ដាក់កូដដើម្បីទទួលបាន <span className="text-yellow-400 font-bold">+{formatNumber(globalConfig.referredBonus || 500)} Points</span> បន្ថែម!</p>
                             <div className="flex">
-                                {/* UPDATED: White Background, Black Text */}
                                 <input
                                     value={inputCode}
                                     onChange={(e) => setInputCode(e.target.value.toUpperCase())}
@@ -743,9 +754,9 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                 const profileRef = getProfileDocRef(userId);
                 const profileDoc = await transaction.get(profileRef);
                 if (!profileDoc.exists() || profileDoc.data().points < cost) throw new Error("Insufficient points");
-                
+              
                 transaction.update(profileRef, { points: increment(-cost) });
-                
+              
                 const newCampRef = doc(getCampaignsCollectionRef());
                 transaction.set(newCampRef, { 
                     userId, 
@@ -924,7 +935,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                 .map(d => ({ id: d.id, ...d.data() }))
                 // FILTER: Exclude own campaigns AND watched campaigns
                 .filter(c => c.userId !== userId && c.remaining > 0 && c.isActive !== false && !watchedIds.has(c.id));
-            
+           
             setCampaigns(list);
             // Only set current if not already playing or if current was removed
             if (!current && list.length > 0) setCurrent(list[0]);
@@ -949,13 +960,13 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
             // Auto Claim Logic (Only for View/Website)
             if (type !== 'sub') handleClaim();
         }
-        
+       
         return () => clearInterval(interval);
     }, [timer, claimed, current, type]);
 
     const handleClaim = async () => {
         if (claimed || !current) return;
-        
+       
         // Prevent claim if timer is not 0 (or if it's -1 loading state)
         if (timer !== 0) {
             return; 
@@ -987,7 +998,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                 const watchedRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'watched'), current.id);
                 transaction.set(watchedRef, { date: serverTimestamp() });
             });
-            
+           
             // Update local state to hide this video immediately
             setWatchedIds(prev => new Set(prev).add(current.id));
 
@@ -1003,7 +1014,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     const handleNext = () => {
         setTimer(-1); // Reset Timer immediately
         setClaimed(false);
-        
+       
         // Re-filter logic with updated watchedIds
         const nextList = campaigns.filter(c => c.id !== current?.id && !watchedIds.has(c.id));
         setCurrent(nextList[0] || null);
@@ -1028,7 +1039,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
 
             const videoResponse = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&access_token=${googleAccessToken}`);
             const videoData = await videoResponse.json();
-            
+           
             if (!videoData.items || videoData.items.length === 0) throw new Error("រកវីដេអូមិនឃើញ");
             const channelId = videoData.items[0].snippet.channelId;
 
@@ -1101,7 +1112,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                          <div className="flex justify-between items-center">
                             <div className="flex items-center space-x-2">
                                 <span className="text-lg font-bold text-yellow-600 flex items-center"><Coins className="w-5 h-5 mr-1" /> {current.requiredDuration}</span>
-                                
+                               
                                 {/* --- UPDATED: Better looking Timer Button --- */}
                                 {timer > 0 ? (
                                     <div className="flex items-center bg-gradient-to-r from-red-100 to-pink-100 px-3 py-1 rounded-full border border-red-200">
@@ -1168,7 +1179,200 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     );
 };
 
-// ... (BuyCoinsPage, BalanceDetailsPage, WatchAdsPage, MyPlanPage, AuthForm, App components remain unchanged)
+// --- UPDATED: Balance Page with Exchange Feature ---
+const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) => {
+    const [history, setHistory] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [showExchange, setShowExchange] = useState(false);
+    const [exchangeAmount, setExchangeAmount] = useState('');
+    const [processing, setProcessing] = useState(false);
+
+    // Use Exchange Rate from Admin or Default to 10000
+    const EXCHANGE_RATE = globalConfig?.exchangeRate || 10000; 
+
+    useEffect(() => {
+        if (!db || !userId) return;
+        const q = query(getHistoryCollectionRef(userId), orderBy('date', 'desc'), limit(30));
+        
+        const unsub = onSnapshot(q, (snap) => {
+            setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching history:", error);
+            setLoading(false);
+        });
+        return () => unsub();
+    }, [db, userId]);
+
+    const handleExchange = async () => {
+        const coinsToExchange = parseInt(exchangeAmount);
+        
+        if (!coinsToExchange || coinsToExchange <= 0) {
+            alert("សូមបញ្ចូលចំនួនកាក់ឲ្យបានត្រឹមត្រូវ!");
+            return;
+        }
+        if (coinsToExchange > userProfile.points) {
+            alert("ពិន្ទុរបស់អ្នកមិនគ្រប់គ្រាន់ទេ!");
+            return;
+        }
+        if (coinsToExchange < 1000) {
+             alert("ត្រូវប្តូរយ៉ាងតិច 1,000 Coins!");
+             return;
+        }
+
+        const moneyReceived = coinsToExchange / EXCHANGE_RATE;
+        const confirmMsg = `តើអ្នកចង់ប្តូរ ${formatNumber(coinsToExchange)} Coins ដើម្បីទទួលបាន $${moneyReceived.toFixed(4)} មែនទេ?`;
+        
+        if (!window.confirm(confirmMsg)) return;
+
+        setProcessing(true);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const userRef = getProfileDocRef(userId);
+                const userDoc = await transaction.get(userRef);
+                if (!userDoc.exists()) throw new Error("User not found");
+
+                const currentPoints = userDoc.data().points || 0;
+                if (currentPoints < coinsToExchange) throw new Error("Points not enough");
+
+                // Deduct Points and Add to Balance
+                transaction.update(userRef, {
+                    points: increment(-coinsToExchange),
+                    balance: increment(moneyReceived) // New Field: balance
+                });
+
+                // Add History
+                const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                transaction.set(historyRef, {
+                    title: 'Exchanged Coins to Cash',
+                    amount: -coinsToExchange, // Show deduction in points history
+                    moneyEarned: moneyReceived, // Extra info
+                    date: serverTimestamp(),
+                    type: 'exchange'
+                });
+            });
+            
+            alert(`ជោគជ័យ! អ្នកទទួលបាន $${moneyReceived.toFixed(4)}`);
+            setExchangeAmount('');
+            setShowExchange(false);
+        } catch (e) {
+            alert("បរាជ័យ: " + e.message);
+        } finally {
+            setProcessing(false);
+        }
+    };
+
+    return (
+        <div className="min-h-screen bg-purple-900 pb-16 pt-20">
+            <Header title="MY BALANCE" onBack={() => setPage('DASHBOARD')} />
+            <main className="p-4 space-y-4">
+                {/* BALANCE CARDS */}
+                <div className="grid grid-cols-2 gap-3">
+                    <Card className="bg-gradient-to-br from-purple-700 to-purple-900 text-center p-4 text-white border-purple-500 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-1 bg-yellow-500/20 rounded-bl-lg">
+                            <Coins size={12} className="text-yellow-400"/>
+                        </div>
+                        <p className="text-xs opacity-70 mb-1">ពិន្ទុបច្ចុប្បន្ន (Coins)</p>
+                        <div className="flex justify-center items-center">
+                            <span className="text-2xl font-bold text-yellow-400">{formatNumber(userProfile.points)}</span>
+                        </div>
+                    </Card>
+                    
+                    {/* NEW: CASH BALANCE CARD */}
+                    <Card className="bg-gradient-to-br from-green-600 to-green-800 text-center p-4 text-white border-green-500 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-1 bg-white/20 rounded-bl-lg">
+                            <DollarSign size={12} className="text-white"/>
+                        </div>
+                        <p className="text-xs opacity-70 mb-1">ទឹកប្រាក់ (Balance)</p>
+                        <div className="flex justify-center items-center">
+                            <span className="text-2xl font-bold text-white">${(userProfile.balance || 0).toFixed(4)}</span>
+                        </div>
+                    </Card>
+                </div>
+
+                {/* EXCHANGE SECTION */}
+                <Card className="p-4 border border-yellow-500/30 bg-purple-800/50">
+                    <div className="flex justify-between items-center">
+                         <div>
+                             <h3 className="font-bold text-white text-sm">ប្តូរកាក់ជាលុយ (Exchange)</h3>
+                             <p className="text-[10px] text-purple-300">អត្រា: {formatNumber(EXCHANGE_RATE)} Coins = $1.00</p>
+                         </div>
+                         <button 
+                            onClick={() => setShowExchange(!showExchange)}
+                            className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center transition"
+                         >
+                            <RefreshCw size={14} className="mr-1"/> {showExchange ? 'បិទ' : 'ដូរឥឡូវ'}
+                         </button>
+                    </div>
+
+                    {showExchange && (
+                        <div className="mt-4 p-3 bg-purple-900 rounded-lg animate-in fade-in slide-in-from-top-2 duration-300">
+                            <label className="text-xs text-purple-200 mb-1 block">ចំនួនកាក់ដែលចង់ដូរ:</label>
+                            <div className="flex space-x-2">
+                                <input 
+                                    type="number" 
+                                    value={exchangeAmount}
+                                    onChange={(e) => setExchangeAmount(e.target.value)}
+                                    placeholder="0"
+                                    className="flex-1 p-2 rounded bg-purple-950 border border-purple-600 text-white text-sm focus:outline-none focus:border-yellow-500"
+                                />
+                                <button 
+                                    onClick={handleExchange} 
+                                    disabled={processing}
+                                    className={`px-4 rounded font-bold text-sm text-white ${processing ? 'bg-gray-500' : 'bg-green-600 hover:bg-green-700'}`}
+                                >
+                                    {processing ? '...' : 'OK'}
+                                </button>
+                            </div>
+                            {exchangeAmount > 0 && (
+                                <p className="text-xs text-right mt-2 text-green-400">
+                                    នឹងទទួលបាន: <span className="font-bold">${(exchangeAmount / EXCHANGE_RATE).toFixed(4)}</span>
+                                </p>
+                            )}
+                        </div>
+                    )}
+                </Card>
+
+                {/* HISTORY LIST */}
+                <Card className="p-4">
+                    <h3 className="font-bold text-white mb-3 border-b border-purple-600 pb-2 flex items-center"><Clock className="w-4 h-4 mr-2"/> ប្រវត្តិប្រតិបត្តិការ</h3>
+                    {loading ? (
+                        <div className="text-center text-purple-300 py-4">Loading...</div>
+                    ) : history.length > 0 ? (
+                        <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
+                            {history.map((item) => (
+                                <div key={item.id} className="flex justify-between items-center bg-purple-800 p-3 rounded-lg border border-purple-700">
+                                    <div className="flex items-center">
+                                        <div className={`p-2 rounded-full mr-3 ${item.amount > 0 ? 'bg-green-900/50 text-green-400' : (item.type === 'exchange' ? 'bg-yellow-900/50 text-yellow-400' : 'bg-red-900/50 text-red-400')}`}>
+                                            {item.type === 'exchange' ? <RefreshCw size={16} /> : (item.amount > 0 ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />)}
+                                        </div>
+                                        <div>
+                                            <p className="text-white text-sm font-bold">{item.title || 'Unknown'}</p>
+                                            <p className="text-[10px] text-purple-300 opacity-70">{item.date?.toDate ? item.date.toDate().toLocaleDateString() : 'Just now'}</p>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className={`font-bold block ${item.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                            {item.amount > 0 ? '+' : ''}{formatNumber(item.amount)} Coins
+                                        </span>
+                                        {item.moneyEarned && (
+                                            <span className="text-[10px] text-green-400 font-bold block">
+                                                +${Number(item.moneyEarned).toFixed(4)}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-center text-purple-400 py-8 opacity-50">មិនទាន់មានប្រវត្តិ</div>
+                    )}
+                </Card>
+            </main>
+        </div>
+    );
+};
+
 const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
     const handlePurchase = async (pkg) => {
         try {
@@ -1202,68 +1406,6 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
                         <div className="bg-white text-gray-800 font-bold px-4 py-2 rounded-lg">{pkg.price}</div>
                     </button>
                 ))}
-            </main>
-        </div>
-    );
-};
-
-const BalanceDetailsPage = ({ db, userId, setPage, userProfile }) => {
-    const [history, setHistory] = useState([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        if (!db || !userId) return;
-        const q = query(getHistoryCollectionRef(userId), orderBy('date', 'desc'), limit(30));
-       
-        const unsub = onSnapshot(q, (snap) => {
-            setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-            setLoading(false);
-        });
-        return () => unsub();
-    }, [db, userId]);
-
-    return (
-        <div className="min-h-screen bg-purple-900 pb-16 pt-20">
-            <Header title="MY BALANCE" onBack={() => setPage('DASHBOARD')} />
-            <main className="p-4 space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                    <Card className="bg-gradient-to-br from-purple-700 to-purple-900 text-center p-4 text-white border-purple-500">
-                        <p className="text-xs opacity-70 mb-1">Current Balance</p>
-                        <div className="flex justify-center items-center"><Coins className="w-5 h-5 text-yellow-400 mr-1" /><span className="text-xl font-bold">{formatNumber(userProfile.points)}</span></div>
-                    </Card>
-                    <Card className="bg-gradient-to-br from-teal-600 to-teal-800 text-center p-4 text-white border-teal-500">
-                        <p className="text-xs opacity-70 mb-1">Total Earned</p>
-                        <div className="flex justify-center items-center"><TrendingUp className="w-5 h-5 text-white mr-1" /><span className="text-xl font-bold">{formatNumber(userProfile.totalEarned || 0)}</span></div>
-                    </Card>
-                </div>
-
-                <Card className="p-4">
-                    <h3 className="font-bold text-white mb-3 border-b border-purple-600 pb-2 flex items-center"><Clock className="w-4 h-4 mr-2"/> ប្រវត្តិពិន្ទុ (History)</h3>
-                    {loading ? (
-                        <div className="text-center text-purple-300 py-4">Loading...</div>
-                    ) : history.length > 0 ? (
-                        <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-                            {history.map((item) => (
-                                <div key={item.id} className="flex justify-between items-center bg-purple-800 p-3 rounded-lg border border-purple-700">
-                                    <div className="flex items-center">
-                                        <div className={`p-2 rounded-full mr-3 ${item.amount > 0 ? 'bg-green-900/50 text-green-400' : 'bg-red-900/50 text-red-400'}`}>
-                                            {item.amount > 0 ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
-                                        </div>
-                                        <div>
-                                            <p className="text-white text-sm font-bold">{item.title || 'Unknown'}</p>
-                                            <p className="text-[10px] text-purple-300 opacity-70">{item.date?.toDate().toLocaleDateString()} {item.date?.toDate().toLocaleTimeString()}</p>
-                                        </div>
-                                    </div>
-                                    <span className={`font-bold ${item.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                        {item.amount > 0 ? '+' : ''}{formatNumber(item.amount)}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="text-center text-purple-400 py-8 opacity-50">មិនទាន់មានប្រវត្តិ</div>
-                    )}
-                </Card>
             </main>
         </div>
     );
@@ -1412,7 +1554,6 @@ const App = () => {
     const [userProfile, setUserProfile] = useState({});
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [notification, setNotification] = useState(null);
-    // Removed authPage state as we only show one view now
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
     const [googleAccessToken, setGoogleAccessToken] = useState(null);
 
@@ -1453,8 +1594,6 @@ const App = () => {
         catch (e) { showNotification('បរាជ័យ: ' + e.code, 'error'); }
     };
 
-    // handleRegister Removed from usage, keeping logic minimal just in case, but not exposed in UI
-
     const handleGoogleLogin = async () => {
         try {
             const provider = new GoogleAuthProvider();
@@ -1474,17 +1613,17 @@ const App = () => {
                  const shortId = getShortId(uid);
                  const bonusPoints = 5000;
                  await setDoc(userDocRef, {
-                    userId: uid,
-                    email: user.email,
-                    userName: user.displayName || `User_${shortId}`,
-                    points: bonusPoints,
-                    totalEarned: bonusPoints,
-                    shortId,
-                    createdAt: serverTimestamp(),
-                    referredBy: null
-                });
-                await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
-                showNotification('គណនីថ្មីត្រូវបានបង្កើតដោយជោគជ័យ!', 'success');
+                     userId: uid,
+                     email: user.email,
+                     userName: user.displayName || `User_${shortId}`,
+                     points: bonusPoints,
+                     totalEarned: bonusPoints,
+                     shortId,
+                     createdAt: serverTimestamp(),
+                     referredBy: null
+                 });
+                 await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
+                 showNotification('គណនីថ្មីត្រូវបានបង្កើតដោយជោគជ័យ!', 'success');
             } else {
                 showNotification('ចូលគណនីជោគជ័យ', 'success');
             }
@@ -1533,7 +1672,7 @@ const App = () => {
                     <h2 className="text-2xl font-bold text-white mb-2">MSL Booster</h2>
                     <p className="text-purple-300 text-sm">សូមស្វាគមន៍មកកាន់ MSL Booster</p>
                 </div>
-                
+              
                 <AuthForm 
                     onSubmit={handleLogin} 
                     btnText="ចូល" 
@@ -1552,7 +1691,8 @@ const App = () => {
         case 'MY_CAMPAIGNS': Content = <MyCampaignsPage db={db} userId={userId} userProfile={userProfile} setPage={setPage} showNotification={showNotification} />; break;
         case 'REFERRAL_PAGE': Content = <ReferralPage db={db} userId={userId} userProfile={userProfile} showNotification={showNotification} setPage={setPage} globalConfig={globalConfig} />; break;
         case 'BUY_COINS': Content = <BuyCoinsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
-        case 'BALANCE_DETAILS': Content = <BalanceDetailsPage db={db} userId={userId} setPage={setPage} userProfile={userProfile} />; break;
+        // UPDATED: Pass globalConfig
+        case 'BALANCE_DETAILS': Content = <BalanceDetailsPage db={db} userId={userId} setPage={setPage} userProfile={userProfile} globalConfig={globalConfig} />; break;
         case 'WATCH_ADS': Content = <WatchAdsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'MY_PLAN': Content = <MyPlanPage setPage={setPage} />; break;
         case 'ADMIN_DASHBOARD': Content = <AdminDashboardPage db={db} setPage={setPage} showNotification={showNotification} />; break;
@@ -1593,7 +1733,7 @@ const App = () => {
                             <IconButton icon={UserCheck} title="SUBSCRIBE" onClick={() => setPage('EXPLORE_SUBSCRIPTION')} iconColor="text-pink-400" />
                             <IconButton icon={Film} title="PLAY VIDEO" onClick={() => setPage('EARN_POINTS')} iconColor="text-red-400" />
                             <IconButton icon={Wallet} title="MY BALANCE" onClick={() => setPage('BALANCE_DETAILS')} iconColor="text-orange-400" />
-                            
+                           
                             <IconButton 
                                 icon={ShoppingCart} 
                                 title="BUY COINS" 
