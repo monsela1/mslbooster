@@ -86,7 +86,7 @@ const getGlobalConfigDocRef = () => db ? doc(db, 'artifacts', appId, 'public', '
 const getShortCodeDocRef = (shortId) => db && shortId ? doc(db, 'artifacts', appId, 'public', 'data', 'short_codes', shortId) : null;
 const getHistoryCollectionRef = (userId) => db && userId ? collection(db, 'artifacts', appId, 'users', userId, 'history') : null;
 
-// Default Config (UPDATED WITH EXCHANGE RATE)
+// Default Config
 const defaultGlobalConfig = {
     dailyCheckinReward: 200,
     referrerReward: 1000,
@@ -182,7 +182,7 @@ const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
     );
 };
 
-// --- 5. ADMIN PAGES (UPDATED) ---
+// --- 5. ADMIN PAGES ---
 
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     const handleChange = (e) => {
@@ -235,14 +235,14 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
             </Card>
 
             <Card className="p-4 border-l-4 border-yellow-400">
-                <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់ & អត្រាប្តូរ</h3>
+                <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់</h3>
                 <div className="grid grid-cols-1 gap-3">
                     <div><label className="text-xs font-bold text-purple-300">Daily Check-in Points</label><InputField name="dailyCheckinReward" type="number" min="0" value={config.dailyCheckinReward || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" min="0" value={config.referrerReward || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referred User Bonus</label><InputField name="referredBonus" type="number" min="0" value={config.referredBonus || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" min="0" value={config.adsReward || 0} onChange={handleChange} /></div>
                     
-                    {/* NEW EXCHANGE RATE CONFIG */}
+                    {/* EXCHANGE RATE */}
                     <div className="pt-3 border-t border-purple-600 mt-2 bg-purple-900/30 p-2 rounded">
                         <label className="text-xs font-bold text-green-400 flex justify-between">
                             <span>អត្រាប្ដូរប្រាក់ (Exchange Rate)</span>
@@ -445,6 +445,84 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
     );
 };
 
+const AdminWithdrawalsTab = ({ db, showNotification }) => {
+    const [withdrawals, setWithdrawals] = useState([]);
+
+    useEffect(() => {
+        const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'withdrawals'), orderBy('date', 'desc'), limit(50));
+        return onSnapshot(q, (snap) => {
+            setWithdrawals(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+    }, [db]);
+
+    const handleAction = async (item, action) => {
+        const confirmMsg = action === 'approved' ? 'យល់ព្រមឱ្យដកលុយ?' : 'បដិសេធសំណើនេះ (លុយនឹងបង្វិលចូលគណនីវិញ)?';
+        if(!window.confirm(confirmMsg)) return;
+
+        try {
+            await runTransaction(db, async (tx) => {
+                const withdrawRef = doc(db, 'artifacts', appId, 'public', 'data', 'withdrawals', item.id);
+                
+                if (action === 'rejected') {
+                    // Refund money if rejected
+                    const userRef = getProfileDocRef(item.userId);
+                    tx.update(userRef, { balance: increment(item.amount) });
+                    
+                    // Add history
+                    const historyRef = doc(collection(db, 'artifacts', appId, 'users', item.userId, 'history'));
+                    tx.set(historyRef, {
+                        title: 'Withdrawal Rejected (Refund)',
+                        amount: 0,
+                        moneyEarned: item.amount,
+                        date: serverTimestamp(),
+                        type: 'refund'
+                    });
+                }
+
+                tx.update(withdrawRef, { status: action });
+            });
+            showNotification(`Success: ${action.toUpperCase()}`, 'success');
+        } catch(e) {
+            showNotification(e.message, 'error');
+        }
+    };
+
+    return (
+        <div className="space-y-3 pb-10">
+            <h3 className="text-white font-bold border-b border-gray-600 pb-2">សំណើដកលុយ ({withdrawals.filter(w => w.status === 'pending').length} Pending)</h3>
+            {withdrawals.map(w => (
+                <div key={w.id} className={`p-3 rounded-lg border ${w.status === 'pending' ? 'bg-purple-800 border-yellow-500' : 'bg-gray-800 border-gray-700 opacity-70'}`}>
+                    <div className="flex justify-between items-start">
+                        <div>
+                            <div className="flex items-center space-x-2">
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${w.status === 'pending' ? 'bg-yellow-500 text-black' : w.status === 'approved' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                                    {w.status.toUpperCase()}
+                                </span>
+                                <span className="text-white font-bold text-sm">{w.userName}</span>
+                            </div>
+                            <p className="text-green-400 font-bold text-lg mt-1">${formatNumber(w.amount)}</p>
+                            <div className="text-xs text-purple-200 mt-1 bg-purple-900/50 p-2 rounded">
+                                <p>Bank: <span className="font-bold text-white">{w.bankName}</span></p>
+                                <p>Acc Name: <span className="font-bold text-white">{w.accountName}</span></p>
+                                <p>Acc Num: <span className="font-bold text-yellow-300 font-mono">{w.accountNumber}</span></p>
+                            </div>
+                            <p className="text-[10px] text-gray-400 mt-1">{w.date?.toDate().toLocaleString()}</p>
+                        </div>
+                        
+                        {w.status === 'pending' && (
+                            <div className="flex flex-col space-y-2">
+                                <button onClick={() => handleAction(w, 'approved')} className="bg-green-600 text-white p-2 rounded text-xs font-bold hover:bg-green-700">APPROVE</button>
+                                <button onClick={() => handleAction(w, 'rejected')} className="bg-red-600 text-white p-2 rounded text-xs font-bold hover:bg-red-700">REJECT</button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            ))}
+            {withdrawals.length === 0 && <p className="text-center text-gray-500">No requests.</p>}
+        </div>
+    );
+};
+
 const AdminDashboardPage = ({ db, setPage, showNotification }) => {
     const [activeTab, setActiveTab] = useState('SETTINGS');
     const [config, setConfig] = useState(null);
@@ -494,12 +572,12 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
         <div className="min-h-screen bg-purple-950 pb-16 pt-20">
             <Header title="ADMIN PANEL" onBack={() => setPage('DASHBOARD')} className="bg-purple-900" />
             <main className="p-4">
-                <div className="flex space-x-1 mb-4 bg-purple-800 p-1 rounded-lg">
-                    {['SETTINGS', 'USERS', 'CAMPAIGNS'].map(tab => (
+                <div className="flex space-x-1 mb-4 bg-purple-800 p-1 rounded-lg overflow-x-auto">
+                    {['SETTINGS', 'USERS', 'CAMPAIGNS', 'WITHDRAWALS'].map(tab => (
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`flex-1 py-2 rounded-lg font-bold text-xs transition ${activeTab === tab ? 'bg-teal-600 text-white shadow' : 'text-purple-300 hover:bg-purple-700'}`}
+                            className={`flex-1 py-2 px-2 rounded-lg font-bold text-[10px] whitespace-nowrap transition ${activeTab === tab ? 'bg-teal-600 text-white shadow' : 'text-purple-300 hover:bg-purple-700'}`}
                         >
                             {tab}
                         </button>
@@ -508,6 +586,7 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
 
                 {activeTab === 'SETTINGS' && <AdminSettingsTab config={config} setConfig={setConfig} onSave={handleSaveConfig} />}
                 {activeTab === 'USERS' && <AdminUserManagerTab db={db} showNotification={showNotification} />}
+                {activeTab === 'WITHDRAWALS' && <AdminWithdrawalsTab db={db} showNotification={showNotification} />}
                
                 {activeTab === 'CAMPAIGNS' && (
                     <div className="space-y-2 pb-10">
@@ -1113,7 +1192,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                             <div className="flex items-center space-x-2">
                                 <span className="text-lg font-bold text-yellow-600 flex items-center"><Coins className="w-5 h-5 mr-1" /> {current.requiredDuration}</span>
                                
-                                {/* --- UPDATED: Better looking Timer Button --- */}
                                 {timer > 0 ? (
                                     <div className="flex items-center bg-gradient-to-r from-red-100 to-pink-100 px-3 py-1 rounded-full border border-red-200">
                                         <Zap className="w-4 h-4 mr-1 text-red-500 animate-pulse" /> 
@@ -1126,7 +1204,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                                 )}
                             </div>
                            
-                            {/* --- UPDATED: Better Toggle Button --- */}
                             <div className="flex items-center space-x-2 cursor-pointer" onClick={() => setAutoPlay(!autoPlay)}>
                                 <span className={`text-xs font-bold ${autoPlay ? 'text-green-600' : 'text-gray-400'}`}>
                                     Auto Play {autoPlay ? 'ON' : 'OFF'}
@@ -1146,14 +1223,12 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                                         ${(timer > 0 || claimed || timer === -1) ? 'opacity-80 cursor-not-allowed' : 'active:scale-95'}`}
                                     disabled={timer > 0 || claimed || timer === -1}
                                 >
-                                    {/* CHANGE: Show Text */}
                                     {claimed ? 'CLAIMED' : `SUBSCRIBE ${timer > 0 ? `(${timer}s)` : ''}`}
                                 </button>
                             ) : (
                                 <button 
                                     onClick={handleClaim} 
                                     disabled={timer > 0 || claimed || timer === -1} 
-                                    // CHANGE: Always Blue
                                     className={`flex-1 py-3 rounded-lg font-bold shadow text-sm text-white transition 
                                         ${claimed ? 'bg-green-500' : 'bg-blue-600 hover:bg-blue-700'}
                                         ${(timer > 0 || timer === -1) ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
@@ -1179,21 +1254,29 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     );
 };
 
-// --- UPDATED: Balance Page with Exchange Feature ---
+// --- 3. UPDATED BALANCE PAGE (FIXED INPUT & ADDED WITHDRAW) ---
 const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
+    
+    // Exchange State
     const [showExchange, setShowExchange] = useState(false);
     const [exchangeAmount, setExchangeAmount] = useState('');
+    
+    // Withdraw State
+    const [showWithdraw, setShowWithdraw] = useState(false);
+    const [withdrawBank, setWithdrawBank] = useState('ABA'); // ABA or ACLEDA
+    const [withdrawAccName, setWithdrawAccName] = useState('');
+    const [withdrawAccNum, setWithdrawAccNum] = useState('');
+    const [withdrawAmount, setWithdrawAmount] = useState('');
+
     const [processing, setProcessing] = useState(false);
 
-    // Use Exchange Rate from Admin or Default to 10000
     const EXCHANGE_RATE = globalConfig?.exchangeRate || 10000; 
 
     useEffect(() => {
         if (!db || !userId) return;
         const q = query(getHistoryCollectionRef(userId), orderBy('date', 'desc'), limit(30));
-        
         const unsub = onSnapshot(q, (snap) => {
             setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
             setLoading(false);
@@ -1204,62 +1287,89 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
         return () => unsub();
     }, [db, userId]);
 
+    // --- FUNCTION: EXCHANGE ---
     const handleExchange = async () => {
         const coinsToExchange = parseInt(exchangeAmount);
-        
-        if (!coinsToExchange || coinsToExchange <= 0) {
-            alert("សូមបញ្ចូលចំនួនកាក់ឲ្យបានត្រឹមត្រូវ!");
-            return;
-        }
-        if (coinsToExchange > userProfile.points) {
-            alert("ពិន្ទុរបស់អ្នកមិនគ្រប់គ្រាន់ទេ!");
-            return;
-        }
-        if (coinsToExchange < 1000) {
-             alert("ត្រូវប្តូរយ៉ាងតិច 1,000 Coins!");
-             return;
-        }
+        if (!coinsToExchange || coinsToExchange <= 0) return alert("សូមបញ្ចូលចំនួនកាក់!");
+        if (coinsToExchange > userProfile.points) return alert("ពិន្ទុមិនគ្រប់គ្រាន់!");
 
         const moneyReceived = coinsToExchange / EXCHANGE_RATE;
-        const confirmMsg = `តើអ្នកចង់ប្តូរ ${formatNumber(coinsToExchange)} Coins ដើម្បីទទួលបាន $${moneyReceived.toFixed(4)} មែនទេ?`;
-        
-        if (!window.confirm(confirmMsg)) return;
+        if (!window.confirm(`ប្តូរ ${formatNumber(coinsToExchange)} Coins = $${moneyReceived.toFixed(4)}?`)) return;
 
         setProcessing(true);
         try {
             await runTransaction(db, async (transaction) => {
                 const userRef = getProfileDocRef(userId);
                 const userDoc = await transaction.get(userRef);
-                if (!userDoc.exists()) throw new Error("User not found");
+                if (!userDoc.exists() || userDoc.data().points < coinsToExchange) throw new Error("Error");
 
-                const currentPoints = userDoc.data().points || 0;
-                if (currentPoints < coinsToExchange) throw new Error("Points not enough");
-
-                // Deduct Points and Add to Balance
                 transaction.update(userRef, {
                     points: increment(-coinsToExchange),
-                    balance: increment(moneyReceived) // New Field: balance
+                    balance: increment(moneyReceived)
                 });
 
-                // Add History
                 const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
                 transaction.set(historyRef, {
-                    title: 'Exchanged Coins to Cash',
-                    amount: -coinsToExchange, // Show deduction in points history
-                    moneyEarned: moneyReceived, // Extra info
+                    title: 'Exchanged Coins',
+                    amount: -coinsToExchange,
+                    moneyEarned: moneyReceived,
                     date: serverTimestamp(),
                     type: 'exchange'
                 });
             });
-            
-            alert(`ជោគជ័យ! អ្នកទទួលបាន $${moneyReceived.toFixed(4)}`);
+            alert("ជោគជ័យ!");
             setExchangeAmount('');
             setShowExchange(false);
-        } catch (e) {
-            alert("បរាជ័យ: " + e.message);
-        } finally {
-            setProcessing(false);
-        }
+        } catch (e) { alert("បរាជ័យ!"); } finally { setProcessing(false); }
+    };
+
+    // --- FUNCTION: WITHDRAW ---
+    const handleWithdraw = async () => {
+        const amount = parseFloat(withdrawAmount);
+        if (!amount || amount <= 0) return alert("សូមបញ្ចូលចំនួនលុយ!");
+        if (amount > (userProfile.balance || 0)) return alert("ទឹកប្រាក់មិនគ្រប់គ្រាន់!");
+        if (amount < 0.50) return alert("ដកយ៉ាងតិច $0.50"); // Minimum withdraw
+        if (!withdrawAccName || !withdrawAccNum) return alert("សូមបំពេញព័ត៌មានធនាគារ!");
+
+        if (!window.confirm(`បញ្ជាក់ការដកលុយ $${amount} ទៅកាន់ ${withdrawBank}?`)) return;
+
+        setProcessing(true);
+        try {
+            await runTransaction(db, async (transaction) => {
+                const userRef = getProfileDocRef(userId);
+                const userDoc = await transaction.get(userRef);
+                if ((userDoc.data().balance || 0) < amount) throw new Error("Balance low");
+
+                // 1. Deduct Balance
+                transaction.update(userRef, { balance: increment(-amount) });
+
+                // 2. Create Withdraw Request
+                const withdrawRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'withdrawals'));
+                transaction.set(withdrawRef, {
+                    userId: userId,
+                    userName: userProfile.userName || 'Unknown',
+                    bankName: withdrawBank,
+                    accountName: withdrawAccName,
+                    accountNumber: withdrawAccNum,
+                    amount: amount,
+                    status: 'pending',
+                    date: serverTimestamp()
+                });
+
+                // 3. Add History
+                const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                transaction.set(historyRef, {
+                    title: `Request Withdraw (${withdrawBank})`,
+                    amount: 0,
+                    moneyEarned: -amount, // Show negative money
+                    date: serverTimestamp(),
+                    type: 'withdraw'
+                });
+            });
+            alert("សំណើដកលុយត្រូវបានបញ្ជូន!");
+            setWithdrawAmount('');
+            setShowWithdraw(false);
+        } catch (e) { alert("បរាជ័យ: " + e.message); } finally { setProcessing(false); }
     };
 
     return (
@@ -1269,24 +1379,14 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                 {/* BALANCE CARDS */}
                 <div className="grid grid-cols-2 gap-3">
                     <Card className="bg-gradient-to-br from-purple-700 to-purple-900 text-center p-4 text-white border-purple-500 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-1 bg-yellow-500/20 rounded-bl-lg">
-                            <Coins size={12} className="text-yellow-400"/>
-                        </div>
-                        <p className="text-xs opacity-70 mb-1">ពិន្ទុបច្ចុប្បន្ន (Coins)</p>
-                        <div className="flex justify-center items-center">
-                            <span className="text-2xl font-bold text-yellow-400">{formatNumber(userProfile.points)}</span>
-                        </div>
+                        <div className="absolute top-0 right-0 p-1 bg-yellow-500/20 rounded-bl-lg"><Coins size={12} className="text-yellow-400"/></div>
+                        <p className="text-xs opacity-70 mb-1">ពិន្ទុ (Coins)</p>
+                        <span className="text-2xl font-bold text-yellow-400">{formatNumber(userProfile.points)}</span>
                     </Card>
-                    
-                    {/* NEW: CASH BALANCE CARD */}
                     <Card className="bg-gradient-to-br from-green-600 to-green-800 text-center p-4 text-white border-green-500 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-1 bg-white/20 rounded-bl-lg">
-                            <DollarSign size={12} className="text-white"/>
-                        </div>
-                        <p className="text-xs opacity-70 mb-1">ទឹកប្រាក់ (Balance)</p>
-                        <div className="flex justify-center items-center">
-                            <span className="text-2xl font-bold text-white">${(userProfile.balance || 0).toFixed(4)}</span>
-                        </div>
+                        <div className="absolute top-0 right-0 p-1 bg-white/20 rounded-bl-lg"><DollarSign size={12} className="text-white"/></div>
+                        <p className="text-xs opacity-70 mb-1">លុយ (Balance)</p>
+                        <span className="text-2xl font-bold text-white">${(userProfile.balance || 0).toFixed(4)}</span>
                     </Card>
                 </div>
 
@@ -1297,76 +1397,94 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                              <h3 className="font-bold text-white text-sm">ប្តូរកាក់ជាលុយ (Exchange)</h3>
                              <p className="text-[10px] text-purple-300">អត្រា: {formatNumber(EXCHANGE_RATE)} Coins = $1.00</p>
                          </div>
-                         <button 
-                            onClick={() => setShowExchange(!showExchange)}
-                            className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center transition"
-                         >
+                         <button onClick={() => setShowExchange(!showExchange)} className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center transition">
                             <RefreshCw size={14} className="mr-1"/> {showExchange ? 'បិទ' : 'ដូរឥឡូវ'}
                          </button>
                     </div>
-
                     {showExchange && (
-                        <div className="mt-4 p-3 bg-purple-900 rounded-lg animate-in fade-in slide-in-from-top-2 duration-300">
+                        <div className="mt-4 p-3 bg-purple-900 rounded-lg">
                             <label className="text-xs text-purple-200 mb-1 block">ចំនួនកាក់ដែលចង់ដូរ:</label>
                             <div className="flex space-x-2">
+                                {/* FIXED: Added text-black and bg-white */}
                                 <input 
                                     type="number" 
                                     value={exchangeAmount}
                                     onChange={(e) => setExchangeAmount(e.target.value)}
                                     placeholder="0"
-                                    className="flex-1 p-2 rounded bg-purple-950 border border-purple-600 text-white text-sm focus:outline-none focus:border-yellow-500"
+                                    className="flex-1 p-2 rounded bg-white border border-purple-600 text-black font-bold text-sm focus:outline-none focus:border-yellow-500"
                                 />
-                                <button 
-                                    onClick={handleExchange} 
-                                    disabled={processing}
-                                    className={`px-4 rounded font-bold text-sm text-white ${processing ? 'bg-gray-500' : 'bg-green-600 hover:bg-green-700'}`}
-                                >
-                                    {processing ? '...' : 'OK'}
-                                </button>
+                                <button onClick={handleExchange} disabled={processing} className="px-4 bg-green-600 rounded text-white font-bold text-sm">OK</button>
                             </div>
-                            {exchangeAmount > 0 && (
-                                <p className="text-xs text-right mt-2 text-green-400">
-                                    នឹងទទួលបាន: <span className="font-bold">${(exchangeAmount / EXCHANGE_RATE).toFixed(4)}</span>
-                                </p>
-                            )}
+                            {exchangeAmount > 0 && <p className="text-xs text-right mt-2 text-green-400">ទទួលបាន: <span className="font-bold">${(exchangeAmount / EXCHANGE_RATE).toFixed(4)}</span></p>}
+                        </div>
+                    )}
+                </Card>
+
+                {/* WITHDRAW SECTION (NEW) */}
+                <Card className="p-4 border border-green-500/30 bg-purple-800/50">
+                    <div className="flex justify-between items-center">
+                         <div>
+                             <h3 className="font-bold text-white text-sm">ដកលុយ (Withdraw)</h3>
+                             <p className="text-[10px] text-purple-300">ABA / ACLEDA</p>
+                         </div>
+                         <button onClick={() => setShowWithdraw(!showWithdraw)} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center transition">
+                            <DollarSign size={14} className="mr-1"/> {showWithdraw ? 'បិទ' : 'ដកលុយ'}
+                         </button>
+                    </div>
+
+                    {showWithdraw && (
+                        <div className="mt-4 p-3 bg-purple-900 rounded-lg space-y-3">
+                            <div>
+                                <label className="text-xs text-purple-200 block mb-1">ជ្រើសរើសធនាគារ (Bank)</label>
+                                <div className="flex space-x-2">
+                                    {['ABA', 'ACLEDA'].map(b => (
+                                        <button key={b} onClick={() => setWithdrawBank(b)} className={`flex-1 py-2 rounded text-sm font-bold ${withdrawBank === b ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300'}`}>{b}</button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs text-purple-200 block mb-1">ឈ្មោះគណនី (Account Name)</label>
+                                <input value={withdrawAccName} onChange={e => setWithdrawAccName(e.target.value)} placeholder="Ex: SOK SAO" className="w-full p-2 rounded bg-white text-black font-bold text-sm" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-purple-200 block mb-1">លេខគណនី (Account Number)</label>
+                                <input value={withdrawAccNum} onChange={e => setWithdrawAccNum(e.target.value)} type="number" placeholder="000 000 000" className="w-full p-2 rounded bg-white text-black font-bold text-sm" />
+                            </div>
+                            <div>
+                                <label className="text-xs text-purple-200 block mb-1">ចំនួនទឹកប្រាក់ ($)</label>
+                                <input value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} type="number" placeholder="0.00" className="w-full p-2 rounded bg-white text-black font-bold text-sm" />
+                            </div>
+                            <button onClick={handleWithdraw} disabled={processing} className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded mt-2">
+                                {processing ? 'Processing...' : 'ស្នើសុំដកលុយ (REQUEST)'}
+                            </button>
                         </div>
                     )}
                 </Card>
 
                 {/* HISTORY LIST */}
                 <Card className="p-4">
-                    <h3 className="font-bold text-white mb-3 border-b border-purple-600 pb-2 flex items-center"><Clock className="w-4 h-4 mr-2"/> ប្រវត្តិប្រតិបត្តិការ</h3>
-                    {loading ? (
-                        <div className="text-center text-purple-300 py-4">Loading...</div>
-                    ) : history.length > 0 ? (
+                    <h3 className="font-bold text-white mb-3 border-b border-purple-600 pb-2 flex items-center"><Clock className="w-4 h-4 mr-2"/> ប្រវត្តិ (History)</h3>
+                    {loading ? <div className="text-center text-purple-300 py-4">Loading...</div> : history.length > 0 ? (
                         <div className="space-y-3 max-h-[50vh] overflow-y-auto pr-1">
                             {history.map((item) => (
                                 <div key={item.id} className="flex justify-between items-center bg-purple-800 p-3 rounded-lg border border-purple-700">
                                     <div className="flex items-center">
-                                        <div className={`p-2 rounded-full mr-3 ${item.amount > 0 ? 'bg-green-900/50 text-green-400' : (item.type === 'exchange' ? 'bg-yellow-900/50 text-yellow-400' : 'bg-red-900/50 text-red-400')}`}>
-                                            {item.type === 'exchange' ? <RefreshCw size={16} /> : (item.amount > 0 ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />)}
+                                        <div className={`p-2 rounded-full mr-3 ${item.type === 'withdraw' ? 'bg-red-900/50 text-red-400' : item.type === 'refund' ? 'bg-green-900/50 text-green-400' : 'bg-blue-900/50 text-blue-400'}`}>
+                                            {item.type === 'withdraw' ? <LogOut size={16} /> : <RefreshCw size={16} />}
                                         </div>
                                         <div>
                                             <p className="text-white text-sm font-bold">{item.title || 'Unknown'}</p>
-                                            <p className="text-[10px] text-purple-300 opacity-70">{item.date?.toDate ? item.date.toDate().toLocaleDateString() : 'Just now'}</p>
+                                            <p className="text-[10px] text-purple-300 opacity-70">{item.date?.toDate ? item.date.toDate().toLocaleDateString() : 'Now'}</p>
                                         </div>
                                     </div>
                                     <div className="text-right">
-                                        <span className={`font-bold block ${item.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                            {item.amount > 0 ? '+' : ''}{formatNumber(item.amount)} Coins
-                                        </span>
-                                        {item.moneyEarned && (
-                                            <span className="text-[10px] text-green-400 font-bold block">
-                                                +${Number(item.moneyEarned).toFixed(4)}
-                                            </span>
-                                        )}
+                                        {item.amount !== 0 && <span className={`font-bold block ${item.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>{item.amount > 0 ? '+' : ''}{formatNumber(item.amount)} Coins</span>}
+                                        {item.moneyEarned && <span className={`text-[10px] font-bold block ${item.moneyEarned > 0 ? 'text-green-400' : 'text-red-400'}`}>{item.moneyEarned > 0 ? '+' : ''}${Number(item.moneyEarned).toFixed(4)}</span>}
                                     </div>
                                 </div>
                             ))}
                         </div>
-                    ) : (
-                        <div className="text-center text-purple-400 py-8 opacity-50">មិនទាន់មានប្រវត្តិ</div>
-                    )}
+                    ) : <div className="text-center text-purple-400 py-8 opacity-50">No History</div>}
                 </Card>
             </main>
         </div>
@@ -1691,7 +1809,6 @@ const App = () => {
         case 'MY_CAMPAIGNS': Content = <MyCampaignsPage db={db} userId={userId} userProfile={userProfile} setPage={setPage} showNotification={showNotification} />; break;
         case 'REFERRAL_PAGE': Content = <ReferralPage db={db} userId={userId} userProfile={userProfile} showNotification={showNotification} setPage={setPage} globalConfig={globalConfig} />; break;
         case 'BUY_COINS': Content = <BuyCoinsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
-        // UPDATED: Pass globalConfig
         case 'BALANCE_DETAILS': Content = <BalanceDetailsPage db={db} userId={userId} setPage={setPage} userProfile={userProfile} globalConfig={globalConfig} />; break;
         case 'WATCH_ADS': Content = <WatchAdsPage db={db} userId={userId} setPage={setPage} showNotification={showNotification} globalConfig={globalConfig} />; break;
         case 'MY_PLAN': Content = <MyPlanPage setPage={setPage} />; break;
