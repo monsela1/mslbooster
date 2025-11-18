@@ -1231,7 +1231,7 @@ const YouTubePlayer = ({ videoId, onStateChange }) => {
     return <div id={`Youtubeer-${videoId}`} className="w-full h-full bg-black" />;
 };
 
-// --- EARN PAGE (UPDATED WITH YOUTUBE FIX) ---
+// --- EARN PAGE (UPDATED WITH RANDOM & YOUTUBE FIX) ---
 const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, googleAccessToken }) => {
     const [campaigns, setCampaigns] = useState([]);
     const [current, setCurrent] = useState(null);
@@ -1261,15 +1261,34 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
         return () => { isMounted.current = false; };
     }, []);
 
+    // Helper function to pick a random item
+    const pickRandomCampaign = (list) => {
+        if (!list || list.length === 0) return null;
+        const randomIndex = Math.floor(Math.random() * list.length);
+        return list[randomIndex];
+    };
+
     useEffect(() => {
         const q = query(getCampaignsCollectionRef(), where('type', '==', type), limit(50));
         return onSnapshot(q, (snap) => {
             if(!isMounted.current) return;
-            const list = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(c => c.userId !== userId && c.remaining > 0 && c.isActive !== false && !watchedIds.has(c.id));
+            // Filter valid campaigns
+            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                .filter(c => 
+                    c.userId !== userId && 
+                    c.remaining > 0 &&     
+                    c.isActive !== false && 
+                    !watchedIds.has(c.id)   
+                );
+            
             setCampaigns(list);
-            if (!current && list.length > 0) setCurrent(list[0]);
+
+            // If currently no video is selected, pick a RANDOM one
+            if (!current && list.length > 0) {
+                setCurrent(pickRandomCampaign(list));
+            }
         });
-    }, [db, userId, type, watchedIds]);
+    }, [db, userId, type, watchedIds]); 
 
     useEffect(() => {
         if (current) { 
@@ -1316,16 +1335,33 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                 const watchedRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'watched'), current.id);
                 transaction.set(watchedRef, { date: serverTimestamp() });
             });
-            setWatchedIds(prev => new Set(prev).add(current.id));
+            
+             // Add to watched list locally to avoid flicker
+             setWatchedIds(prev => {
+                const newSet = new Set(prev);
+                newSet.add(current.id);
+                return newSet;
+            });
+
             if(isMounted.current) showNotification('Success! Points Added.', 'success');
-            if(autoPlay && isMounted.current) { handleNext(); }
+            if(autoPlay && isMounted.current) { setTimeout(() => handleNext(), 500); }
         } catch (e) { if(isMounted.current) showNotification('បរាជ័យ: ' + e.message, 'error'); }
     };
 
     const handleNext = () => {
         setTimer(-1); setClaimed(false); setIsVideoPlaying(false);
-        const nextList = campaigns.filter(c => c.id !== current?.id && !watchedIds.has(c.id));
-        setCurrent(nextList[0] || null);
+        
+        // Filter out the current one and already watched ones
+        const availableList = campaigns.filter(c => c.id !== current?.id && !watchedIds.has(c.id));
+        
+        if (availableList.length > 0) {
+            // Pick a RANDOM campaign from the remaining list
+            const randomNext = pickRandomCampaign(availableList);
+            setCurrent(randomNext);
+        } else {
+            setCurrent(null);
+            showNotification('អស់វីដេអូហើយ!', 'info');
+        }
     }
 
     const handleSubscribeClick = async () => {
