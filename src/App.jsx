@@ -95,6 +95,7 @@ const defaultGlobalConfig = {
     maxDailyAds: 15,
     enableBuyCoins: false,
     exchangeRate: 10000, // 10,000 Coins = $1.00
+    withdrawalOptions: [2, 5, 7, 10], // Default options
     adsSettings: {
         bannerId: "ca-app-pub-xxxxxxxx/yyyyyy",
         interstitialId: "ca-app-pub-xxxxxxxx/zzzzzz",
@@ -185,6 +186,9 @@ const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
 // --- 5. ADMIN PAGES ---
 
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
+    // State for the withdraw options input string to avoid comma issues while typing
+    const [withdrawStr, setWithdrawStr] = useState(config.withdrawalOptions?.join(', ') || '2, 5, 7, 10');
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setConfig(prev => ({ ...prev, [name]: parseInt(value) || 0 }));
@@ -208,6 +212,16 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
             newPackages[index][field] = field === 'coins' ? (parseInt(value) || 0) : value;
             setConfig(prev => ({ ...prev, coinPackages: newPackages }));
         }
+    };
+
+    const handleWithdrawStrChange = (e) => {
+        setWithdrawStr(e.target.value);
+    };
+
+    // Parse string to array when leaving the input field (onBlur)
+    const handleWithdrawBlur = () => {
+        const arr = withdrawStr.split(',').map(n => parseFloat(n.trim())).filter(n => !isNaN(n) && n > 0);
+        setConfig(prev => ({ ...prev, withdrawalOptions: arr }));
     };
 
     return (
@@ -235,21 +249,36 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
             </Card>
 
             <Card className="p-4 border-l-4 border-yellow-400">
-                <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់</h3>
+                <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់ & អត្រាប្តូរ</h3>
                 <div className="grid grid-cols-1 gap-3">
                     <div><label className="text-xs font-bold text-purple-300">Daily Check-in Points</label><InputField name="dailyCheckinReward" type="number" min="0" value={config.dailyCheckinReward || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" min="0" value={config.referrerReward || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referred User Bonus</label><InputField name="referredBonus" type="number" min="0" value={config.referredBonus || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" min="0" value={config.adsReward || 0} onChange={handleChange} /></div>
                     
-                    {/* EXCHANGE RATE */}
-                    <div className="pt-3 border-t border-purple-600 mt-2 bg-purple-900/30 p-2 rounded">
-                        <label className="text-xs font-bold text-green-400 flex justify-between">
-                            <span>អត្រាប្ដូរប្រាក់ (Exchange Rate)</span>
-                            <span className="text-white opacity-70">Coins to $1.00</span>
-                        </label>
-                        <p className="text-[10px] text-gray-400 mb-1">ចំនួនកាក់ដែលស្មើនឹង $1 (Default: 10000)</p>
-                        <InputField name="exchangeRate" type="number" min="1" value={config.exchangeRate || 10000} onChange={handleChange} className="border-green-500 text-green-300" />
+                    {/* EXCHANGE RATE & WITHDRAW OPTIONS */}
+                    <div className="pt-3 border-t border-purple-600 mt-2 bg-purple-900/30 p-2 rounded space-y-3">
+                        <div>
+                            <label className="text-xs font-bold text-green-400 flex justify-between">
+                                <span>អត្រាប្ដូរប្រាក់ (Exchange Rate)</span>
+                                <span className="text-white opacity-70">Coins to $1.00</span>
+                            </label>
+                            <p className="text-[10px] text-gray-400 mb-1">ចំនួនកាក់ដែលស្មើនឹង $1 (Default: 10000)</p>
+                            <InputField name="exchangeRate" type="number" min="1" value={config.exchangeRate || 10000} onChange={handleChange} className="border-green-500 text-green-300" />
+                        </div>
+
+                        <div>
+                            <label className="text-xs font-bold text-blue-400">ជម្រើសដកលុយ (Withdraw Options)</label>
+                            <p className="text-[10px] text-gray-400 mb-1">សរសេរលេខខណ្ឌដោយសញ្ញាក្បៀស (,) ឧ: 2, 5, 7, 10</p>
+                            <InputField 
+                                type="text" 
+                                value={withdrawStr} 
+                                onChange={handleWithdrawStrChange} 
+                                onBlur={handleWithdrawBlur}
+                                placeholder="2, 5, 7, 10"
+                                className="border-blue-500 text-blue-300 font-bold" 
+                            />
+                        </div>
                     </div>
 
                     <div className="pt-3 border-t border-purple-600 mt-2">
@@ -1254,7 +1283,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     );
 };
 
-// --- 3. UPDATED BALANCE PAGE (FIXED INPUT & ADDED WITHDRAW) ---
+// --- 3. UPDATED BALANCE PAGE (FIXED: Select Withdraw Amount) ---
 const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -1268,9 +1297,14 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
     const [withdrawBank, setWithdrawBank] = useState('ABA'); // ABA or ACLEDA
     const [withdrawAccName, setWithdrawAccName] = useState('');
     const [withdrawAccNum, setWithdrawAccNum] = useState('');
-    const [withdrawAmount, setWithdrawAmount] = useState('');
+    const [withdrawAmount, setWithdrawAmount] = useState(null); // Changed to null initially
 
     const [processing, setProcessing] = useState(false);
+
+    // Options for Withdraw (Load from Config or Default)
+    const WITHDRAW_OPTIONS = globalConfig?.withdrawalOptions && globalConfig.withdrawalOptions.length > 0 
+        ? globalConfig.withdrawalOptions 
+        : [2, 5, 7, 10];
 
     const EXCHANGE_RATE = globalConfig?.exchangeRate || 10000; 
 
@@ -1326,9 +1360,8 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
     // --- FUNCTION: WITHDRAW ---
     const handleWithdraw = async () => {
         const amount = parseFloat(withdrawAmount);
-        if (!amount || amount <= 0) return alert("សូមបញ្ចូលចំនួនលុយ!");
+        if (!amount || amount <= 0) return alert("សូមជ្រើសរើសចំនួនទឹកប្រាក់!");
         if (amount > (userProfile.balance || 0)) return alert("ទឹកប្រាក់មិនគ្រប់គ្រាន់!");
-        if (amount < 0.50) return alert("ដកយ៉ាងតិច $0.50"); // Minimum withdraw
         if (!withdrawAccName || !withdrawAccNum) return alert("សូមបំពេញព័ត៌មានធនាគារ!");
 
         if (!window.confirm(`បញ្ជាក់ការដកលុយ $${amount} ទៅកាន់ ${withdrawBank}?`)) return;
@@ -1361,13 +1394,13 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                 transaction.set(historyRef, {
                     title: `Request Withdraw (${withdrawBank})`,
                     amount: 0,
-                    moneyEarned: -amount, // Show negative money
+                    moneyEarned: -amount,
                     date: serverTimestamp(),
                     type: 'withdraw'
                 });
             });
             alert("សំណើដកលុយត្រូវបានបញ្ជូន!");
-            setWithdrawAmount('');
+            setWithdrawAmount(null);
             setShowWithdraw(false);
         } catch (e) { alert("បរាជ័យ: " + e.message); } finally { setProcessing(false); }
     };
@@ -1405,7 +1438,6 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                         <div className="mt-4 p-3 bg-purple-900 rounded-lg">
                             <label className="text-xs text-purple-200 mb-1 block">ចំនួនកាក់ដែលចង់ដូរ:</label>
                             <div className="flex space-x-2">
-                                {/* FIXED: Added text-black and bg-white */}
                                 <input 
                                     type="number" 
                                     value={exchangeAmount}
@@ -1420,7 +1452,7 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                     )}
                 </Card>
 
-                {/* WITHDRAW SECTION (NEW) */}
+                {/* WITHDRAW SECTION (UPDATED: Selection Buttons) */}
                 <Card className="p-4 border border-green-500/30 bg-purple-800/50">
                     <div className="flex justify-between items-center">
                          <div>
@@ -1442,6 +1474,27 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                                     ))}
                                 </div>
                             </div>
+                            
+                            {/* UPDATED: Amount Selection Grid */}
+                            <div>
+                                <label className="text-xs text-purple-200 block mb-1">ចំនួនទឹកប្រាក់ ($)</label>
+                                <div className="grid grid-cols-4 gap-2">
+                                    {WITHDRAW_OPTIONS.map((amt) => (
+                                        <button 
+                                            key={amt} 
+                                            onClick={() => setWithdrawAmount(amt)}
+                                            className={`py-2 rounded-lg font-bold text-sm border transition ${
+                                                withdrawAmount === amt 
+                                                ? 'bg-green-500 text-white border-green-400 ring-2 ring-green-300' 
+                                                : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-100'
+                                            }`}
+                                        >
+                                            ${amt}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="text-xs text-purple-200 block mb-1">ឈ្មោះគណនី (Account Name)</label>
                                 <input value={withdrawAccName} onChange={e => setWithdrawAccName(e.target.value)} placeholder="Ex: SOK SAO" className="w-full p-2 rounded bg-white text-black font-bold text-sm" />
@@ -1450,11 +1503,8 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                                 <label className="text-xs text-purple-200 block mb-1">លេខគណនី (Account Number)</label>
                                 <input value={withdrawAccNum} onChange={e => setWithdrawAccNum(e.target.value)} type="number" placeholder="000 000 000" className="w-full p-2 rounded bg-white text-black font-bold text-sm" />
                             </div>
-                            <div>
-                                <label className="text-xs text-purple-200 block mb-1">ចំនួនទឹកប្រាក់ ($)</label>
-                                <input value={withdrawAmount} onChange={e => setWithdrawAmount(e.target.value)} type="number" placeholder="0.00" className="w-full p-2 rounded bg-white text-black font-bold text-sm" />
-                            </div>
-                            <button onClick={handleWithdraw} disabled={processing} className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded mt-2">
+
+                            <button onClick={handleWithdraw} disabled={processing || !withdrawAmount} className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded mt-2 disabled:opacity-50 disabled:cursor-not-allowed">
                                 {processing ? 'Processing...' : 'ស្នើសុំដកលុយ (REQUEST)'}
                             </button>
                         </div>
