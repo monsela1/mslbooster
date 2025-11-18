@@ -90,19 +90,34 @@ const crc16 = (str) => {
     return hex.length === 3 ? "0" + hex : hex.length === 2 ? "00" + hex : hex.length === 1 ? "000" + hex : hex;
 };
 
-const generateKhqr = (bakongId, amount) => {
-    const accountInfo = `0006bakong01${bakongId.length < 10 ? '0'+bakongId.length : bakongId.length}${bakongId}`;
+// --- NEW KHQR GENERATOR (STANDARD) ---
+const generateKhqr = (bakongId, amount, currency = "840") => {
+    // 840 = USD, 116 = KHR
+    const accountInfo = `0006bakong01${bakongId.length < 10 ? '0' + bakongId.length : bakongId.length}${bakongId}`;
     const tag29 = `29${accountInfo.length}${accountInfo}`;
-    const amountStr = amount.toString();
-    const tag54 = `54${amountStr.length < 10 ? '0'+amountStr.length : amountStr.length}${amountStr}`;
-    const tag53 = `5303840`; 
-    const tag58 = "5802KH";
-    const name = "MSL BOOSTER"; 
-    const tag59 = `59${name.length < 10 ? '0'+name.length : name.length}${name}`;
-    const city = "PHNOM PENH";
-    const tag60 = `60${city.length < 10 ? '0'+city.length : city.length}${city}`;
     
-    let qrString = `000201010212${tag29}52045999${tag53}${tag54}${tag58}${tag59}${tag60}6304`;
+    // Merchant Category
+    const tag52 = "52045999"; 
+    
+    // Currency
+    const tag53 = `5303${currency}`; 
+    
+    // Amount
+    const amountStr = amount.toFixed(2);
+    const tag54 = `54${amountStr.length < 10 ? '0' + amountStr.length : amountStr.length}${amountStr}`;
+    
+    // Country
+    const tag58 = "5802KH";
+    
+    // Name
+    const name = "MSL BOOSTER"; 
+    const tag59 = `59${name.length < 10 ? '0' + name.length : name.length}${name}`;
+    
+    // City
+    const city = "PHNOM PENH";
+    const tag60 = `60${city.length < 10 ? '0' + city.length : city.length}${city}`;
+    
+    let qrString = `000201010212${tag29}${tag52}${tag53}${tag54}${tag58}${tag59}${tag60}6304`;
     const crc = crc16(qrString);
     return qrString + crc;
 };
@@ -358,7 +373,7 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                             />
                         </div>
                     </div>
-                     <div>
+                      <div>
                         <label className="text-xs font-bold text-purple-300 block mb-1">Custom Banner Click URL</label>
                         <div className="flex items-center space-x-2">
                              <Link size={20} className="text-gray-400"/>
@@ -395,7 +410,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
             const shortCodesRef = collection(db, 'artifacts', appId, 'public', 'data', 'short_codes');
             const q = query(shortCodesRef, limit(20));
             const snap = await getDocs(q);
-           
+            
             const usersData = await Promise.all(snap.docs.map(async (docSnap) => {
                 const { fullUserId } = docSnap.data();
                 if(!fullUserId) return null;
@@ -405,7 +420,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                 }
                 return null;
             }));
-           
+            
             setAllUsers(usersData.filter(u => u !== null));
         } catch (e) { console.error(e); }
         setLoadingList(false);
@@ -469,14 +484,14 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                     />
                     <button onClick={handleSearch} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"><Search/></button>
                 </div>
-               
+                
                 {foundUser && (
                     <div className="bg-purple-900 p-4 rounded-lg border border-purple-600 relative">
                          <button 
                             onClick={() => handleDeleteUser(foundUser.uid, foundUser.shortId)}
                             className="absolute top-4 right-4 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
                             title="លុបគណនីនេះ"
-                         >
+                          >
                             <Trash2 size={20} />
                         </button>
 
@@ -504,7 +519,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                     <h3 className="font-bold text-lg text-white">បញ្ជីអ្នកប្រើប្រាស់ ({allUsers.length})</h3>
                     <button onClick={loadUserList} className='p-2 bg-purple-600 rounded hover:bg-purple-500'><RefreshCw size={18} className='text-white'/></button>
                 </div>
-               
+                
                 {loadingList ? <div className='text-center text-purple-300'>Loading users...</div> : (
                     <div className='overflow-y-auto max-h-64 space-y-2'>
                         {allUsers.map((u, i) => (
@@ -671,7 +686,7 @@ const AdminDepositsTab = ({ db, showNotification }) => {
                     <div className="flex justify-between items-start">
                         <div>
                             <div className="flex items-center space-x-2">
-                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${d.status === 'pending' ? 'bg-yellow-500 text-black' : d.status === 'approved' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded ${d.status === 'pending' ? 'bg-yellow-500 text-black' : d.status.startsWith('approved') ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}>
                                     {d.status.toUpperCase()}
                                 </span>
                                 <span className="text-white font-bold text-sm">{d.userName}</span>
@@ -763,7 +778,7 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
                 {activeTab === 'USERS' && <AdminUserManagerTab db={db} showNotification={showNotification} />}
                 {activeTab === 'DEPOSITS' && <AdminDepositsTab db={db} showNotification={showNotification} />}
                 {activeTab === 'WITHDRAWALS' && <AdminWithdrawalsTab db={db} showNotification={showNotification} />}
-               
+                
                 {activeTab === 'CAMPAIGNS' && (
                     <div className="space-y-2 pb-10">
                         {campaigns.map(c => (
@@ -809,7 +824,7 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
 
     const handleSubmitCode = async () => {
         const code = inputCode.toUpperCase().trim();
-       
+        
         if (code.length !== 6) return showNotification('កូដត្រូវតែមាន ៦ ខ្ទង់', 'error');
         if (code === shortId) return showNotification('មិនអាចដាក់កូដខ្លួនឯងបានទេ!', 'error');
         if (userProfile.referredBy) return showNotification('អ្នកមានអ្នកណែនាំរួចហើយ', 'error');
@@ -822,19 +837,19 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
                 if (!shortCodeDoc.exists()) throw new Error("កូដអ្នកណែនាំមិនត្រឹមត្រូវ");
 
                 const referrerId = shortCodeDoc.data().fullUserId;
-               
+                
                 const userRef = getProfileDocRef(userId);
                 const userDoc = await transaction.get(userRef);
                 if (userDoc.data().referredBy) throw new Error("អ្នកមានអ្នកណែនាំរួចហើយ");
 
                 const referrerRef = getProfileDocRef(referrerId);
-              
+               
                 // UPDATE TOTAL EARNED FOR REFERRER
                 transaction.update(referrerRef, {
                     points: increment(globalConfig.referrerReward),
                     totalEarned: increment(globalConfig.referrerReward)
                 });
-              
+               
                 const referrerHistoryRef = doc(collection(db, 'artifacts', appId, 'users', referrerId, 'history'));
                 transaction.set(referrerHistoryRef, {
                     title: 'Referral Reward',
@@ -867,7 +882,7 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
                     timestamp: serverTimestamp()
                 });
             });
-           
+            
             showNotification(`ជោគជ័យ! ទទួលបាន +${formatNumber(globalConfig.referredBonus || 500)} Points`, 'success');
             setInputCode('');
         } catch (e) {
@@ -880,7 +895,7 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
         <div className="min-h-screen bg-purple-900 pb-16 pt-20">
             <Header title="ណែនាំមិត្ត" onBack={() => setPage('DASHBOARD')} />
             <main className="p-4 space-y-4">
-               
+                
                 {/* YOUR CODE */}
                 <Card className="p-6 text-center bg-purple-800 border-2 border-yellow-500/50">
                     <h3 className="font-bold text-white text-lg">កូដណែនាំរបស់អ្នក</h3>
@@ -894,7 +909,7 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
                 {/* INPUT REFERRER CODE */}
                 <Card className="p-4 border border-teal-500/30 bg-gradient-to-br from-purple-800 to-purple-900">
                     <h3 className="font-bold text-white mb-2 flex items-center"><UserPlus className="w-4 h-4 mr-2"/> ដាក់កូដអ្នកណែនាំ</h3>
-                   
+                    
                     {userProfile.referredBy ? (
                         <div className="bg-purple-950/50 p-3 rounded border border-purple-700 text-center">
                             <p className="text-purple-300 text-sm">អ្នកត្រូវបានណែនាំដោយ៖</p>
@@ -976,7 +991,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
     const handleCheckLink = (e) => {
         e.preventDefault();
         if(!link.trim()) return showNotification('សូមបញ្ចូល Link ជាមុនសិន', 'error');
-       
+        
         if (type === 'view' || type === 'sub') {
             const embed = getEmbedUrl(link);
             if(!embed) return showNotification('Link YouTube មិនត្រឹមត្រូវ', 'error');
@@ -985,7 +1000,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
             if(!link.startsWith('http')) return showNotification('Link ត្រូវតែមាន http:// ឬ https://', 'error');
             setPreviewUrl(null);
         }
-       
+        
         setIsLinkVerified(true);
         showNotification('Link ត្រឹមត្រូវ!', 'success');
     };
@@ -1009,9 +1024,9 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                 const profileRef = getProfileDocRef(userId);
                 const profileDoc = await transaction.get(profileRef);
                 if (!profileDoc.exists() || profileDoc.data().points < cost) throw new Error("Insufficient points");
-              
+               
                 transaction.update(profileRef, { points: increment(-cost) });
-              
+               
                 const newCampRef = doc(getCampaignsCollectionRef());
                 transaction.set(newCampRef, { 
                     userId, 
@@ -1025,7 +1040,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                     createdAt: serverTimestamp(), 
                     isActive: true 
                 });
-               
+                
                 // SAVE HISTORY
                 const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
                 transaction.set(historyRef, {
@@ -1083,7 +1098,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                             {isLinkVerified && (
                                 <div className='mt-4 space-y-4'>
                                     <h3 className='text-white font-bold text-sm border-b border-gray-600 pb-2'>Campaigns Setting</h3>
-                                   
+                                    
                                     <div className="flex justify-between items-center mb-2">
                                         <label className="text-white font-bold text-sm">Number of views</label>
                                         <div 
@@ -1105,7 +1120,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                                             </div>
                                         </div>
                                     )}
-                                   
+                                    
                                     <div className="flex justify-between items-center mb-4 pt-2 border-t border-gray-600">
                                         <label className="text-white font-bold text-sm">Campaign Cost</label>
                                         <span className='text-xl font-bold text-yellow-500'>{formatNumber(calculateCost())}</span>
@@ -1190,7 +1205,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     useEffect(() => {
         if (current) { setTimer(current.requiredDuration || 30); setClaimed(false); }
     }, [current]);
-   
+    
     useEffect(() => {
         let interval = null;
         if (timer > 0 && !claimed) { interval = setInterval(() => { setTimer(t => Math.max(0, t - 1)); }, 1000); } 
@@ -1298,7 +1313,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     );
 };
 
-// --- 3. BALANCE PAGE (FIXED: Select Withdraw Amount) ---
 const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -1309,14 +1323,14 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
     
     // Withdraw State
     const [showWithdraw, setShowWithdraw] = useState(false);
-    const [withdrawBank, setWithdrawBank] = useState('ABA'); // ABA or ACLEDA
+    const [withdrawBank, setWithdrawBank] = useState('ABA'); 
     const [withdrawAccName, setWithdrawAccName] = useState('');
     const [withdrawAccNum, setWithdrawAccNum] = useState('');
-    const [withdrawAmount, setWithdrawAmount] = useState(null); // Changed to null initially
+    const [withdrawAmount, setWithdrawAmount] = useState(null);
 
     const [processing, setProcessing] = useState(false);
 
-    // Options for Withdraw (Load from Config or Default)
+    // Options for Withdraw
     const WITHDRAW_OPTIONS = globalConfig?.withdrawalOptions && globalConfig.withdrawalOptions.length > 0 
         ? globalConfig.withdrawalOptions 
         : [2, 5, 7, 10];
@@ -1467,7 +1481,7 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                     )}
                 </Card>
 
-                {/* WITHDRAW SECTION (UPDATED: Selection Buttons) */}
+                {/* WITHDRAW SECTION */}
                 <Card className="p-4 border border-green-500/30 bg-purple-800/50">
                     <div className="flex justify-between items-center">
                          <div>
@@ -1490,7 +1504,6 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                                 </div>
                             </div>
                             
-                            {/* UPDATED: Amount Selection Grid */}
                             <div>
                                 <label className="text-xs text-purple-200 block mb-1">ចំនួនទឹកប្រាក់ ($)</label>
                                 <div className="grid grid-cols-4 gap-2">
@@ -1556,51 +1569,135 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
     );
 };
 
+// --- BuyCoinsPage (UPDATED WITH BAKONG AUTO CHECK) ---
 const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig, userProfile }) => {
     const [selectedPkg, setSelectedPkg] = useState(null);
     const [trxId, setTrxId] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // --- CONFIGURATION ---
     const BAKONG_ID = "monsela@aclb"; 
-    const BAKONG_API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7ImlkIjoiZmYzNTdjNWRlNjM0NDgwOSJ9LCJpYXQiOjE3NjI2MTM0MjQsImV4cCI6MTc3MDM4OTQyNH0.6CogHoCPR5pqLVP9C1N6zkk4Wj2KgKdcEh9qy3qAXWU";
+    const BAKONG_API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7ImlkIjoiZmYzNTdjNWRlNjM0NDgwOSJ9LCJpYXQiOjE3NjI2MTM0MjQsImV4cCI6MTc3MDM4OTQyNH0.6CogHoCPR5pqLVP9C1N6zkk4Wj2KgKdcEh9qy3qAXWU"; // សម្រាប់តេស្ត (Production គួរដាក់នៅ Backend)
 
-    const handleBuyClick = (pkg) => { setSelectedPkg(pkg); setTrxId(''); };
-
-    const checkAutoPayment = async () => {
-        if (!trxId) return showNotification('សូមបញ្ចូលលេខ Hash/Trx ID ជាមុនសិន', 'error');
-        setIsSubmitting(true);
-        try {
-            const response = await fetch('https://api-bakong.nbc.org.kh/v1/check_transaction_status', {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${BAKONG_API_TOKEN}`, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ hash: trxId })
-            });
-            const data = await response.json();
-            if (data && data.responseCode === 0) { 
-                 await runTransaction(db, async (tx) => {
-                    const userRef = getProfileDocRef(userId);
-                    const depositRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'deposits'));
-                    tx.update(userRef, { points: increment(selectedPkg.coins), totalEarned: increment(selectedPkg.coins) });
-                    tx.set(depositRef, { userId, userName: userProfile?.userName || 'Unknown', coins: selectedPkg.coins, price: selectedPkg.price, transactionId: trxId, status: 'approved_auto', date: serverTimestamp() });
-                    const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
-                    tx.set(historyRef, { title: 'Buy Coins (Auto)', amount: selectedPkg.coins, date: serverTimestamp(), type: 'deposit_auto' });
-                 });
-                 showNotification('ជោគជ័យ! កាក់ត្រូវបានបញ្ចូល។', 'success'); setSelectedPkg(null);
-            } else { throw new Error(data.responseMessage || 'រកមិនឃើញប្រតិបត្តិការ ឬមិនទាន់បង់ប្រាក់'); }
-        } catch (error) {
-            console.error(error);
-            if(window.confirm(`ប្រព័ន្ធរកមិនឃើញ៖ "${error.message}"\nតើអ្នកចង់ផ្ញើទៅ Admin ដើម្បីឆែកផ្ទាល់ទេ?`)) { handleSubmitManual(); }
-        } finally { setIsSubmitting(false); }
+    const handleBuyClick = (pkg) => { 
+        setSelectedPkg(pkg); 
+        setTrxId(''); 
     };
 
-    const handleSubmitManual = async () => {
-        if(!trxId.trim()) return showNotification('សូមបញ្ចូលលេខប្រតិបត្តិការ', 'error');
+    // Function to verify transaction with KHQR API
+    const checkAutoPayment = async () => {
+        const cleanTrxId = trxId.trim();
+
+        if (!cleanTrxId) return showNotification('សូមបញ្ចូលលេខ Hash/Trx ID ជាមុនសិន', 'error');
+        
         setIsSubmitting(true);
         try {
+            // Call Bakong Check Transaction Status API
+            const response = await fetch('https://api-bakong.nbc.org.kh/v1/check_transaction_status', {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${BAKONG_API_TOKEN}`, 
+                    'Content-Type': 'application/json' 
+                },
+                body: JSON.stringify({ hash: cleanTrxId })
+            });
+            
+            const data = await response.json();
+
+            // data.responseCode === 0 means success
+            if (data && data.responseCode === 0) { 
+                 
+                 await runTransaction(db, async (tx) => {
+                    // 1. Check Duplicate
+                    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'deposits'), where('transactionId', '==', cleanTrxId));
+                    const existingDocs = await getDocs(q);
+                    
+                    if (!existingDocs.empty) {
+                        throw new Error("Transaction ID នេះត្រូវបានប្រើរួចហើយ!");
+                    }
+
+                    const userRef = getProfileDocRef(userId);
+                    const depositRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'deposits'));
+                    
+                    // 2. Add Coins
+                    tx.update(userRef, { 
+                        points: increment(selectedPkg.coins), 
+                        totalEarned: increment(selectedPkg.coins) 
+                    });
+                    
+                    // 3. Record Deposit
+                    tx.set(depositRef, { 
+                        userId, 
+                        userName: userProfile?.userName || 'Unknown', 
+                        coins: selectedPkg.coins, 
+                        price: selectedPkg.price, 
+                        transactionId: cleanTrxId, 
+                        status: 'approved_auto', 
+                        date: serverTimestamp(),
+                        method: 'KHQR_AUTO'
+                    });
+                    
+                    // 4. History
+                    const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
+                    tx.set(historyRef, { 
+                        title: 'Buy Coins (Auto)', 
+                        amount: selectedPkg.coins, 
+                        date: serverTimestamp(), 
+                        type: 'deposit_auto' 
+                    });
+                 });
+
+                 showNotification('ជោគជ័យ! កាក់ត្រូវបានបញ្ចូល។', 'success'); 
+                 setSelectedPkg(null);
+
+            } else { 
+                let errorMsg = 'ប្រតិបត្តិការមិនត្រឹមត្រូវ ឬរកមិនឃើញ';
+                if (data.responseMessage) errorMsg = data.responseMessage;
+                throw new Error(errorMsg); 
+            }
+        } catch (error) {
+            console.error(error);
+            if(error.message.includes("ត្រូវបានប្រើរួចហើយ")) {
+                showNotification(error.message, 'error');
+            } else if(window.confirm(`ប្រព័ន្ធរកមិនឃើញ៖ "${error.message}"\nតើអ្នកចង់ផ្ញើទៅ Admin ដើម្បីឆែកផ្ទាល់ទេ?`)) { 
+                handleSubmitManual(cleanTrxId); 
+            }
+        } finally { 
+            setIsSubmitting(false); 
+        }
+    };
+
+    const handleSubmitManual = async (manualTrxId = trxId) => {
+        if(!manualTrxId.trim()) return showNotification('សូមបញ្ចូលលេខប្រតិបត្តិការ', 'error');
+        setIsSubmitting(true);
+        try {
+             // Check Duplicate again for manual
+             const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'deposits'), where('transactionId', '==', manualTrxId.trim()));
+             const snapshot = await getDocs(q);
+             if(!snapshot.empty) {
+                 showNotification('សំណើនេះត្រូវបានបញ្ជូនរួចហើយ!', 'error');
+                 setIsSubmitting(false);
+                 return;
+             }
+
              const depositRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'deposits'));
-             await setDoc(depositRef, { userId: userId, userName: userProfile?.userName || 'Unknown', coins: selectedPkg.coins, price: selectedPkg.price, transactionId: trxId, status: 'pending', date: serverTimestamp() });
-             showNotification('បានបញ្ជូនសំណើ! សូមរង់ចាំ Admin ត្រួតពិនិត្យ។', 'success'); setSelectedPkg(null);
-        } catch (e) { showNotification('បរាជ័យ: ' + e.message, 'error'); } finally { setIsSubmitting(false); }
+             await setDoc(depositRef, { 
+                 userId: userId, 
+                 userName: userProfile?.userName || 'Unknown', 
+                 coins: selectedPkg.coins, 
+                 price: selectedPkg.price, 
+                 transactionId: manualTrxId.trim(), 
+                 status: 'pending', 
+                 date: serverTimestamp(),
+                 method: 'MANUAL'
+             });
+             showNotification('បានបញ្ជូនសំណើ! សូមរង់ចាំ Admin ត្រួតពិនិត្យ។', 'success'); 
+             setSelectedPkg(null);
+        } catch (e) { 
+            showNotification('បរាជ័យ: ' + e.message, 'error'); 
+        } finally { 
+            setIsSubmitting(false); 
+        }
     };
 
     return (
@@ -1609,27 +1706,64 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig, use
             <main className="p-4 space-y-4">
                 {globalConfig.coinPackages?.map((pkg) => (
                     <button key={pkg.id} onClick={() => handleBuyClick(pkg)} className={`w-full flex items-center justify-between p-4 rounded-xl shadow-lg text-white transform active:scale-95 transition ${pkg.color}`}>
-                        <div className="flex items-center space-x-3"><div className="bg-white bg-opacity-20 p-3 rounded-full"><Coins className="w-6 h-6 text-yellow-100" /></div><div className="text-left"><p className="text-xl font-bold">{formatNumber(pkg.coins)} Coins</p><p className="text-sm opacity-80">កញ្ចប់ពិន្ទុ</p></div></div><div className="bg-white text-gray-800 font-bold px-4 py-2 rounded-lg">{pkg.price}</div>
+                        <div className="flex items-center space-x-3">
+                            <div className="bg-white bg-opacity-20 p-3 rounded-full"><Coins className="w-6 h-6 text-yellow-100" /></div>
+                            <div className="text-left">
+                                <p className="text-xl font-bold">{formatNumber(pkg.coins)} Coins</p>
+                                <p className="text-sm opacity-80">តម្លៃ: {pkg.price}</p>
+                            </div>
+                        </div>
+                        <div className="bg-white text-gray-800 font-bold px-4 py-2 rounded-lg">ទិញ</div>
                     </button>
                 ))}
             </main>
+
             {selectedPkg && (
                 <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
                     <div className="bg-white rounded-xl w-full max-w-sm p-5 text-center relative">
                         <button onClick={() => setSelectedPkg(null)} className="absolute top-3 right-3 text-gray-500 hover:text-red-500"><XCircle size={24}/></button>
-                        <h3 className="text-xl font-bold text-purple-900 mb-1">KHQR (បង់ប្រាក់)</h3><p className="text-gray-500 text-sm mb-4">Scan ដើម្បីបង់ប្រាក់ ({selectedPkg.price})</p>
-                        <div className="bg-purple-100 p-4 rounded-xl mb-4 inline-block shadow-inner">
+                        
+                        <h3 className="text-xl font-bold text-purple-900 mb-1">ស្កេនបង់ប្រាក់ (KHQR)</h3>
+                        <p className="text-gray-500 text-sm mb-4">ចំនួនទឹកប្រាក់: <span className="font-bold text-red-600">{selectedPkg.price}</span></p>
+                        
+                        <div className="bg-purple-100 p-4 rounded-xl mb-4 inline-block shadow-inner border border-purple-200">
                             {(() => {
-                                const amount = parseFloat(selectedPkg.price.replace('$', ''));
+                                const priceStr = selectedPkg.price.toString().replace('$', '');
+                                const amount = parseFloat(priceStr);
                                 const khqrString = generateKhqr(BAKONG_ID, amount);
+                                // Using QR Server API to display QR Code
                                 const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(khqrString)}`;
-                                return <img src={qrImageUrl} alt="KHQR" className="w-48 h-48 mx-auto mix-blend-multiply"/>;
+                                return (
+                                    <>
+                                        <img src={qrImageUrl} alt="KHQR" className="w-48 h-48 mx-auto mix-blend-multiply"/>
+                                        <div className="mt-2 text-[10px] text-gray-500 break-all font-mono opacity-50">{khqrString.substring(0, 20)}...</div>
+                                    </>
+                                );
                             })()}
-                            <p className="mt-2 font-bold text-purple-900 text-lg">{selectedPkg.price}</p><p className="text-xs text-gray-500 mt-1">Merchant: {BAKONG_ID}</p>
                         </div>
-                        <div className="text-left space-y-2"><label className="text-xs font-bold text-gray-600 ml-1">លេខប្រតិបត្តិការ (Hash / Trx ID)</label><input type="text" value={trxId} onChange={e => setTrxId(e.target.value)} placeholder="បញ្ចូលលេខ Hash នៅទីនេះ..." className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-black font-bold focus:border-purple-500 focus:outline-none"/></div>
-                        <div className="flex space-x-2 mt-5"><button onClick={checkAutoPayment} disabled={isSubmitting} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl shadow-lg text-sm flex justify-center items-center">{isSubmitting ? <RefreshCw className="animate-spin w-4 h-4"/> : 'AUTO CHECK'}</button><button onClick={handleSubmitManual} disabled={isSubmitting} className="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 rounded-xl shadow-lg text-sm">ផ្ញើទៅ Admin</button></div>
-                        <p className="text-[10px] text-gray-400 mt-2">ប្រសិនបើ Auto មិនដើរ សូមប្រើប៊ូតុង "ផ្ញើទៅ Admin"</p>
+                        
+                        <div className="text-left space-y-2">
+                            <label className="text-xs font-bold text-gray-600 ml-1">បញ្ចូលលេខកូដប្រតិបត្តិការ (Hash / MD5):</label>
+                            <input 
+                                type="text" 
+                                value={trxId} 
+                                onChange={e => setTrxId(e.target.value)} 
+                                placeholder="Paste Hash here..." 
+                                className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-black font-bold focus:border-purple-500 focus:outline-none text-sm"
+                            />
+                            <p className="text-[10px] text-blue-500">* ចុចលើប្រតិបត្តិការក្នុង App ធនាគារ រួចចម្លង Hash/Trx ID</p>
+                        </div>
+
+                        <div className="flex space-x-2 mt-5">
+                            <button onClick={checkAutoPayment} disabled={isSubmitting} className={`flex-1 ${isSubmitting ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'} text-white font-bold py-3 rounded-xl shadow-lg text-sm flex justify-center items-center transition`}>
+                                {isSubmitting ? <RefreshCw className="animate-spin w-4 h-4 mr-2"/> : <Zap className="w-4 h-4 mr-2"/>}
+                                {isSubmitting ? 'កំពុងឆែក...' : 'ពិនិត្យស្វ័យប្រវត្តិ'}
+                            </button>
+                        </div>
+                        
+                        <button onClick={() => handleSubmitManual()} disabled={isSubmitting} className="w-full mt-3 text-gray-500 hover:text-gray-700 font-bold text-xs py-2 underline">
+                            ស្វ័យប្រវត្តិមិនដើរ? ផ្ញើឱ្យ Admin ពិនិត្យ
+                        </button>
                     </div>
                 </div>
             )}
@@ -1720,7 +1854,7 @@ const AuthForm = ({ onSubmit, btnText, isRegister = false, onGoogleLogin }) => {
     return (
         <div className="space-y-4">
             <button onClick={onGoogleLogin} className="w-full bg-white text-gray-800 p-3 rounded font-bold hover:bg-gray-100 transition shadow-lg flex items-center justify-center border border-gray-300">
-                <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
+                <svg className="w-5 h-5 mr-3" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.04 2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
                 បន្តជាមួយប្រើ Google
             </button>
             <div className="flex items-center justify-center space-x-2 my-4"><div className="h-px bg-purple-600 flex-1"></div><span className="text-purple-300 text-xs font-bold">ឬ ចូលប្រើគណនី (ADMIN/LEGACY)</span><div className="h-px bg-purple-600 flex-1"></div></div>
