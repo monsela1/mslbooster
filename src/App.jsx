@@ -137,6 +137,7 @@ const defaultGlobalConfig = {
     adsReward: 30,
     maxDailyAds: 15,
     enableBuyCoins: false,
+    enableWithdraw: true, // <--- បន្ថែមថ្មី: បើក/បិទ ដកលុយ
     exchangeRate: 10000,
     withdrawalOptions: [2, 5, 7, 10],
     adsSettings: {
@@ -243,6 +244,11 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
         setConfig(prev => ({ ...prev, enableBuyCoins: !prev.enableBuyCoins }));
     };
 
+    // +++ Function បិទ/បើក ដកលុយ +++
+    const handleWithdrawToggle = () => {
+        setConfig(prev => ({ ...prev, enableWithdraw: !prev.enableWithdraw }));
+    };
+
     const handleAdsChange = (e) => {
         const { name, value } = e.target;
         setConfig(prev => ({
@@ -272,7 +278,9 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
         <div className="space-y-4 pb-10">
             <Card className="p-4 border-l-4 border-blue-500">
                 <h3 className="font-bold text-lg mb-3 text-blue-400 flex items-center"><Settings className="w-5 h-5 mr-2"/> ការកំណត់ទូទៅ (Features)</h3>
-                <div className="flex items-center justify-between bg-purple-900/50 p-4 rounded-lg border border-purple-600">
+                
+                {/* Buy Coins Toggle */}
+                <div className="flex items-center justify-between bg-purple-900/50 p-4 rounded-lg border border-purple-600 mb-2">
                     <div className="flex flex-col">
                         <span className="text-white font-bold text-base">បើកមុខងារទិញកាក់</span>
                         <span className={`text-xs mt-1 font-bold ${config.enableBuyCoins ? 'text-green-400' : 'text-red-400'}`}>
@@ -283,6 +291,20 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                         <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 ${config.enableBuyCoins ? 'translate-x-8' : 'translate-x-0'}`}></div>
                     </button>
                 </div>
+
+                {/* +++ Withdraw Toggle +++ */}
+                <div className="flex items-center justify-between bg-purple-900/50 p-4 rounded-lg border border-purple-600">
+                    <div className="flex flex-col">
+                        <span className="text-white font-bold text-base">បើកមុខងារដកលុយ (Withdraw)</span>
+                        <span className={`text-xs mt-1 font-bold ${config.enableWithdraw ? 'text-green-400' : 'text-red-400'}`}>
+                            {config.enableWithdraw ? 'កំពុងបើក (ON)' : 'កំពុងបិទ (OFF)'}
+                        </span>
+                    </div>
+                    <button onClick={handleWithdrawToggle} className={`relative w-16 h-8 rounded-full transition-colors duration-300 focus:outline-none shadow-inner ${config.enableWithdraw ? 'bg-green-500' : 'bg-gray-600'}`}>
+                        <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full shadow-md transform transition-transform duration-300 ${config.enableWithdraw ? 'translate-x-8' : 'translate-x-0'}`}></div>
+                    </button>
+                </div>
+
             </Card>
 
             <Card className="p-4 border-l-4 border-yellow-400">
@@ -485,7 +507,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                 
                 {foundUser && (
                     <div className="bg-purple-900 p-4 rounded-lg border border-purple-600 relative">
-                         <button 
+                          <button 
                             onClick={() => handleDeleteUser(foundUser.uid, foundUser.shortId)}
                             className="absolute top-4 right-4 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
                             title="លុបគណនីនេះ"
@@ -841,13 +863,13 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
                 if (userDoc.data().referredBy) throw new Error("អ្នកមានអ្នកណែនាំរួចហើយ");
 
                 const referrerRef = getProfileDocRef(referrerId);
-               
+                
                 // UPDATE TOTAL EARNED FOR REFERRER
                 transaction.update(referrerRef, {
                     points: increment(globalConfig.referrerReward),
                     totalEarned: increment(globalConfig.referrerReward)
                 });
-               
+                
                 const referrerHistoryRef = doc(collection(db, 'artifacts', appId, 'users', referrerId, 'history'));
                 transaction.set(referrerHistoryRef, {
                     title: 'Referral Reward',
@@ -1023,9 +1045,9 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                 const profileRef = getProfileDocRef(userId);
                 const profileDoc = await transaction.get(profileRef);
                 if (!profileDoc.exists() || profileDoc.data().points < cost) throw new Error("Insufficient points");
-               
+                
                 transaction.update(profileRef, { points: increment(-cost) });
-               
+                
                 const newCampRef = doc(getCampaignsCollectionRef());
                 transaction.set(newCampRef, { 
                     userId, 
@@ -1063,7 +1085,7 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
             <main className="p-0">
                 {/* CREATE CAMPAIGN FORM */}
                 <div className="px-4 space-y-4">
-                     {isLinkVerified && previewUrl && (
+                      {isLinkVerified && previewUrl && (
                         <div className="w-full aspect-video bg-black mb-4 rounded-lg overflow-hidden shadow-lg">
                             <iframe src={previewUrl} className="w-full h-full" frameBorder="0" allowFullScreen title="preview" />
                         </div>
@@ -1318,7 +1340,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
             const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
                 .filter(c => 
                     c.userId !== userId && 
-                    c.remaining > 0 &&     
+                    c.remaining > 0 &&      
                     c.isActive !== false && 
                     !watchedIds.has(c.id)   
                 );
@@ -1569,6 +1591,12 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
 
     // --- FUNCTION: WITHDRAW ---
     const handleWithdraw = async () => {
+        // +++ Check Enable Withdraw +++
+        if (!globalConfig.enableWithdraw) {
+            alert("សុំទោស! មុខងារដកលុយត្រូវបានបិទជាបណ្ដោះអាសន្នសម្រាប់ការថែទាំ។");
+            return;
+        }
+
         const amount = parseFloat(withdrawAmount);
         if (!amount || amount <= 0) return alert("សូមជ្រើសរើសចំនួនទឹកប្រាក់!");
         if (amount > (userProfile.balance || 0)) return alert("ទឹកប្រាក់មិនគ្រប់គ្រាន់!");
@@ -1669,7 +1697,17 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                              <h3 className="font-bold text-white text-sm">ដកលុយ (Withdraw)</h3>
                              <p className="text-[10px] text-purple-300">ABA / ACLEDA</p>
                          </div>
-                         <button onClick={() => setShowWithdraw(!showWithdraw)} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center transition">
+                         <button 
+                            onClick={() => {
+                                // +++ Check Toggle in Click +++
+                                if(globalConfig.enableWithdraw) {
+                                    setShowWithdraw(!showWithdraw);
+                                } else {
+                                    alert("មុខងារដកលុយត្រូវបានបិទជាបណ្ដោះអាសន្ន!");
+                                }
+                            }} 
+                            className={`${globalConfig.enableWithdraw ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-600 cursor-not-allowed'} text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center transition`}
+                        >
                             <DollarSign size={14} className="mr-1"/> {showWithdraw ? 'បិទ' : 'ដកលុយ'}
                          </button>
                     </div>
@@ -1788,7 +1826,7 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig, use
 
             // data.responseCode === 0 means success
             if (data && data.responseCode === 0) { 
-                 
+                  
                  await runTransaction(db, async (tx) => {
                     // 1. Check Duplicate
                     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'deposits'), where('transactionId', '==', cleanTrxId));
@@ -1815,7 +1853,7 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig, use
                         price: selectedPkg.price, 
                         transactionId: cleanTrxId, 
                         status: 'approved_auto', 
-                        date: serverTimestamp(),
+                        date: serverTimestamp(), 
                         method: 'KHQR_AUTO'
                     });
                     
@@ -1870,7 +1908,7 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig, use
                  price: selectedPkg.price, 
                  transactionId: manualTrxId.trim(), 
                  status: 'pending', 
-                 date: serverTimestamp(),
+                 date: serverTimestamp(), 
                  method: 'MANUAL'
              });
              showNotification('បានបញ្ជូនសំណើ! សូមរង់ចាំ Admin ត្រួតពិនិត្យ។', 'success'); 
