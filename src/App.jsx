@@ -95,10 +95,11 @@ const defaultGlobalConfig = {
     maxDailyAds: 15,
     enableBuyCoins: false,
     exchangeRate: 10000, // 10,000 Coins = $1.00
-    withdrawalOptions: [2, 5, 7, 10], // Default options
+    withdrawalOptions: [2, 5, 7, 10], // Default Options
     adsSettings: {
-        bannerId: "ca-app-pub-xxxxxxxx/yyyyyy",
-        interstitialId: "ca-app-pub-xxxxxxxx/zzzzzz",
+        bannerId: "",
+        interstitialId: "",
+        directLinkUrl: "https://google.com", // Default Monetag Link
         isEnabled: true
     },
     coinPackages: [
@@ -186,7 +187,7 @@ const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
 // --- 5. ADMIN PAGES ---
 
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
-    // State for the withdraw options input string to avoid comma issues while typing
+    // Manage withdraw string state
     const [withdrawStr, setWithdrawStr] = useState(config.withdrawalOptions?.join(', ') || '2, 5, 7, 10');
 
     const handleChange = (e) => {
@@ -218,7 +219,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
         setWithdrawStr(e.target.value);
     };
 
-    // Parse string to array when leaving the input field (onBlur)
     const handleWithdrawBlur = () => {
         const arr = withdrawStr.split(',').map(n => parseFloat(n.trim())).filter(n => !isNaN(n) && n > 0);
         setConfig(prev => ({ ...prev, withdrawalOptions: arr }));
@@ -256,7 +256,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                     <div><label className="text-xs font-bold text-purple-300">Referred User Bonus</label><InputField name="referredBonus" type="number" min="0" value={config.referredBonus || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" min="0" value={config.adsReward || 0} onChange={handleChange} /></div>
                     
-                    {/* EXCHANGE RATE & WITHDRAW OPTIONS */}
                     <div className="pt-3 border-t border-purple-600 mt-2 bg-purple-900/30 p-2 rounded space-y-3">
                         <div>
                             <label className="text-xs font-bold text-green-400 flex justify-between">
@@ -266,7 +265,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                             <p className="text-[10px] text-gray-400 mb-1">ចំនួនកាក់ដែលស្មើនឹង $1 (Default: 10000)</p>
                             <InputField name="exchangeRate" type="number" min="1" value={config.exchangeRate || 10000} onChange={handleChange} className="border-green-500 text-green-300" />
                         </div>
-
                         <div>
                             <label className="text-xs font-bold text-blue-400">ជម្រើសដកលុយ (Withdraw Options)</label>
                             <p className="text-[10px] text-gray-400 mb-1">សរសេរលេខខណ្ឌដោយសញ្ញាក្បៀស (,) ឧ: 2, 5, 7, 10</p>
@@ -288,30 +286,21 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                 </div>
             </Card>
 
-            <Card className="p-4 border-l-4 border-green-500">
-                <h3 className="font-bold text-lg mb-3 text-green-400 flex items-center"><ShoppingCart className="w-5 h-5 mr-2"/> កំណត់កញ្ចប់កាក់ (Sell Coins)</h3>
-                <div className="space-y-3">
-                    {config.coinPackages?.map((pkg, idx) => (
-                        <div key={pkg.id || idx} className="flex space-x-2 items-center bg-purple-900 p-2 rounded">
-                            <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold">{idx + 1}</div>
-                            <div className="flex-1">
-                                <label className="text-xs text-purple-300">ចំនួនកាក់</label>
-                                <InputField type="number" min="0" value={pkg.coins} onChange={(e) => handlePackageChange(idx, 'coins', e.target.value)} />
-                            </div>
-                            <div className="flex-1">
-                                <label className="text-xs text-purple-300">តម្លៃលក់ ($)</label>
-                                <InputField type="text" value={pkg.price} onChange={(e) => handlePackageChange(idx, 'price', e.target.value)} />
-                            </div>
-                        </div>
-                    )) || <p className="text-red-300 text-sm">No packages found.</p>}
-                </div>
-            </Card>
-
             <Card className="p-4 border-l-4 border-pink-500">
-                <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ Ads IDs</h3>
+                <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ Monetag</h3>
                 <div className="space-y-3">
-                    <div><label className="text-xs font-bold text-purple-300">Banner ID</label><InputField name="bannerId" type="text" value={config.adsSettings?.bannerId || ''} onChange={handleAdsChange} /></div>
-                    <div><label className="text-xs font-bold text-purple-300">Interstitial/Video ID</label><InputField name="interstitialId" type="text" value={config.adsSettings?.interstitialId || ''} onChange={handleAdsChange} /></div>
+                    <div>
+                        <label className="text-xs font-bold text-purple-300">Monetag Direct Link URL</label>
+                        <InputField 
+                            name="directLinkUrl" 
+                            type="text" 
+                            placeholder="https://..." 
+                            value={config.adsSettings?.directLinkUrl || ''} 
+                            onChange={handleAdsChange} 
+                            className="text-blue-300"
+                        />
+                        <p className="text-[10px] text-gray-400 mt-1">ដាក់ Link ពី Monetag នៅទីនេះ</p>
+                    </div>
                 </div>
             </Card>
 
@@ -1582,9 +1571,12 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
 const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) => {
     const [adsWatched, setAdsWatched] = useState(0);
     const [timer, setTimer] = useState(15);
+    const [isAdOpened, setIsAdOpened] = useState(false); // Check if user clicked
     const [finished, setFinished] = useState(false);
+    
     const reward = globalConfig.adsReward || 30;
     const maxDaily = globalConfig.maxDailyAds || 15;
+    const directLink = globalConfig.adsSettings?.directLinkUrl || "https://google.com"; // Fallback
 
     useEffect(() => {
         const unsub = onSnapshot(getDailyStatusDocRef(userId), (doc) => {
@@ -1595,10 +1587,20 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
 
     useEffect(() => {
         let interval;
-        if (timer > 0) { interval = setInterval(() => setTimer(t => t - 1), 1000); }
-        else setFinished(true);
+        // Start timer ONLY after ad is opened
+        if (isAdOpened && timer > 0) { 
+            interval = setInterval(() => setTimer(t => t - 1), 1000); 
+        } else if (timer === 0) {
+            setFinished(true);
+        }
         return () => clearInterval(interval);
-    }, [timer]);
+    }, [timer, isAdOpened]);
+
+    const handleOpenAd = () => {
+        // Open Monetag Link in new tab
+        window.open(directLink, '_blank');
+        setIsAdOpened(true);
+    };
 
     const claimReward = async () => {
         if (adsWatched >= maxDaily) return showNotification('អស់សិទ្ធិមើលសម្រាប់ថ្ងៃនេះហើយ!', 'error');
@@ -1611,10 +1613,9 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
                 });
                 tx.set(dailyRef, { adsWatchedCount: increment(1), date: getTodayDateKey() }, { merge: true });
                
-                // SAVE HISTORY
                 const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
                 tx.set(historyRef, {
-                    title: 'Watched Ad',
+                    title: 'Watched Ad (Monetag)',
                     amount: reward,
                     date: serverTimestamp(),
                     type: 'ads'
@@ -1629,23 +1630,53 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
 
     return (
         <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 z-50">
-            <div className="text-white text-2xl font-bold mb-4">កំពុងមើលពាណិជ្ជកម្ម...</div>
-            <div className="w-full h-64 bg-gray-800 flex items-center justify-center rounded-lg mb-6 border-2 border-yellow-500 relative">
-                <div className="absolute top-2 right-2 bg-red-600 text-white text-xs px-2 py-1 rounded">
-                    Watched: {adsWatched} / {maxDaily}
+            <div className="text-white text-2xl font-bold mb-4">មើលពាណិជ្ជកម្ម</div>
+            
+            <div className="w-full max-w-md bg-gray-800 rounded-xl p-6 border-2 border-yellow-500 relative text-center">
+                <div className="absolute top-2 right-2 bg-red-600 text-white text-xs px-2 py-1 rounded font-bold">
+                    {adsWatched} / {maxDaily}
                 </div>
-                <div className="text-center">
-                    <MonitorPlay className="w-16 h-16 text-yellow-500 mx-auto mb-2" />
-                    <p className="text-white">ADS ID: {globalConfig.adsSettings?.interstitialId || 'N/A'}</p>
-                </div>
+                
+                <MonitorPlay className="w-20 h-20 text-yellow-500 mx-auto mb-4 animate-bounce" />
+                
+                {isLimitReached ? (
+                    <div className="text-red-500 font-bold text-xl bg-white p-3 rounded">អស់សិទ្ធិមើលសម្រាប់ថ្ងៃនេះហើយ</div>
+                ) : (
+                    <>
+                        {!isAdOpened ? (
+                            <div className='space-y-4'>
+                                <p className="text-white mb-4">ចុចប៊ូតុងខាងក្រោមដើម្បីបើកពាណិជ្ជកម្ម រួចរង់ចាំ 15 វិនាទី។</p>
+                                <button 
+                                    onClick={handleOpenAd} 
+                                    className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg transition transform active:scale-95"
+                                >
+                                    បើកពាណិជ្ជកម្ម (OPEN AD)
+                                </button>
+                            </div>
+                        ) : (
+                            <div className='space-y-4'>
+                                {finished ? (
+                                    <button 
+                                        onClick={claimReward} 
+                                        className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-full text-xl shadow-lg animate-pulse"
+                                    >
+                                        ទទួលរង្វាន់ (CLAIM)
+                                    </button>
+                                ) : (
+                                    <div>
+                                        <p className="text-gray-400 text-sm mb-2">សូមកុំបិទផ្ទាំងពាណិជ្ជកម្ម...</p>
+                                        <div className="text-white text-3xl font-bold font-mono">{timer}s</div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </>
+                )}
             </div>
-            {isLimitReached ? (
-                <div className="text-red-500 font-bold text-xl bg-white p-3 rounded">អស់សិទ្ធិមើលសម្រាប់ថ្ងៃនេះហើយ</div>
-            ) : (
-                finished ?
-                <button onClick={claimReward} className="bg-green-500 text-white font-bold py-3 px-8 rounded-full text-xl shadow-lg animate-bounce">ទទួលរង្វាន់ (Claim)</button>
-                : <div className="text-white text-xl">រង់ចាំ: {timer} វិនាទី</div>
-            )}
+            
+            <button onClick={() => setPage('DASHBOARD')} className="mt-8 text-gray-500 hover:text-white underline">
+                ត្រឡប់ក្រោយ (Back)
+            </button>
         </div>
     );
 };
