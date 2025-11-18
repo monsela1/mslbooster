@@ -77,7 +77,6 @@ const getEmbedUrl = (url) => {
     return null;
 };
 
-// KHQR CRC16 Calculator
 const crc16 = (str) => {
     let crc = 0xFFFF;
     for (let c = 0; c < str.length; c++) {
@@ -91,19 +90,17 @@ const crc16 = (str) => {
     return hex.length === 3 ? "0" + hex : hex.length === 2 ? "00" + hex : hex.length === 1 ? "000" + hex : hex;
 };
 
-// Generate KHQR String
 const generateKhqr = (bakongId, amount) => {
     const accountInfo = `0006bakong01${bakongId.length < 10 ? '0'+bakongId.length : bakongId.length}${bakongId}`;
     const tag29 = `29${accountInfo.length}${accountInfo}`;
     const amountStr = amount.toString();
     const tag54 = `54${amountStr.length < 10 ? '0'+amountStr.length : amountStr.length}${amountStr}`;
-    const tag53 = `5303840`; // 840 = USD
+    const tag53 = `5303840`; 
     const tag58 = "5802KH";
     const name = "MSL BOOSTER"; 
     const tag59 = `59${name.length < 10 ? '0'+name.length : name.length}${name}`;
     const city = "PHNOM PENH";
     const tag60 = `60${city.length < 10 ? '0'+city.length : city.length}${city}`;
-    
     let qrString = `000201010212${tag29}52045999${tag53}${tag54}${tag58}${tag59}${tag60}6304`;
     const crc = crc16(qrString);
     return qrString + crc;
@@ -126,12 +123,12 @@ const defaultGlobalConfig = {
     adsReward: 30,
     maxDailyAds: 15,
     enableBuyCoins: false,
-    exchangeRate: 10000, // 10,000 Coins = $1.00
+    exchangeRate: 10000, 
     withdrawalOptions: [2, 5, 7, 10],
     adsSettings: {
         bannerId: "", 
         interstitialId: "", 
-        directLinkUrl: "https://google.com", // Monetag/Adsterra Link
+        directLinkUrl: "https://google.com", 
         bannerImgUrl: "", 
         bannerClickUrl: "",
         isEnabled: true
@@ -218,7 +215,9 @@ const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
     );
 };
 
-// --- 5. ADMIN COMPONENTS ---
+// ==========================================
+// --- 5. ADMIN COMPONENTS (RE-STRUCTURED) ---
+// ==========================================
 
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     const [withdrawStr, setWithdrawStr] = useState(config.withdrawalOptions?.join(', ') || '2, 5, 7, 10');
@@ -257,12 +256,12 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     return (
         <div className="space-y-4 pb-10">
             <Card className="p-4 border-l-4 border-blue-500">
-                <h3 className="font-bold text-lg mb-3 text-blue-400 flex items-center"><Settings className="w-5 h-5 mr-2"/> ការកំណត់ទូទៅ</h3>
+                <h3 className="font-bold text-lg mb-3 text-blue-400 flex items-center"><Settings className="w-5 h-5 mr-2"/> ការកំណត់ទូទៅ (Features)</h3>
                 <div className="flex items-center justify-between bg-purple-900/50 p-4 rounded-lg border border-purple-600">
                     <div className="flex flex-col">
                         <span className="text-white font-bold text-base">បើកមុខងារទិញកាក់</span>
                         <span className={`text-xs mt-1 font-bold ${config.enableBuyCoins ? 'text-green-400' : 'text-red-400'}`}>
-                            {config.enableBuyCoins ? 'ON' : 'OFF'}
+                            {config.enableBuyCoins ? 'កំពុងបើក (ON)' : 'កំពុងបិទ (OFF)'}
                         </span>
                     </div>
                     <button onClick={handleToggleChange} className={`relative w-16 h-8 rounded-full transition-colors duration-300 focus:outline-none shadow-inner ${config.enableBuyCoins ? 'bg-green-500' : 'bg-gray-600'}`}>
@@ -274,16 +273,36 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
             <Card className="p-4 border-l-4 border-yellow-400">
                 <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់ & អត្រាប្តូរ</h3>
                 <div className="grid grid-cols-1 gap-3">
-                    <div><label className="text-xs font-bold text-purple-300">Daily Check-in</label><InputField name="dailyCheckinReward" type="number" min="0" value={config.dailyCheckinReward || 0} onChange={handleChange} /></div>
-                    <div><label className="text-xs font-bold text-purple-300">Referral Reward</label><InputField name="referrerReward" type="number" min="0" value={config.referrerReward || 0} onChange={handleChange} /></div>
-                    <div><label className="text-xs font-bold text-purple-300">Referred Bonus</label><InputField name="referredBonus" type="number" min="0" value={config.referredBonus || 0} onChange={handleChange} /></div>
+                    <div><label className="text-xs font-bold text-purple-300">Daily Check-in Points</label><InputField name="dailyCheckinReward" type="number" min="0" value={config.dailyCheckinReward || 0} onChange={handleChange} /></div>
+                    <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" min="0" value={config.referrerReward || 0} onChange={handleChange} /></div>
+                    <div><label className="text-xs font-bold text-purple-300">Referred User Bonus</label><InputField name="referredBonus" type="number" min="0" value={config.referredBonus || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Watch Ads Reward</label><InputField name="adsReward" type="number" min="0" value={config.adsReward || 0} onChange={handleChange} /></div>
                     
                     <div className="pt-3 border-t border-purple-600 mt-2 bg-purple-900/30 p-2 rounded space-y-3">
-                        <div><label className="text-xs font-bold text-green-400 flex justify-between"><span>អត្រាប្ដូរប្រាក់ (Exchange Rate)</span></label><InputField name="exchangeRate" type="number" min="1" value={config.exchangeRate || 10000} onChange={handleChange} className="border-green-500 text-green-300" /></div>
-                        <div><label className="text-xs font-bold text-blue-400">ជម្រើសដកលុយ (Withdraw Options)</label><InputField type="text" value={withdrawStr} onChange={handleWithdrawStrChange} onBlur={handleWithdrawBlur} className="border-blue-500 text-blue-300 font-bold" /></div>
+                        <div>
+                            <label className="text-xs font-bold text-green-400 flex justify-between">
+                                <span>អត្រាប្ដូរប្រាក់ (Exchange Rate)</span>
+                                <span className="text-white opacity-70">Coins to $1.00</span>
+                            </label>
+                            <InputField name="exchangeRate" type="number" min="1" value={config.exchangeRate || 10000} onChange={handleChange} className="border-green-500 text-green-300" />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-blue-400">ជម្រើសដកលុយ (Withdraw Options)</label>
+                            <p className="text-[10px] text-gray-400 mb-1">សរសេរលេខខណ្ឌដោយសញ្ញាក្បៀស (,) ឧ: 2, 5, 7, 10</p>
+                            <InputField 
+                                type="text" 
+                                value={withdrawStr} 
+                                onChange={handleWithdrawStrChange} 
+                                onBlur={handleWithdrawBlur}
+                                className="border-blue-500 text-blue-300 font-bold" 
+                            />
+                        </div>
                     </div>
-                    <div className="pt-3 border-t border-purple-600 mt-2"><label className="text-xs font-bold text-yellow-300">ចំនួនមើលពាណិជ្ជកម្មក្នុងមួយថ្ងៃ (Max)</label><InputField name="maxDailyAds" type="number" min="1" value={config.maxDailyAds || 15} onChange={handleChange} /></div>
+
+                    <div className="pt-3 border-t border-purple-600 mt-2">
+                        <label className="text-xs font-bold text-yellow-300">ចំនួនមើលពាណិជ្ជកម្មក្នុងមួយថ្ងៃ (Max Daily Ads)</label>
+                        <InputField name="maxDailyAds" type="number" min="1" value={config.maxDailyAds || 15} onChange={handleChange} />
+                    </div>
                 </div>
             </Card>
 
@@ -293,28 +312,65 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                     {config.coinPackages?.map((pkg, idx) => (
                         <div key={pkg.id || idx} className="flex space-x-2 items-center bg-purple-900 p-2 rounded">
                             <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white font-bold">{idx + 1}</div>
-                            <div className="flex-1"><label className="text-xs text-purple-300">ចំនួនកាក់</label><InputField type="number" min="0" value={pkg.coins} onChange={(e) => handlePackageChange(idx, 'coins', e.target.value)} /></div>
-                            <div className="flex-1"><label className="text-xs text-purple-300">តម្លៃលក់ ($)</label><InputField type="text" value={pkg.price} onChange={(e) => handlePackageChange(idx, 'price', e.target.value)} /></div>
+                            <div className="flex-1">
+                                <label className="text-xs text-purple-300">ចំនួនកាក់</label>
+                                <InputField type="number" min="0" value={pkg.coins} onChange={(e) => handlePackageChange(idx, 'coins', e.target.value)} />
+                            </div>
+                            <div className="flex-1">
+                                <label className="text-xs text-purple-300">តម្លៃលក់ ($)</label>
+                                <InputField type="text" value={pkg.price} onChange={(e) => handlePackageChange(idx, 'price', e.target.value)} />
+                            </div>
                         </div>
                     )) || <p className="text-red-300 text-sm">No packages found.</p>}
                 </div>
             </Card>
 
             <Card className="p-4 border-l-4 border-pink-500">
-                <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ Ads Network</h3>
+                <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ Ads & Banners</h3>
                 <div className="space-y-3">
-                    <div><label className="text-xs font-bold text-purple-300">Ad Network Direct Link URL</label><InputField name="directLinkUrl" type="text" placeholder="https://..." value={config.adsSettings?.directLinkUrl || ''} onChange={handleAdsChange} className="text-blue-300"/></div>
+                    <div>
+                        <label className="text-xs font-bold text-purple-300">Ad Network Direct Link URL</label>
+                        <InputField 
+                            name="directLinkUrl" 
+                            type="text" 
+                            placeholder="https://..." 
+                            value={config.adsSettings?.directLinkUrl || ''} 
+                            onChange={handleAdsChange} 
+                            className="text-blue-300"
+                        />
+                    </div>
                     <div className="pt-2 border-t border-purple-600 mt-2">
                         <label className="text-xs font-bold text-purple-300 block mb-1">Custom Banner Image URL</label>
-                        <div className="flex items-center space-x-2"><ImageIcon size={20} className="text-gray-400"/><InputField name="bannerImgUrl" type="text" placeholder="https://image.com/banner.gif" value={config.adsSettings?.bannerImgUrl || ''} onChange={handleAdsChange} /></div>
+                        <div className="flex items-center space-x-2">
+                             <ImageIcon size={20} className="text-gray-400"/>
+                             <InputField 
+                                name="bannerImgUrl" 
+                                type="text" 
+                                placeholder="https://image.com/banner.gif" 
+                                value={config.adsSettings?.bannerImgUrl || ''} 
+                                onChange={handleAdsChange} 
+                            />
+                        </div>
                     </div>
                      <div>
                         <label className="text-xs font-bold text-purple-300 block mb-1">Custom Banner Click URL</label>
-                        <div className="flex items-center space-x-2"><Link size={20} className="text-gray-400"/><InputField name="bannerClickUrl" type="text" placeholder="https://ad-link..." value={config.adsSettings?.bannerClickUrl || ''} onChange={handleAdsChange} /></div>
+                        <div className="flex items-center space-x-2">
+                             <Link size={20} className="text-gray-400"/>
+                             <InputField 
+                                name="bannerClickUrl" 
+                                type="text" 
+                                placeholder="https://ad-link..." 
+                                value={config.adsSettings?.bannerClickUrl || ''} 
+                                onChange={handleAdsChange} 
+                            />
+                        </div>
                     </div>
                 </div>
             </Card>
-             <button onClick={onSave} className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-lg flex justify-center items-center transition"><Save className="w-5 h-5 mr-2"/> រក្សាទុកការកំណត់ (SAVE ALL)</button>
+
+             <button onClick={onSave} className="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-lg flex justify-center items-center transition">
+                <Save className="w-5 h-5 mr-2"/> រក្សាទុកការកំណត់ (SAVE ALL)
+            </button>
         </div>
     );
 };
@@ -329,7 +385,8 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
     const loadUserList = async () => {
         setLoadingList(true);
         try {
-            const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'short_codes'), limit(20));
+            const shortCodesRef = collection(db, 'artifacts', appId, 'public', 'data', 'short_codes');
+            const q = query(shortCodesRef, limit(20));
             const snap = await getDocs(q);
             const usersData = await Promise.all(snap.docs.map(async (docSnap) => {
                 const { fullUserId } = docSnap.data();
@@ -351,8 +408,13 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
             if(shortCodeDoc.exists()){
                 const uid = shortCodeDoc.data().fullUserId;
                 const profile = await getDoc(getProfileDocRef(uid));
-                if(profile.exists()) setFoundUser({ uid, ...profile.data() });
-            } else { showNotification('User not found', 'error'); setFoundUser(null); }
+                if(profile.exists()){
+                    setFoundUser({ uid, ...profile.data() });
+                }
+            } else {
+                showNotification('User not found', 'error');
+                setFoundUser(null);
+            }
         } catch(e) { console.error(e); }
     };
 
@@ -368,14 +430,17 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
     };
 
     const handleDeleteUser = async (targetUid, targetShortId) => {
-        if(!window.confirm('Delete this user?')) return;
+        if(!window.confirm('តើអ្នកពិតជាចង់លុបគណនីនេះមែនទេ?')) return;
         try {
             if(targetUid) await deleteDoc(getProfileDocRef(targetUid));
             if(targetShortId) await deleteDoc(getShortCodeDocRef(targetShortId));
-            showNotification('User deleted!', 'success');
+            showNotification('បានលុបគណនីដោយជោគជ័យ!', 'success');
             setFoundUser(null);
             loadUserList(); 
-        } catch (e) { showNotification(e.message, 'error'); }
+        } catch (e) {
+            console.error(e);
+            showNotification('បរាជ័យក្នុងការលុប: ' + e.message, 'error');
+        }
     };
 
     return (
@@ -386,12 +451,14 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                     <InputField value={searchId} onChange={e => setSearchId(e.target.value.toUpperCase())} placeholder="Enter ID (e.g. A1B2C3)" className="uppercase font-mono" maxLength={6} />
                     <button onClick={handleSearch} className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"><Search/></button>
                 </div>
+               
                 {foundUser && (
                     <div className="bg-purple-900 p-4 rounded-lg border border-purple-600 relative">
-                         <button onClick={() => handleDeleteUser(foundUser.uid, foundUser.shortId)} className="absolute top-4 right-4 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"><Trash2 size={20} /></button>
+                         <button onClick={() => handleDeleteUser(foundUser.uid, foundUser.shortId)} className="absolute top-4 right-4 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition" title="លុបគណនីនេះ"><Trash2 size={20} /></button>
                         <p className="font-bold text-lg text-white">{foundUser.userName}</p>
                         <p className="text-purple-300 text-sm">Email: {foundUser.email}</p>
                         <p className="text-purple-300 text-sm mb-2">Current Points: <span className="font-bold text-yellow-400">{formatNumber(foundUser.points)}</span></p>
+                        
                         <div className="flex items-center space-x-2 mt-4">
                             <button onClick={() => setPointsToAdd(p => p - 100)} className="p-2 bg-red-600 rounded text-white"><MinusCircle size={20}/></button>
                             <InputField type="number" value={pointsToAdd} onChange={e => setPointsToAdd(parseInt(e.target.value) || 0)} className="text-center font-bold" />
@@ -401,6 +468,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                     </div>
                 )}
             </Card>
+
             <Card className="p-4">
                 <div className='flex justify-between items-center mb-3'>
                     <h3 className="font-bold text-lg text-white">បញ្ជីអ្នកប្រើប្រាស់ ({allUsers.length})</h3>
@@ -426,14 +494,19 @@ const AdminWithdrawalsTab = ({ db, showNotification }) => {
 
     useEffect(() => {
         const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'withdrawals'), orderBy('date', 'desc'), limit(50));
-        return onSnapshot(q, (snap) => setWithdrawals(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+        return onSnapshot(q, (snap) => {
+            setWithdrawals(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
     }, [db]);
 
     const handleAction = async (item, action) => {
-        if(!window.confirm(action === 'approved' ? 'Approve withdrawal?' : 'Reject and Refund?')) return;
+        const confirmMsg = action === 'approved' ? 'យល់ព្រមឱ្យដកលុយ?' : 'បដិសេធសំណើនេះ?';
+        if(!window.confirm(confirmMsg)) return;
+
         try {
             await runTransaction(db, async (tx) => {
                 const withdrawRef = doc(db, 'artifacts', appId, 'public', 'data', 'withdrawals', item.id);
+                
                 if (action === 'rejected') {
                     const userRef = getProfileDocRef(item.userId);
                     tx.update(userRef, { balance: increment(item.amount) });
@@ -443,7 +516,9 @@ const AdminWithdrawalsTab = ({ db, showNotification }) => {
                 tx.update(withdrawRef, { status: action });
             });
             showNotification(`Success: ${action.toUpperCase()}`, 'success');
-        } catch(e) { showNotification(e.message, 'error'); }
+        } catch(e) {
+            showNotification(e.message, 'error');
+        }
     };
 
     return (
@@ -473,7 +548,9 @@ const AdminDepositsTab = ({ db, showNotification }) => {
 
     useEffect(() => {
         const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'deposits'), orderBy('date', 'desc'), limit(50));
-        return onSnapshot(q, (snap) => setDeposits(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+        return onSnapshot(q, (snap) => {
+            setDeposits(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
     }, [db]);
 
     const handleApprove = async (item) => {
@@ -1067,10 +1144,8 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig, use
     const [trxId, setTrxId] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // --- ព័ត៌មានសម្ងាត់ (CREDENTIALS) ---
     const BAKONG_ID = "monsela@aclb"; 
     const BAKONG_API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7ImlkIjoiZmYzNTdjNWRlNjM0NDgwOSJ9LCJpYXQiOjE3NjI2MTM0MjQsImV4cCI6MTc3MDM4OTQyNH0.6CogHoCPR5pqLVP9C1N6zkk4Wj2KgKdcEh9qy3qAXWU";
-    // -----------------------------------
 
     const handleBuyClick = (pkg) => { setSelectedPkg(pkg); setTrxId(''); };
 
