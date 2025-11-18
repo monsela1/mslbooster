@@ -20,7 +20,7 @@ import {
     DollarSign, LogOut, Mail, Lock, CheckSquare, Edit, Trash2,
     Settings, Copy, Save, Search, PlusCircle, MinusCircle,
     CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
-    ArrowUpRight, ArrowDownLeft, Clock, ChevronDown
+    ArrowUpRight, ArrowDownLeft, Clock, ChevronDown, Image as ImageIcon
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -94,12 +94,15 @@ const defaultGlobalConfig = {
     adsReward: 30,
     maxDailyAds: 15,
     enableBuyCoins: false,
-    exchangeRate: 10000, // 10,000 Coins = $1.00
-    withdrawalOptions: [2, 5, 7, 10], // Default Options
+    exchangeRate: 10000,
+    withdrawalOptions: [2, 5, 7, 10],
     adsSettings: {
-        bannerId: "",
-        interstitialId: "",
-        directLinkUrl: "https://google.com", // Default Monetag Link
+        bannerId: "", // Legacy
+        interstitialId: "", // Legacy
+        directLinkUrl: "https://google.com", // Monetag Link for Watch Ads
+        // NEW: Custom Banner Settings
+        bannerImgUrl: "", // Link to image (e.g., https://i.imgur.com/...)
+        bannerClickUrl: "", // Link to open when clicked (Monetag Link)
         isEnabled: true
     },
     coinPackages: [
@@ -187,7 +190,6 @@ const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
 // --- 5. ADMIN PAGES ---
 
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
-    // Manage withdraw string state
     const [withdrawStr, setWithdrawStr] = useState(config.withdrawalOptions?.join(', ') || '2, 5, 7, 10');
 
     const handleChange = (e) => {
@@ -287,10 +289,10 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
             </Card>
 
             <Card className="p-4 border-l-4 border-pink-500">
-                <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ Monetag</h3>
+                <h3 className="font-bold text-lg mb-3 text-pink-400 flex items-center"><MonitorPlay className="w-5 h-5 mr-2"/> ការកំណត់ Ads & Banners</h3>
                 <div className="space-y-3">
                     <div>
-                        <label className="text-xs font-bold text-purple-300">Monetag Direct Link URL</label>
+                        <label className="text-xs font-bold text-purple-300">Monetag Direct Link URL (For Watch Ads)</label>
                         <InputField 
                             name="directLinkUrl" 
                             type="text" 
@@ -299,7 +301,36 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                             onChange={handleAdsChange} 
                             className="text-blue-300"
                         />
-                        <p className="text-[10px] text-gray-400 mt-1">ដាក់ Link ពី Monetag នៅទីនេះ</p>
+                    </div>
+                    
+                    <div className="pt-2 border-t border-purple-600 mt-2">
+                        <label className="text-xs font-bold text-purple-300 block mb-1">Custom Banner Image URL (Bottom)</label>
+                        <div className="flex items-center space-x-2">
+                             <ImageIcon size={20} className="text-gray-400"/>
+                             <InputField 
+                                name="bannerImgUrl" 
+                                type="text" 
+                                placeholder="https://image.com/banner.gif" 
+                                value={config.adsSettings?.bannerImgUrl || ''} 
+                                onChange={handleAdsChange} 
+                            />
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1">ដាក់ Link រូបភាព (320x50 ឬ 300x50)</p>
+                    </div>
+
+                     <div>
+                        <label className="text-xs font-bold text-purple-300 block mb-1">Custom Banner Click URL (Link)</label>
+                        <div className="flex items-center space-x-2">
+                             <Link size={20} className="text-gray-400"/>
+                             <InputField 
+                                name="bannerClickUrl" 
+                                type="text" 
+                                placeholder="https://monetag-link..." 
+                                value={config.adsSettings?.bannerClickUrl || ''} 
+                                onChange={handleAdsChange} 
+                            />
+                        </div>
+                        <p className="text-[10px] text-gray-400 mt-1">ដាក់ Link ដែលចង់ឱ្យបើកពេលគេចុច Banner</p>
                     </div>
                 </div>
             </Card>
@@ -1263,10 +1294,16 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
             </div>
 
             <div className="absolute bottom-0 w-full bg-gray-100 border-t border-gray-300 h-16 flex items-center justify-center z-30">
-                 <div className="flex flex-col items-center">
-                    <span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-1 rounded mb-1">AD</span>
-                    <p className="text-xs text-gray-500 font-mono">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p>
-                </div>
+                 {globalConfig.adsSettings?.bannerImgUrl ? (
+                     <a href={globalConfig.adsSettings.bannerClickUrl || '#'} target="_blank" rel="noopener noreferrer" className="w-full h-full">
+                         <img src={globalConfig.adsSettings.bannerImgUrl} alt="Ads" className="w-full h-full object-cover"/>
+                     </a>
+                 ) : (
+                    <div className="flex flex-col items-center">
+                        <span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-1 rounded mb-1">AD</span>
+                        <p className="text-xs text-gray-500 font-mono">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p>
+                    </div>
+                 )}
             </div>
         </div>
     );
@@ -1968,9 +2005,16 @@ const App = () => {
 
                     <div className="px-4 mt-6">
                         <div className="w-full bg-white h-20 flex flex-col items-center justify-center rounded-lg border-2 border-yellow-500/50 shadow-lg relative overflow-hidden">
-                             <div className="absolute top-0 right-0 bg-yellow-500 text-purple-900 text-[10px] px-2 font-bold">AD</div>
-                            <MonitorPlay className="w-6 h-6 text-gray-400 mb-1" />
-                            <p className="text-xs text-gray-500 font-mono">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p>
+                             {globalConfig.adsSettings?.bannerImgUrl ? (
+                                 <a href={globalConfig.adsSettings.bannerClickUrl || '#'} target="_blank" rel="noopener noreferrer" className="w-full h-full block">
+                                     <img src={globalConfig.adsSettings.bannerImgUrl} alt="Ads" className="w-full h-full object-cover"/>
+                                 </a>
+                             ) : (
+                                <div className="flex flex-col items-center">
+                                    <span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-1 rounded mb-1">AD</span>
+                                    <p className="text-xs text-gray-500 font-mono">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p>
+                                </div>
+                             )}
                         </div>
                     </div>
                 </div>
