@@ -13,5 +13,17 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+  <script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('/sw.js').then(function(registration) {
+        console.log('Monetag SW registered');
+      }, function(err) {
+        console.log('Monetag SW failed', err);
+      });
+    });
+  }
+</script>
+  
   </body>
 </html>
