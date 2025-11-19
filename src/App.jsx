@@ -11,7 +11,7 @@ import {
 import {
     getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc, deleteDoc,
     collection, query, where, serverTimestamp, getDocs,
-    runTransaction, increment, limit, orderBy
+    runTransaction, increment, limit, orderBy, startAfter // <--- Added startAfter
 } from 'firebase/firestore';
 import {
     Users, Coins, Video, Link, Globe, MonitorPlay, Zap,
@@ -21,7 +21,7 @@ import {
     Settings, Copy, Save, Search, PlusCircle, MinusCircle,
     CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
     ArrowUpRight, ArrowDownLeft, Clock, ChevronDown, Image as ImageIcon, LogIn,
-    Youtube, Bell, AlertTriangle, MessageCircle // <--- Added MessageCircle
+    Youtube, Bell, AlertTriangle, MessageCircle
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -140,7 +140,7 @@ const defaultGlobalConfig = {
     enableBuyCoins: false,
     enableWithdraw: true, 
     exchangeRate: 10000,
-    minTasksForWithdraw: 50, // New Field
+    minTasksForWithdraw: 50,
     withdrawalOptions: [2, 5, 7, 10],
     adsSettings: {
         bannerId: "", 
@@ -150,7 +150,7 @@ const defaultGlobalConfig = {
         bannerClickUrl: "",
         isEnabled: true
     },
-    welcomePopup: { // New Field
+    welcomePopup: {
         isEnabled: true,
         title: "សួស្តី!",
         message: "ជួយគ្នាដើម្បីជោគជ័យទាំងអស់គ្នា"
@@ -237,22 +237,21 @@ const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
     );
 };
 
+// --- FIXED: ORANGE WELCOME MODAL ---
 const WelcomeModal = ({ isOpen, onClose, title, message }) => {
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in zoom-in duration-300">
-            <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative">
-                <div className="bg-purple-900 p-4 text-center">
-                    <div className="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-2">
-                        <MessageCircle size={32} className="text-yellow-400" />
+            <div className="bg-orange-500 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative text-white border-4 border-orange-400">
+                <div className="p-6 text-center flex flex-col items-center">
+                    <div className="bg-white w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-md animate-bounce">
+                        <MessageCircle size={32} className="text-orange-600" />
                     </div>
-                    <h3 className="text-xl font-bold text-white">{title || "សួស្តី!"}</h3>
+                    <h3 className="text-2xl font-extrabold mb-2 drop-shadow-md">{title || "សួស្តី!"}</h3>
+                    <p className="text-white font-medium text-lg leading-relaxed opacity-95">{message || "សូមស្វាគមន៍"}</p>
                 </div>
-                <div className="p-6 text-center">
-                    <p className="text-gray-700 font-medium text-lg leading-relaxed">{message || "សូមស្វាគមន៍"}</p>
-                </div>
-                <div className="p-4 bg-gray-50 border-t border-gray-200">
-                    <button onClick={onClose} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl shadow transition">
+                <div className="p-4 bg-orange-600/50 border-t border-orange-400/50">
+                    <button onClick={onClose} className="w-full bg-white hover:bg-gray-100 text-orange-600 font-extrabold py-3 rounded-xl shadow-lg transition transform active:scale-95">
                         យល់ព្រម (OK)
                     </button>
                 </div>
@@ -322,8 +321,8 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     return (
         <div className="space-y-4 pb-10">
             {/* POPUP SETTINGS */}
-            <Card className="p-4 border-l-4 border-indigo-500">
-                <h3 className="font-bold text-lg mb-3 text-indigo-400 flex items-center"><MessageCircle className="w-5 h-5 mr-2"/> Pop-up ពេលចូល (Welcome Message)</h3>
+            <Card className="p-4 border-l-4 border-orange-500">
+                <h3 className="font-bold text-lg mb-3 text-orange-400 flex items-center"><MessageCircle className="w-5 h-5 mr-2"/> Pop-up ពេលចូល (Welcome Message)</h3>
                 <div className="flex items-center justify-between bg-purple-900/50 p-3 rounded-lg border border-purple-600 mb-3">
                     <span className="text-white font-bold">បង្ហាញ Pop-up</span>
                     <button onClick={handlePopupToggle} className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${config.welcomePopup?.isEnabled ? 'bg-green-500' : 'bg-gray-600'}`}>
@@ -494,20 +493,40 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     );
 };
 
+// --- UPDATED: ADMIN USER MANAGER WITH PAGINATION ---
 const AdminUserManagerTab = ({ db, showNotification }) => {
     const [searchId, setSearchId] = useState('');
     const [foundUser, setFoundUser] = useState(null);
     const [pointsToAdd, setPointsToAdd] = useState(0);
     const [allUsers, setAllUsers] = useState([]);
     const [loadingList, setLoadingList] = useState(false);
+    const [lastDoc, setLastDoc] = useState(null); // Track last document for pagination
+    const [hasMore, setHasMore] = useState(true);
 
-    const loadUserList = async () => {
+    const loadUserList = async (isLoadMore = false) => {
+        if (isLoadMore && !lastDoc) return; // Safety check
+        
         setLoadingList(true);
         try {
             const shortCodesRef = collection(db, 'artifacts', appId, 'public', 'data', 'short_codes');
-            const q = query(shortCodesRef, limit(20));
+            
+            let q;
+            if (isLoadMore) {
+                // Fetch next 50
+                q = query(shortCodesRef, limit(50), startAfter(lastDoc));
+            } else {
+                // Fetch initial 50
+                q = query(shortCodesRef, limit(50));
+            }
+
             const snap = await getDocs(q);
             
+            if (snap.empty) {
+                setHasMore(false);
+                setLoadingList(false);
+                return;
+            }
+
             const usersData = await Promise.all(snap.docs.map(async (docSnap) => {
                 const { fullUserId } = docSnap.data();
                 if(!fullUserId) return null;
@@ -518,7 +537,25 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                 return null;
             }));
             
-            setAllUsers(usersData.filter(u => u !== null));
+            const validUsers = usersData.filter(u => u !== null);
+
+            if (isLoadMore) {
+                setAllUsers(prev => [...prev, ...validUsers]);
+            } else {
+                setAllUsers(validUsers);
+            }
+
+            // Update lastDoc
+            const lastVisible = snap.docs[snap.docs.length - 1];
+            setLastDoc(lastVisible);
+            
+            // If we fetched less than limit, no more data
+            if (snap.docs.length < 50) {
+                setHasMore(false);
+            } else {
+                setHasMore(true);
+            }
+
         } catch (e) { console.error(e); }
         setLoadingList(false);
     };
@@ -549,7 +586,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
             showNotification('Points updated successfully', 'success');
             setFoundUser(prev => ({...prev, points: prev.points + parseInt(pointsToAdd)}));
             setPointsToAdd(0);
-            loadUserList();
+            // Refresh logic could be complex with pagination, maybe just update local state or reload
         } catch(e) { showNotification('Update failed', 'error'); }
     };
 
@@ -560,7 +597,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
             if(targetShortId) await deleteDoc(getShortCodeDocRef(targetShortId));
             showNotification('បានលុបគណនីដោយជោគជ័យ!', 'success');
             setFoundUser(null);
-            loadUserList(); 
+            loadUserList(false); // Reload from scratch
         } catch (e) {
             console.error(e);
             showNotification('បរាជ័យក្នុងការលុប: ' + e.message, 'error');
@@ -614,33 +651,42 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
             <Card className="p-4">
                 <div className='flex justify-between items-center mb-3'>
                     <h3 className="font-bold text-lg text-white">បញ្ជីអ្នកប្រើប្រាស់ ({allUsers.length})</h3>
-                    <button onClick={loadUserList} className='p-2 bg-purple-600 rounded hover:bg-purple-500'><RefreshCw size={18} className='text-white'/></button>
+                    <button onClick={() => loadUserList(false)} className='p-2 bg-purple-600 rounded hover:bg-purple-500'><RefreshCw size={18} className='text-white'/></button>
                 </div>
                 
-                {loadingList ? <div className='text-center text-purple-300'>Loading users...</div> : (
-                    <div className='overflow-y-auto max-h-64 space-y-2'>
-                        {allUsers.map((u, i) => (
-                            <div key={u.uid || i} className='flex justify-between items-center bg-purple-900 p-3 rounded border border-purple-700 cursor-pointer hover:bg-purple-800 transition'>
-                                <div onClick={() => {setFoundUser(u); setSearchId(u.shortId);}} className="flex-1">
-                                    <p className='font-bold text-white text-sm'>{u.userName}</p>
-                                    <p className='text-xs text-purple-400 font-mono'>{u.shortId} | {u.email}</p>
-                                </div>
-                                <div className="flex items-center space-x-3">
-                                    <span className='font-bold text-yellow-400 mr-2'>{formatNumber(u.points)}</span>
-                                    <button 
-                                        onClick={(e) => {
-                                            e.stopPropagation(); 
-                                            handleDeleteUser(u.uid, u.shortId);
-                                        }}
-                                        className="p-2 bg-red-900/50 text-red-400 rounded hover:bg-red-600 hover:text-white transition"
-                                    >
-                                        <Trash2 size={16} />
-                                    </button>
-                                </div>
+                <div className='overflow-y-auto max-h-96 space-y-2'>
+                    {allUsers.map((u, i) => (
+                        <div key={u.uid || i} className='flex justify-between items-center bg-purple-900 p-3 rounded border border-purple-700 cursor-pointer hover:bg-purple-800 transition'>
+                            <div onClick={() => {setFoundUser(u); setSearchId(u.shortId);}} className="flex-1">
+                                <p className='font-bold text-white text-sm'>{u.userName}</p>
+                                <p className='text-xs text-purple-400 font-mono'>{u.shortId} | {u.email}</p>
                             </div>
-                        ))}
-                    </div>
-                )}
+                            <div className="flex items-center space-x-3">
+                                <span className='font-bold text-yellow-400 mr-2'>{formatNumber(u.points)}</span>
+                                <button 
+                                    onClick={(e) => {
+                                        e.stopPropagation(); 
+                                        handleDeleteUser(u.uid, u.shortId);
+                                    }}
+                                    className="p-2 bg-red-900/50 text-red-400 rounded hover:bg-red-600 hover:text-white transition"
+                                >
+                                    <Trash2 size={16} />
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                    
+                    {loadingList && <div className='text-center text-purple-300 py-2'>កំពុងផ្ទុក...</div>}
+                    
+                    {!loadingList && hasMore && (
+                        <button 
+                            onClick={() => loadUserList(true)} 
+                            className="w-full py-3 bg-gray-700 hover:bg-gray-600 text-white font-bold rounded mt-2"
+                        >
+                            មើលបន្ថែម (Load More)
+                        </button>
+                    )}
+                </div>
             </Card>
         </div>
     );
@@ -2268,7 +2314,7 @@ const AuthForm = ({ onSubmit, onGoogleLogin }) => {
 const App = () => {
     const [page, setPage] = useState('DASHBOARD');
     const [userId, setUserId] = useState(null);
-    const [userProfile, setUserProfile] = useState(null); 
+    const [userProfile, setUserProfile] = useState(null); // Null if guest
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [notification, setNotification] = useState(null);
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
@@ -2356,6 +2402,7 @@ const App = () => {
 
     const handleLogout = async () => { await signOut(auth); showNotification('បានចាកចេញ', 'success'); };
 
+    // +++ HELPER: Check Auth before Action +++
     const handleAuthAction = (action) => {
         if (userId) {
             action();
@@ -2379,6 +2426,7 @@ const App = () => {
 
     if (!isAuthReady) return <Loading />;
 
+    // +++ PREPARE DISPLAY DATA (GUEST MODE) +++
     const displayPoints = userProfile?.points || 0;
     const displayBalance = userProfile?.balance || 0;
     const displayShortId = userProfile?.shortId || "GUEST";
@@ -2404,6 +2452,7 @@ const App = () => {
                         rightContent={
                             <div className="flex space-x-2">
                                 {isAdmin && (<button onClick={() => setPage('ADMIN_DASHBOARD')} className="bg-red-500 text-white p-1 rounded shadow"><Settings size={20}/></button>)}
+                                {/* +++ Login/Logout Logic +++ */}
                                 {userId ? (
                                     <button onClick={handleLogout} className="bg-gray-600 text-white p-1 rounded shadow"><LogOut size={20}/></button>
                                 ) : (
@@ -2416,8 +2465,11 @@ const App = () => {
                     />
                     
                     {/* --- Balance Card --- */}
-                    <div className={`px-4 mb-6 transition-opacity duration-200 ${showLoginModal ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                    {/* FIXED: Added opacity-0 to hide this block when modal is open */}
+                    <div className={`px-4 mb-6 transition-opacity duration-200 ${showLoginModal || showWelcomeModal ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                         <div className="bg-gradient-to-br from-[#5b247a] to-[#1bcedf] rounded-2xl p-6 text-white shadow-2xl text-center relative overflow-hidden border border-white/10">
+                            
+                            {/* Background Decorations */}
                             <div className="absolute -top-10 -left-10 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl z-0"></div>
                             <div className="absolute top-2 right-[-10px] opacity-10 transform rotate-12 z-0">
                                 <Youtube size={80} className="text-white" />
@@ -2428,12 +2480,16 @@ const App = () => {
                             <div className="absolute top-1/2 left-10 opacity-5 transform -rotate-45 z-0">
                                 <Bell size={50} className="text-pink-300" />
                             </div>
+
+                            {/* Content Layer */}
                             <div className="relative z-10">
                                 <p className="text-sm font-medium opacity-90 tracking-wide">សមតុល្យរបស់អ្នក</p>
+                                
                                 <h1 className="text-5xl font-extrabold mt-3 mb-3 flex justify-center items-center gap-2 text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-300 drop-shadow-sm">
                                     {formatNumber(displayPoints)} 
                                     <Coins className="w-8 h-8 text-yellow-400 drop-shadow" fill="currentColor" />
                                 </h1>
+                                
                                 <div className="flex justify-center items-center mb-5">
                                     <div className="bg-white/10 backdrop-blur-md px-6 py-2 rounded-full flex items-center border border-white/20 shadow-inner">
                                         <span className="text-green-400 font-bold mr-1 text-xl">$</span>
@@ -2442,6 +2498,7 @@ const App = () => {
                                         </span>
                                     </div>
                                 </div>
+                                
                                 <div className="inline-block">
                                     <p className="text-xs font-bold text-white/70 bg-black/20 px-4 py-1.5 rounded-lg uppercase tracking-wider">
                                         ID: {displayShortId}
@@ -2451,8 +2508,8 @@ const App = () => {
                         </div>
                     </div>
 
-                    {/* Menu Grid */}
-                    <div className={`px-4 transition-opacity duration-200 ${showLoginModal ? 'opacity-20 pointer-events-none' : 'opacity-100'}`}>
+                    {/* Menu Grid - Dimmed when modal open */}
+                    <div className={`px-4 transition-opacity duration-200 ${showLoginModal || showWelcomeModal ? 'opacity-20 pointer-events-none' : 'opacity-100'}`}>
                         <Card className="p-4 grid grid-cols-3 gap-3">
                             <IconButton icon={CalendarCheck} title="DAILY TASK" onClick={() => handleAuthAction(handleDailyCheckin)} iconColor={userProfile?.dailyCheckin ? 'text-gray-500' : 'text-blue-400'} textColor={userProfile?.dailyCheckin ? 'text-gray-400' : 'text-white'} disabled={!!userProfile?.dailyCheckin && !!userId} />
                             <IconButton icon={UserCheck} title="SUBSCRIBE" onClick={() => handleAuthAction(() => setPage('EXPLORE_SUBSCRIPTION'))} iconColor="text-pink-400" />
@@ -2466,8 +2523,8 @@ const App = () => {
                         </Card>
                     </div>
                     
-                     {/* Ad Banner */}
-                    <div className={`px-4 mt-6 transition-opacity duration-200 ${showLoginModal ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                     {/* Ad Banner - Hidden when modal open */}
+                    <div className={`px-4 mt-6 transition-opacity duration-200 ${showLoginModal || showWelcomeModal ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                         <div className="w-full bg-white h-20 flex flex-col items-center justify-center rounded-lg border-2 border-yellow-500/50 shadow-lg relative overflow-hidden">
                              {globalConfig.adsSettings?.bannerImgUrl ? (<a href={globalConfig.adsSettings.bannerClickUrl || '#'} target="_blank" rel="noopener noreferrer" className="w-full h-full block"><img src={globalConfig.adsSettings.bannerImgUrl} alt="Ads" className="w-full h-full object-cover"/></a>) : (<div className="flex flex-col items-center"><span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-1 rounded mb-1">AD</span><p className="text-xs text-gray-500 font-mono">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p></div>)}
                         </div>
@@ -2495,7 +2552,7 @@ const App = () => {
                 </div>
             )}
 
-            {/* +++ WELCOME POPUP +++ */}
+            {/* +++ WELCOME POPUP (ORANGE) +++ */}
             {showWelcomeModal && userId && globalConfig.welcomePopup?.isEnabled && (
                 <WelcomeModal 
                     isOpen={showWelcomeModal} 
