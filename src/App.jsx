@@ -242,23 +242,15 @@ const WelcomeModal = ({ isOpen, onClose, title, message }) => {
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in zoom-in duration-300">
-            {/* 1. Card Background: Orange */}
             <div className="bg-orange-500 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative border-2 border-orange-400">
                 <div className="p-6 text-center flex flex-col items-center">
-                    {/* 2. Icon Container: White */}
                     <div className="bg-white w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-lg animate-bounce">
-                        {/* 3. Icon: Orange */}
                         <MessageCircle size={32} className="text-orange-500" />
                     </div>
-                    {/* 4. Title: White */}
                     <h3 className="text-2xl font-extrabold mb-2 text-white drop-shadow-md">{title || "សួស្តី!"}</h3>
-                    {/* 5. Message: White */}
                     <p className="text-white font-medium text-lg leading-relaxed opacity-95">{message || "សូមស្វាគមន៍"}</p>
                 </div>
-
-                {/* 6. Footer: Darker Orange or Transparent */}
                 <div className="p-4 bg-orange-600/20 border-t border-orange-400/30">
-                    {/* 7. Button: White with Orange Text */}
                     <button onClick={onClose} className="w-full bg-white hover:bg-gray-100 text-orange-600 font-extrabold py-3 rounded-xl shadow-lg transition transform active:scale-95">
                         យល់ព្រម (OK)
                     </button>
@@ -938,16 +930,32 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
                     <div className="space-y-2 pb-10">
                         {campaigns.map(c => (
                             <div key={c.id} className={`bg-purple-800 p-3 rounded-lg shadow flex justify-between items-center border-l-4 ${c.remaining > 0 ? 'border-green-500' : 'border-red-500'}`}>
-                                <div className='overflow-hidden'>
-                                    <p className="font-bold text-sm truncate text-white w-48">{c.link}</p>
-                                    <div className='flex space-x-2 text-xs mt-1'>
-                                        <span className='bg-purple-900 px-2 py-0.5 rounded text-purple-200'>{c.type}</span>
-                                        <span className={`${c.remaining > 0 ? 'text-green-400' : 'text-red-400'} font-bold`}>
-                                            Rem: {c.remaining}
-                                        </span>
+                                <div className="flex items-center space-x-3 overflow-hidden">
+                                    {/* Image Block */}
+                                    <div className="w-20 h-14 flex-shrink-0 bg-black rounded overflow-hidden border border-purple-600">
+                                        <img
+                                            src={getYouTubeID(c.link) ? `https://img.youtube.com/vi/${getYouTubeID(c.link)}/mqdefault.jpg` : 'https://via.placeholder.com/150'}
+                                            alt="Thumbnail"
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => e.target.style.display = 'none'} 
+                                        />
+                                    </div>
+
+                                    {/* Text Block */}
+                                    <div className="flex-1 overflow-hidden">
+                                        <a href={c.link} target="_blank" rel="noreferrer" className="font-bold text-sm truncate text-blue-300 hover:underline block w-full">
+                                            {c.link}
+                                        </a>
+                                        <div className='flex space-x-2 text-xs mt-1'>
+                                           <span className='bg-purple-900 px-2 py-0.5 rounded text-purple-200'>{c.type}</span>
+                                           <span className={`${c.remaining > 0 ? 'text-green-400' : 'text-red-400'} font-bold`}>
+                                                Rem: {c.remaining}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
-                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 shadow">
+
+                                <button onClick={() => handleDeleteCampaign(c.id)} className="p-2 bg-red-600 text-white rounded-full hover:bg-red-700 shadow ml-2">
                                     <Trash2 size={18}/>
                                 </button>
                             </div>
