@@ -64,7 +64,7 @@ const getShortId = (id) => id?.substring(0, 6).toUpperCase() || '------';
 const formatNumber = (num) => num?.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') || '0';
 
 const getYouTubeID = (url) => {
-    if (!url) return null;
+    if (!url || typeof url !== 'string') return null;
     const regExp = /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
     const match = url.match(regExp);
     return (match && match[7].length === 11) ? match[7] : null;
@@ -1384,6 +1384,8 @@ const YouTubePlayer = ({ videoId, onStateChange }) => {
     }, [onStateChange]);
 
     useEffect(() => {
+        if (!videoId) return;
+
         if (!window.YT) {
             const tag = document.createElement('script');
             tag.src = "https://www.youtube.com/iframe_api";
@@ -1392,29 +1394,40 @@ const YouTubePlayer = ({ videoId, onStateChange }) => {
         }
 
         const createPlayer = () => {
-            if (playerRef.current) return; // Prevent duplicate players
+            if (playerRef.current) {
+                try { playerRef.current.destroy(); } catch(e) {}
+            }
 
-            playerRef.current = new window.YT.Player(`Youtubeer-${videoId}`, {
-                height: '100%',
-                width: '100%',
-                videoId: videoId,
-                playerVars: {
-                    'playsinline': 1,
-                    'autoplay': 1,
-                    'controls': 1,
-                    'rel': 0,
-                    'modestbranding': 1,
-                    'disablekb': 0
-                },
-                events: {
-                    'onStateChange': (event) => {
-                        const isPlaying = event.data === window.YT.PlayerState.PLAYING;
-                        if (callbackRef.current) {
-                            callbackRef.current(isPlaying);
+            try {
+                playerRef.current = new window.YT.Player(`Youtubeer-${videoId}`, {
+                    height: '100%',
+                    width: '100%',
+                    videoId: videoId,
+                    playerVars: {
+                        'playsinline': 1,
+                        'autoplay': 1,
+                        'controls': 1,
+                        'rel': 0,
+                        'modestbranding': 1,
+                        'disablekb': 0,
+                        'origin': window.location.origin
+                    },
+                    events: {
+                        'onStateChange': (event) => {
+                            const isPlaying = event.data === window.YT.PlayerState.PLAYING;
+                            if (callbackRef.current) {
+                                callbackRef.current(isPlaying);
+                            }
+                        },
+                        'onError': (e) => {
+                             console.error("YouTube Player Error:", e);
+                             if (callbackRef.current) callbackRef.current(true); 
                         }
                     }
-                }
-            });
+                });
+            } catch (error) {
+                console.error("Failed to create player", error);
+            }
         };
 
         if (window.YT && window.YT.Player) {
@@ -1433,7 +1446,7 @@ const YouTubePlayer = ({ videoId, onStateChange }) => {
                 playerRef.current = null;
             }
         };
-    }, [videoId]); // Only re-run if videoId changes
+    }, [videoId]); 
 
     return <div id={`Youtubeer-${videoId}`} className="w-full h-full bg-black" />;
 };
@@ -1491,7 +1504,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
             setCampaigns(list);
 
             // If currently no video is selected, pick a RANDOM one
-            if (!current && list.length > 0) {
+            if ((!current || watchedIds.has(current.id)) && list.length > 0) {
                 setCurrent(pickRandomCampaign(list));
             }
         });
@@ -1602,18 +1615,25 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     };
 
     const isVideo = type === 'view' || type === 'sub';
-    const videoId = current ? getYouTubeID(current.link) : null;
+    const videoId = (current && current.link && typeof current.link === 'string') ? getYouTubeID(current.link) : null;
 
     return (
         <div className="h-screen bg-[#0f172a] flex flex-col relative">
             <Header title={type === 'view' ? 'មើលវីដេអូ' : type === 'website' ? 'មើល Website' : 'Subscribe'} onBack={() => setPage('DASHBOARD')} className="relative" />
             <div className="flex-1 relative bg-black">
                 {current ? (
-                    isVideo && videoId ? (
-                        <YouTubePlayer 
-                            videoId={videoId} 
-                            onStateChange={handlePlayerStateChange} 
-                        />
+                    isVideo ? (
+                        videoId ? (
+                            <YouTubePlayer 
+                                videoId={videoId} 
+                                onStateChange={handlePlayerStateChange} 
+                            />
+                        ) : (
+                             <div className="flex flex-col items-center justify-center h-full text-white">
+                                <p className="text-red-500 font-bold mb-2">វីដេអូខូច ឬ Link មិនត្រឹមត្រូវ</p>
+                                <button onClick={handleNext} className="bg-yellow-500 text-black px-4 py-2 rounded">ចូលវីដេអូបន្ទាប់</button>
+                             </div>
+                        )
                     ) : (
                         <>
                             <iframe src={current.link} className="w-full h-full absolute top-0 left-0" frameBorder="0" allowFullScreen title="content-viewer" sandbox="allow-scripts allow-same-origin allow-forms" />
