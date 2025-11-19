@@ -2306,40 +2306,32 @@ const App = () => {
                         } 
                     />
                     
-                    {/* --- Balance Card with Background Icons --- */}
-                    <div className="px-4 mb-6">
+                    {/* --- Balance Card --- */}
+                    {/* FIXED: Added opacity-0 to hide this block when modal is open */}
+                    <div className={`px-4 mb-6 transition-opacity duration-200 ${showLoginModal ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                         <div className="bg-gradient-to-br from-[#5b247a] to-[#1bcedf] rounded-2xl p-6 text-white shadow-2xl text-center relative overflow-hidden border border-white/10">
                             
-                            {/* --- BACKGROUND DECORATIONS --- */}
-                            {/* 1. Light Circle Top-Left */}
-                            <div className="absolute -top-10 -left-10 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
-                            
-                            {/* 2. YouTube Icon Top-Right */}
+                            {/* Background Decorations */}
+                            <div className="absolute -top-10 -left-10 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl z-0"></div>
                             <div className="absolute top-2 right-[-10px] opacity-10 transform rotate-12 z-0">
                                 <Youtube size={80} className="text-white" />
                             </div>
-
-                            {/* 3. Dollar Icon Bottom-Left */}
                             <div className="absolute -bottom-4 -left-2 opacity-10 transform -rotate-12 z-0">
                                 <DollarSign size={90} className="text-yellow-300" />
                             </div>
-
-                            {/* 4. Bell Icon Center-Left */}
                             <div className="absolute top-1/2 left-10 opacity-5 transform -rotate-45 z-0">
                                 <Bell size={50} className="text-pink-300" />
                             </div>
 
-                            {/* --- CONTENT LAYER --- */}
+                            {/* Content Layer */}
                             <div className="relative z-10">
                                 <p className="text-sm font-medium opacity-90 tracking-wide">សមតុល្យរបស់អ្នក</p>
                                 
-                                {/* Points */}
                                 <h1 className="text-5xl font-extrabold mt-3 mb-3 flex justify-center items-center gap-2 text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-300 drop-shadow-sm">
                                     {formatNumber(displayPoints)} 
                                     <Coins className="w-8 h-8 text-yellow-400 drop-shadow" fill="currentColor" />
                                 </h1>
                                 
-                                {/* Balance */}
                                 <div className="flex justify-center items-center mb-5">
                                     <div className="bg-white/10 backdrop-blur-md px-6 py-2 rounded-full flex items-center border border-white/20 shadow-inner">
                                         <span className="text-green-400 font-bold mr-1 text-xl">$</span>
@@ -2349,7 +2341,6 @@ const App = () => {
                                     </div>
                                 </div>
                                 
-                                {/* ID */}
                                 <div className="inline-block">
                                     <p className="text-xs font-bold text-white/70 bg-black/20 px-4 py-1.5 rounded-lg uppercase tracking-wider">
                                         ID: {displayShortId}
@@ -2359,9 +2350,9 @@ const App = () => {
                         </div>
                     </div>
 
-                    <div className="px-4">
+                    {/* Menu Grid - Dimmed when modal open */}
+                    <div className={`px-4 transition-opacity duration-200 ${showLoginModal ? 'opacity-20 pointer-events-none' : 'opacity-100'}`}>
                         <Card className="p-4 grid grid-cols-3 gap-3">
-                            {/* +++ Updated Buttons with handleAuthAction +++ */}
                             <IconButton icon={CalendarCheck} title="DAILY TASK" onClick={() => handleAuthAction(handleDailyCheckin)} iconColor={userProfile?.dailyCheckin ? 'text-gray-500' : 'text-blue-400'} textColor={userProfile?.dailyCheckin ? 'text-gray-400' : 'text-white'} disabled={!!userProfile?.dailyCheckin && !!userId} />
                             <IconButton icon={UserCheck} title="SUBSCRIBE" onClick={() => handleAuthAction(() => setPage('EXPLORE_SUBSCRIPTION'))} iconColor="text-pink-400" />
                             <IconButton icon={Film} title="PLAY VIDEO" onClick={() => handleAuthAction(() => setPage('EARN_POINTS'))} iconColor="text-red-400" />
@@ -2373,7 +2364,9 @@ const App = () => {
                             <IconButton icon={MonitorPlay} title="មើល ADS" onClick={() => handleAuthAction(() => setPage('WATCH_ADS'))} iconColor="text-pink-400" />
                         </Card>
                     </div>
-                    <div className="px-4 mt-6">
+                    
+                     {/* Ad Banner - Hidden when modal open */}
+                    <div className={`px-4 mt-6 transition-opacity duration-200 ${showLoginModal ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                         <div className="w-full bg-white h-20 flex flex-col items-center justify-center rounded-lg border-2 border-yellow-500/50 shadow-lg relative overflow-hidden">
                              {globalConfig.adsSettings?.bannerImgUrl ? (<a href={globalConfig.adsSettings.bannerClickUrl || '#'} target="_blank" rel="noopener noreferrer" className="w-full h-full block"><img src={globalConfig.adsSettings.bannerImgUrl} alt="Ads" className="w-full h-full object-cover"/></a>) : (<div className="flex flex-col items-center"><span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-1 rounded mb-1">AD</span><p className="text-xs text-gray-500 font-mono">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p></div>)}
                         </div>
@@ -2389,8 +2382,8 @@ const App = () => {
             
             {/* +++ LOGIN MODAL +++ */}
             {showLoginModal && (
-                <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
-                    <div className="bg-white rounded-2xl w-full max-w-sm p-6 relative shadow-2xl">
+                <div className="fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in zoom-in duration-200 isolate">
+                    <div className="bg-white rounded-2xl w-full max-w-sm p-6 relative shadow-2xl z-[100000]">
                         <button onClick={() => setShowLoginModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full p-1"><XCircle size={24}/></button>
                         <div className="text-center mb-6">
                             <h2 className="text-2xl font-bold text-purple-900">សូមស្វាគមន៍!</h2>
