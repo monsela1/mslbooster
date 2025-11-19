@@ -21,7 +21,7 @@ import {
     Settings, Copy, Save, Search, PlusCircle, MinusCircle,
     CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
     ArrowUpRight, ArrowDownLeft, Clock, ChevronDown, Image as ImageIcon, LogIn,
-    Youtube, Bell // <--- Added new Icons here
+    Youtube, Bell 
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -1504,7 +1504,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
             
             <div className="absolute bottom-0 w-full bg-gray-100 border-t border-gray-300 h-16 flex items-center justify-center z-30">
                  {globalConfig.adsSettings?.bannerImgUrl ? (
-                     <a href={globalConfig.adsSettings.bannerClickUrl || '#'} target="_blank" rel="noopener noreferrer" className="w-full h-full block"><img src={globalConfig.adsSettings.bannerImgUrl} alt="Ads" className="w-full h-full object-cover"/></a>
+                      <a href={globalConfig.adsSettings.bannerClickUrl || '#'} target="_blank" rel="noopener noreferrer" className="w-full h-full block"><img src={globalConfig.adsSettings.bannerImgUrl} alt="Ads" className="w-full h-full object-cover"/></a>
                  ) : (
                     <div className="flex flex-col items-center"><span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-1 rounded mb-1">AD</span><p className="text-xs text-gray-500 font-mono">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p></div>
                  )}
@@ -2015,7 +2015,15 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
         return () => clearInterval(interval);
     }, [timer, isAdOpened]);
 
-    const handleOpenAd = () => { window.open(directLink, '_blank'); setIsAdOpened(true); };
+    const handleOpenAd = () => { 
+        setIsAdOpened(true); 
+    };
+
+    const handleCloseAd = () => {
+        setIsAdOpened(false);
+        // Reset timer if closed before finishing (optional)
+        if (!finished) setTimer(15);
+    };
 
     const claimReward = async () => {
         if (adsWatched >= maxDaily) return showNotification('អស់សិទ្ធិមើលសម្រាប់ថ្ងៃនេះហើយ!', 'error');
@@ -2027,11 +2035,59 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
                 const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
                 tx.set(historyRef, { title: 'Watched Ad (Monetag)', amount: reward, date: serverTimestamp(), type: 'ads' });
             });
-            showNotification(`ទទួលបាន ${reward} Coins!`, 'success'); setPage('DASHBOARD');
+            showNotification(`ទទួលបាន ${reward} Coins!`, 'success'); 
+            setPage('DASHBOARD');
         } catch (e) { showNotification(e.message, 'error'); }
     };
 
     const isLimitReached = adsWatched >= maxDaily;
+
+    // Show Iframe Overlay
+    if (isAdOpened) {
+        return (
+            <div className="fixed inset-0 z-[100] bg-black flex flex-col">
+                {/* Top Bar for Timer & Close */}
+                <div className="h-14 bg-purple-900 flex items-center justify-between px-4 border-b border-purple-700 shadow-lg shrink-0">
+                    <span className="text-white font-bold text-sm">Advertisement</span>
+                    
+                    <div className="flex items-center space-x-4">
+                        {finished ? (
+                            <button 
+                                onClick={claimReward} 
+                                className="bg-green-500 hover:bg-green-600 text-white text-xs px-4 py-2 rounded font-bold animate-pulse shadow-lg transition transform active:scale-95"
+                            >
+                                ទទួលរង្វាន់ (CLAIM)
+                            </button>
+                        ) : (
+                            <div className="flex items-center bg-black/30 px-3 py-1 rounded-full border border-yellow-500/30">
+                                <span className="text-yellow-400 font-mono font-bold mr-1">{timer}s</span>
+                                <span className="text-xs text-gray-300">to reward</span>
+                            </div>
+                        )}
+                        
+                        <button onClick={handleCloseAd} className="p-2 bg-red-600/80 hover:bg-red-600 rounded-full text-white">
+                            <XCircle size={18} />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Iframe Container */}
+                <div className="flex-1 bg-white relative w-full overflow-hidden">
+                    {finished && (
+                        <div className="absolute top-0 left-0 w-full bg-green-600 text-white text-center text-xs py-1 z-10">
+                            ការមើលបានបញ្ចប់! សូមចុចប៊ូតុង CLAIM នៅខាងលើ
+                        </div>
+                    )}
+                    <iframe 
+                        src={directLink} 
+                        className="w-full h-full border-0"
+                        sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                        title="Ad Viewer"
+                    />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4 z-50">
@@ -2042,13 +2098,12 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
                 {isLimitReached ? (
                     <div className="text-red-500 font-bold text-xl bg-white p-3 rounded">អស់សិទ្ធិមើលសម្រាប់ថ្ងៃនេះហើយ</div>
                 ) : (
-                    <>
-                        {!isAdOpened ? (
-                            <div className='space-y-4'><p className="text-white mb-4">ចុចប៊ូតុងខាងក្រោមដើម្បីបើកពាណិជ្ជកម្ម រួចរង់ចាំ 15 វិនាទី។</p><button onClick={handleOpenAd} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg transition transform active:scale-95">បើកពាណិជ្ជកម្ម (OPEN AD)</button></div>
-                        ) : (
-                            <div className='space-y-4'>{finished ? (<button onClick={claimReward} className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-full text-xl shadow-lg animate-pulse">ទទួលរង្វាន់ (CLAIM)</button>) : (<div><p className="text-gray-400 text-sm mb-2">សូមកុំបិទផ្ទាំងពាណិជ្ជកម្ម...</p><div className="text-white text-3xl font-bold font-mono">{timer}s</div></div>)}</div>
-                        )}
-                    </>
+                    <div className='space-y-4'>
+                        <p className="text-white mb-4">ចុចប៊ូតុងខាងក្រោមដើម្បីមើលពាណិជ្ជកម្មផ្ទាល់ក្នុង App រួចរង់ចាំ 15 វិនាទី។</p>
+                        <button onClick={handleOpenAd} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-8 rounded-full text-lg shadow-lg transition transform active:scale-95">
+                            បើកពាណិជ្ជកម្ម (OPEN AD)
+                        </button>
+                    </div>
                 )}
             </div>
             <button onClick={() => setPage('DASHBOARD')} className="mt-8 text-gray-500 hover:text-white underline">ត្រឡប់ក្រោយ (Back)</button>
