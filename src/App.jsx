@@ -133,6 +133,7 @@ const getHistoryCollectionRef = (userId) => db && userId ? collection(db, 'artif
 // Default Config
 const defaultGlobalConfig = {
     dailyCheckinReward: 50,
+    signupBonus: 100, // <--- Added signupBonus
     referrerReward: 200,
     referredBonus: 100,
     adsReward: 25,
@@ -380,6 +381,12 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
             <Card className="p-4 border-l-4 border-yellow-400">
                 <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់ & អត្រាប្តូរ</h3>
                 <div className="grid grid-cols-1 gap-3">
+                    {/* NEW: Sign-up Bonus */}
+                    <div>
+                        <label className="text-xs font-bold text-purple-300">Sign-up Bonus (New User)</label>
+                        <InputField name="signupBonus" type="number" min="0" value={config.signupBonus || 0} onChange={handleChange} />
+                    </div>
+
                     <div><label className="text-xs font-bold text-purple-300">Daily Check-in Points</label><InputField name="dailyCheckinReward" type="number" min="0" value={config.dailyCheckinReward || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referral Reward Points</label><InputField name="referrerReward" type="number" min="0" value={config.referrerReward || 0} onChange={handleChange} /></div>
                     <div><label className="text-xs font-bold text-purple-300">Referred User Bonus</label><InputField name="referredBonus" type="number" min="0" value={config.referredBonus || 0} onChange={handleChange} /></div>
@@ -395,7 +402,7 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                             <InputField name="exchangeRate" type="number" min="1" value={config.exchangeRate || 10000} onChange={handleChange} className="border-green-500 text-green-300" />
                         </div>
                         
-                        {/* NEW: Min Tasks for Withdraw */}
+                        {/* Min Tasks for Withdraw */}
                         <div>
                             <label className="text-xs font-bold text-red-400">ចំនួនមើលអប្បបរមាដើម្បីដកលុយ (Min Tasks)</label>
                             <p className="text-[10px] text-gray-400 mb-1">User ត្រូវមើលបានប៉ុន្មានដងទើបដកលុយបាន?</p>
@@ -1384,8 +1391,6 @@ const YouTubePlayer = ({ videoId, onStateChange }) => {
     }, [onStateChange]);
 
     useEffect(() => {
-        if (!videoId) return;
-
         if (!window.YT) {
             const tag = document.createElement('script');
             tag.src = "https://www.youtube.com/iframe_api";
@@ -1394,40 +1399,29 @@ const YouTubePlayer = ({ videoId, onStateChange }) => {
         }
 
         const createPlayer = () => {
-            if (playerRef.current) {
-                try { playerRef.current.destroy(); } catch(e) {}
-            }
+            if (playerRef.current) return; // Prevent duplicate players
 
-            try {
-                playerRef.current = new window.YT.Player(`Youtubeer-${videoId}`, {
-                    height: '100%',
-                    width: '100%',
-                    videoId: videoId,
-                    playerVars: {
-                        'playsinline': 1,
-                        'autoplay': 1,
-                        'controls': 1,
-                        'rel': 0,
-                        'modestbranding': 1,
-                        'disablekb': 0,
-                        'origin': window.location.origin
-                    },
-                    events: {
-                        'onStateChange': (event) => {
-                            const isPlaying = event.data === window.YT.PlayerState.PLAYING;
-                            if (callbackRef.current) {
-                                callbackRef.current(isPlaying);
-                            }
-                        },
-                        'onError': (e) => {
-                             console.error("YouTube Player Error:", e);
-                             if (callbackRef.current) callbackRef.current(true); 
+            playerRef.current = new window.YT.Player(`Youtubeer-${videoId}`, {
+                height: '100%',
+                width: '100%',
+                videoId: videoId,
+                playerVars: {
+                    'playsinline': 1,
+                    'autoplay': 1,
+                    'controls': 1,
+                    'rel': 0,
+                    'modestbranding': 1,
+                    'disablekb': 0
+                },
+                events: {
+                    'onStateChange': (event) => {
+                        const isPlaying = event.data === window.YT.PlayerState.PLAYING;
+                        if (callbackRef.current) {
+                            callbackRef.current(isPlaying);
                         }
                     }
-                });
-            } catch (error) {
-                console.error("Failed to create player", error);
-            }
+                }
+            });
         };
 
         if (window.YT && window.YT.Player) {
@@ -1446,7 +1440,7 @@ const YouTubePlayer = ({ videoId, onStateChange }) => {
                 playerRef.current = null;
             }
         };
-    }, [videoId]); 
+    }, [videoId]); // Only re-run if videoId changes
 
     return <div id={`Youtubeer-${videoId}`} className="w-full h-full bg-black" />;
 };
@@ -1504,7 +1498,7 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
             setCampaigns(list);
 
             // If currently no video is selected, pick a RANDOM one
-            if ((!current || watchedIds.has(current.id)) && list.length > 0) {
+            if (!current && list.length > 0) {
                 setCurrent(pickRandomCampaign(list));
             }
         });
@@ -1615,25 +1609,18 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     };
 
     const isVideo = type === 'view' || type === 'sub';
-    const videoId = (current && current.link && typeof current.link === 'string') ? getYouTubeID(current.link) : null;
+    const videoId = current ? getYouTubeID(current.link) : null;
 
     return (
         <div className="h-screen bg-[#0f172a] flex flex-col relative">
             <Header title={type === 'view' ? 'មើលវីដេអូ' : type === 'website' ? 'មើល Website' : 'Subscribe'} onBack={() => setPage('DASHBOARD')} className="relative" />
             <div className="flex-1 relative bg-black">
                 {current ? (
-                    isVideo ? (
-                        videoId ? (
-                            <YouTubePlayer 
-                                videoId={videoId} 
-                                onStateChange={handlePlayerStateChange} 
-                            />
-                        ) : (
-                             <div className="flex flex-col items-center justify-center h-full text-white">
-                                <p className="text-red-500 font-bold mb-2">វីដេអូខូច ឬ Link មិនត្រឹមត្រូវ</p>
-                                <button onClick={handleNext} className="bg-yellow-500 text-black px-4 py-2 rounded">ចូលវីដេអូបន្ទាប់</button>
-                             </div>
-                        )
+                    isVideo && videoId ? (
+                        <YouTubePlayer 
+                            videoId={videoId} 
+                            onStateChange={handlePlayerStateChange} 
+                        />
                     ) : (
                         <>
                             <iframe src={current.link} className="w-full h-full absolute top-0 left-0" frameBorder="0" allowFullScreen title="content-viewer" sandbox="allow-scripts allow-same-origin allow-forms" />
@@ -2422,7 +2409,7 @@ const App = () => {
             if (!userDoc.exists()) {
                  const shortId = getShortId(uid); 
                  // --- FIXED: Reduced Bonus to 100 ---
-                 const bonusPoints = 100; 
+                 const bonusPoints = globalConfig.signupBonus || 100; // Now pulls from globalConfig
                  // -----------------------------------
                  await setDoc(userDocRef, { userId: uid, email: user.email, userName: user.displayName || `User_${shortId}`, points: bonusPoints, totalEarned: bonusPoints, shortId, createdAt: serverTimestamp(), referredBy: null });
                  await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
@@ -2588,7 +2575,7 @@ const App = () => {
                 </div>
             )}
 
-            {/* +++ WELCOME POPUP (ORANGE) +++ */}
+            {/* +++ WELCOME POPUP (ORANGE FULL CARD) +++ */}
             {showWelcomeModal && userId && globalConfig.welcomePopup?.isEnabled && (
                 <WelcomeModal 
                     isOpen={showWelcomeModal} 
