@@ -11,7 +11,7 @@ import {
 import {
     getFirestore, doc, getDoc, setDoc, onSnapshot, updateDoc, deleteDoc,
     collection, query, where, serverTimestamp, getDocs,
-    runTransaction, increment, limit, orderBy, startAfter // <--- Added startAfter
+    runTransaction, increment, limit, orderBy, startAfter
 } from 'firebase/firestore';
 import {
     Users, Coins, Video, Link, Globe, MonitorPlay, Zap,
@@ -237,21 +237,27 @@ const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
     );
 };
 
-// --- FIXED: ORANGE WELCOME MODAL ---
+// --- FIXED: ORANGE BUTTON WELCOME MODAL ---
 const WelcomeModal = ({ isOpen, onClose, title, message }) => {
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in zoom-in duration-300">
-            <div className="bg-orange-500 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative text-white border-4 border-orange-400">
+            {/* White Background for Body */}
+            <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative border-4 border-orange-500">
                 <div className="p-6 text-center flex flex-col items-center">
-                    <div className="bg-white w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-md animate-bounce">
+                    {/* Orange Circle Icon */}
+                    <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-sm">
                         <MessageCircle size={32} className="text-orange-600" />
                     </div>
-                    <h3 className="text-2xl font-extrabold mb-2 drop-shadow-md">{title || "សួស្តី!"}</h3>
-                    <p className="text-white font-medium text-lg leading-relaxed opacity-95">{message || "សូមស្វាគមន៍"}</p>
+                    {/* Orange Title */}
+                    <h3 className="text-2xl font-extrabold mb-2 text-orange-600">{title || "សួស្តី!"}</h3>
+                    {/* Black/Gray Text */}
+                    <p className="text-gray-600 font-medium text-lg leading-relaxed">{message || "សូមស្វាគមន៍"}</p>
                 </div>
-                <div className="p-4 bg-orange-600/50 border-t border-orange-400/50">
-                    <button onClick={onClose} className="w-full bg-white hover:bg-gray-100 text-orange-600 font-extrabold py-3 rounded-xl shadow-lg transition transform active:scale-95">
+                
+                {/* Orange Button (Replaces White Button) */}
+                <div className="p-4 bg-gray-50 border-t border-gray-100">
+                    <button onClick={onClose} className="w-full bg-orange-600 hover:bg-orange-700 text-white font-extrabold py-3 rounded-xl shadow-lg transition transform active:scale-95">
                         យល់ព្រម (OK)
                     </button>
                 </div>
