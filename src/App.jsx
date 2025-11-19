@@ -237,27 +237,29 @@ const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
     );
 };
 
-// --- FIXED: ORANGE BUTTON WELCOME MODAL ---
+// --- FIXED: ORANGE FULL CARD MODAL ---
 const WelcomeModal = ({ isOpen, onClose, title, message }) => {
     if (!isOpen) return null;
     return (
         <div className="fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in zoom-in duration-300">
-            {/* White Background for Body */}
-            <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative border-4 border-orange-500">
+            {/* 1. Card Background: Orange */}
+            <div className="bg-orange-500 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative border-2 border-orange-400">
                 <div className="p-6 text-center flex flex-col items-center">
-                    {/* Orange Circle Icon */}
-                    <div className="bg-orange-100 w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-sm">
-                        <MessageCircle size={32} className="text-orange-600" />
+                    {/* 2. Icon Container: White */}
+                    <div className="bg-white w-16 h-16 rounded-full flex items-center justify-center mb-4 shadow-lg animate-bounce">
+                        {/* 3. Icon: Orange */}
+                        <MessageCircle size={32} className="text-orange-500" />
                     </div>
-                    {/* Orange Title */}
-                    <h3 className="text-2xl font-extrabold mb-2 text-orange-600">{title || "សួស្តី!"}</h3>
-                    {/* Black/Gray Text */}
-                    <p className="text-gray-600 font-medium text-lg leading-relaxed">{message || "សូមស្វាគមន៍"}</p>
+                    {/* 4. Title: White */}
+                    <h3 className="text-2xl font-extrabold mb-2 text-white drop-shadow-md">{title || "សួស្តី!"}</h3>
+                    {/* 5. Message: White */}
+                    <p className="text-white font-medium text-lg leading-relaxed opacity-95">{message || "សូមស្វាគមន៍"}</p>
                 </div>
-                
-                {/* Orange Button (Replaces White Button) */}
-                <div className="p-4 bg-gray-50 border-t border-gray-100">
-                    <button onClick={onClose} className="w-full bg-orange-600 hover:bg-orange-700 text-white font-extrabold py-3 rounded-xl shadow-lg transition transform active:scale-95">
+
+                {/* 6. Footer: Darker Orange or Transparent */}
+                <div className="p-4 bg-orange-600/20 border-t border-orange-400/30">
+                    {/* 7. Button: White with Orange Text */}
+                    <button onClick={onClose} className="w-full bg-white hover:bg-gray-100 text-orange-600 font-extrabold py-3 rounded-xl shadow-lg transition transform active:scale-95">
                         យល់ព្រម (OK)
                     </button>
                 </div>
