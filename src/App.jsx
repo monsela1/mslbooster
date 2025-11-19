@@ -2389,7 +2389,7 @@ const App = () => {
             
             {/* +++ LOGIN MODAL +++ */}
             {showLoginModal && (
-                <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
+                <div className="fixed inset-0 bg-black/80 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
                     <div className="bg-white rounded-2xl w-full max-w-sm p-6 relative shadow-2xl">
                         <button onClick={() => setShowLoginModal(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-gray-100 rounded-full p-1"><XCircle size={24}/></button>
                         <div className="text-center mb-6">
