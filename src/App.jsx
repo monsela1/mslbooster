@@ -21,7 +21,7 @@ import {
     Settings, Copy, Save, Search, PlusCircle, MinusCircle,
     CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
     ArrowUpRight, ArrowDownLeft, Clock, ChevronDown, Image as ImageIcon, LogIn,
-    Youtube, Bell, AlertTriangle // <--- Added AlertTriangle
+    Youtube, Bell, AlertTriangle, MessageCircle // <--- Added MessageCircle
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -132,14 +132,15 @@ const getHistoryCollectionRef = (userId) => db && userId ? collection(db, 'artif
 
 // Default Config
 const defaultGlobalConfig = {
-    dailyCheckinReward: 200,
-    referrerReward: 1000,
-    referredBonus: 500,
-    adsReward: 30,
+    dailyCheckinReward: 50,
+    referrerReward: 200,
+    referredBonus: 100,
+    adsReward: 25,
     maxDailyAds: 15,
     enableBuyCoins: false,
-    enableWithdraw: true, // Default ON
+    enableWithdraw: true, 
     exchangeRate: 10000,
+    minTasksForWithdraw: 50, // New Field
     withdrawalOptions: [2, 5, 7, 10],
     adsSettings: {
         bannerId: "", 
@@ -148,6 +149,11 @@ const defaultGlobalConfig = {
         bannerImgUrl: "", 
         bannerClickUrl: "",
         isEnabled: true
+    },
+    welcomePopup: { // New Field
+        isEnabled: true,
+        title: "សួស្តី!",
+        message: "ជួយគ្នាដើម្បីជោគជ័យទាំងអស់គ្នា"
     },
     coinPackages: [
         { id: 1, coins: 5000, price: '$1.00', color: 'bg-green-500' },
@@ -231,6 +237,30 @@ const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
     );
 };
 
+const WelcomeModal = ({ isOpen, onClose, title, message }) => {
+    if (!isOpen) return null;
+    return (
+        <div className="fixed inset-0 bg-black/80 z-[99999] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in zoom-in duration-300">
+            <div className="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl relative">
+                <div className="bg-purple-900 p-4 text-center">
+                    <div className="bg-white/20 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-2">
+                        <MessageCircle size={32} className="text-yellow-400" />
+                    </div>
+                    <h3 className="text-xl font-bold text-white">{title || "សួស្តី!"}</h3>
+                </div>
+                <div className="p-6 text-center">
+                    <p className="text-gray-700 font-medium text-lg leading-relaxed">{message || "សូមស្វាគមន៍"}</p>
+                </div>
+                <div className="p-4 bg-gray-50 border-t border-gray-200">
+                    <button onClick={onClose} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl shadow transition">
+                        យល់ព្រម (OK)
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- 5. ADMIN PAGES ---
 
 const AdminSettingsTab = ({ config, setConfig, onSave }) => {
@@ -256,6 +286,21 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
             adsSettings: { ...prev.adsSettings, [name]: value }
         }));
     };
+    
+    const handlePopupChange = (e) => {
+        const { name, value } = e.target;
+        setConfig(prev => ({
+            ...prev,
+            welcomePopup: { ...prev.welcomePopup, [name]: value }
+        }));
+    };
+    
+    const handlePopupToggle = () => {
+        setConfig(prev => ({
+            ...prev,
+            welcomePopup: { ...prev.welcomePopup, isEnabled: !prev.welcomePopup?.isEnabled }
+        }));
+    };
 
     const handlePackageChange = (index, field, value) => {
         const newPackages = config.coinPackages ? [...config.coinPackages] : [];
@@ -276,6 +321,33 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
 
     return (
         <div className="space-y-4 pb-10">
+            {/* POPUP SETTINGS */}
+            <Card className="p-4 border-l-4 border-indigo-500">
+                <h3 className="font-bold text-lg mb-3 text-indigo-400 flex items-center"><MessageCircle className="w-5 h-5 mr-2"/> Pop-up ពេលចូល (Welcome Message)</h3>
+                <div className="flex items-center justify-between bg-purple-900/50 p-3 rounded-lg border border-purple-600 mb-3">
+                    <span className="text-white font-bold">បង្ហាញ Pop-up</span>
+                    <button onClick={handlePopupToggle} className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${config.welcomePopup?.isEnabled ? 'bg-green-500' : 'bg-gray-600'}`}>
+                        <div className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transform transition-transform ${config.welcomePopup?.isEnabled ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                    </button>
+                </div>
+                <div className="space-y-2">
+                    <div>
+                        <label className="text-xs text-purple-300">ចំណងជើង (Title)</label>
+                        <InputField name="title" value={config.welcomePopup?.title || ''} onChange={handlePopupChange} placeholder="សួស្តី!" />
+                    </div>
+                    <div>
+                        <label className="text-xs text-purple-300">ខ្លឹមសារ (Message)</label>
+                        <textarea 
+                            name="message"
+                            value={config.welcomePopup?.message || ''} 
+                            onChange={handlePopupChange}
+                            placeholder="សរសេរសារនៅទីនេះ..."
+                            className="w-full p-3 border border-purple-600 rounded bg-purple-700 text-white placeholder-purple-400 focus:outline-none focus:border-yellow-400 h-24"
+                        />
+                    </div>
+                </div>
+            </Card>
+
             <Card className="p-4 border-l-4 border-blue-500">
                 <h3 className="font-bold text-lg mb-3 text-blue-400 flex items-center"><Settings className="w-5 h-5 mr-2"/> ការកំណត់ទូទៅ (Features)</h3>
                 
@@ -323,6 +395,14 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                             <p className="text-[10px] text-gray-400 mb-1">ចំនួនកាក់ដែលស្មើនឹង $1 (Default: 10000)</p>
                             <InputField name="exchangeRate" type="number" min="1" value={config.exchangeRate || 10000} onChange={handleChange} className="border-green-500 text-green-300" />
                         </div>
+                        
+                        {/* NEW: Min Tasks for Withdraw */}
+                        <div>
+                            <label className="text-xs font-bold text-red-400">ចំនួនមើលអប្បបរមាដើម្បីដកលុយ (Min Tasks)</label>
+                            <p className="text-[10px] text-gray-400 mb-1">User ត្រូវមើលបានប៉ុន្មានដងទើបដកលុយបាន?</p>
+                            <InputField name="minTasksForWithdraw" type="number" min="0" value={config.minTasksForWithdraw || 50} onChange={handleChange} className="border-red-500 text-red-300 font-bold" />
+                        </div>
+
                         <div>
                             <label className="text-xs font-bold text-blue-400">ជម្រើសដកលុយ (Withdraw Options)</label>
                             <p className="text-[10px] text-gray-400 mb-1">សរសេរលេខខណ្ឌដោយសញ្ញាក្បៀស (,) ឧ: 2, 5, 7, 10</p>
@@ -1608,8 +1688,8 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
             return;
         }
 
-        // +++ NEW SECURITY CHECK: Must complete 50 tasks +++
-        const MIN_TASKS = 50;
+        // +++ NEW SECURITY CHECK: Must complete Min Tasks +++
+        const MIN_TASKS = globalConfig.minTasksForWithdraw || 50;
         const userTasks = userProfile.tasksCompleted || 0;
         
         if (userTasks < MIN_TASKS) {
@@ -1683,7 +1763,7 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                 
                 {/* TASKS PROGRESS (Optional Display for user) */}
                 <div className="bg-purple-800/50 p-2 rounded text-center text-xs text-purple-200 border border-purple-700">
-                    បានមើលវីដេអូចំនួន: <span className="font-bold text-white">{userProfile.tasksCompleted || 0}</span> / 50 (ដើម្បីដកលុយ)
+                    បានមើលវីដេអូចំនួន: <span className="font-bold text-white">{userProfile.tasksCompleted || 0}</span> / {globalConfig.minTasksForWithdraw || 50} (ដើម្បីដកលុយ)
                 </div>
 
                 {/* EXCHANGE SECTION */}
@@ -2188,7 +2268,7 @@ const AuthForm = ({ onSubmit, onGoogleLogin }) => {
 const App = () => {
     const [page, setPage] = useState('DASHBOARD');
     const [userId, setUserId] = useState(null);
-    const [userProfile, setUserProfile] = useState(null); // Null if guest
+    const [userProfile, setUserProfile] = useState(null); 
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [notification, setNotification] = useState(null);
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
@@ -2196,6 +2276,7 @@ const App = () => {
 
     // +++ STATE FOR LOGIN MODAL +++
     const [showLoginModal, setShowLoginModal] = useState(false);
+    const [showWelcomeModal, setShowWelcomeModal] = useState(false); // New state for Welcome Popup
 
     // --- ADMIN CONFIGURATION (UID CHECK) ---
     const ADMIN_UIDS = ["48wx8GPZbVYSxmfws1MxbuEOzsE3"]; 
@@ -2211,11 +2292,14 @@ const App = () => {
         return onAuthStateChanged(auth, (user) => {
             if (user) {
                 setUserId(user.uid);
-                setShowLoginModal(false); // Close modal on success
+                setShowLoginModal(false);
+                // Show Welcome Popup on login/refresh if enabled
+                setTimeout(() => setShowWelcomeModal(true), 1000);
             } else {
                 setUserId(null);
                 setUserProfile(null);
                 setPage('DASHBOARD');
+                setShowWelcomeModal(false);
             }
             setIsAuthReady(true);
         });
@@ -2255,11 +2339,9 @@ const App = () => {
             
             if (!userDoc.exists()) {
                  const shortId = getShortId(uid); 
-                 
                  // --- FIXED: Reduced Bonus to 100 ---
                  const bonusPoints = 100; 
                  // -----------------------------------
-
                  await setDoc(userDocRef, { userId: uid, email: user.email, userName: user.displayName || `User_${shortId}`, points: bonusPoints, totalEarned: bonusPoints, shortId, createdAt: serverTimestamp(), referredBy: null });
                  await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
                  showNotification('គណនីថ្មីត្រូវបានបង្កើតដោយជោគជ័យ!', 'success');
@@ -2274,7 +2356,6 @@ const App = () => {
 
     const handleLogout = async () => { await signOut(auth); showNotification('បានចាកចេញ', 'success'); };
 
-    // +++ HELPER: Check Auth before Action +++
     const handleAuthAction = (action) => {
         if (userId) {
             action();
@@ -2298,7 +2379,6 @@ const App = () => {
 
     if (!isAuthReady) return <Loading />;
 
-    // +++ PREPARE DISPLAY DATA (GUEST MODE) +++
     const displayPoints = userProfile?.points || 0;
     const displayBalance = userProfile?.balance || 0;
     const displayShortId = userProfile?.shortId || "GUEST";
@@ -2324,7 +2404,6 @@ const App = () => {
                         rightContent={
                             <div className="flex space-x-2">
                                 {isAdmin && (<button onClick={() => setPage('ADMIN_DASHBOARD')} className="bg-red-500 text-white p-1 rounded shadow"><Settings size={20}/></button>)}
-                                {/* +++ Login/Logout Logic +++ */}
                                 {userId ? (
                                     <button onClick={handleLogout} className="bg-gray-600 text-white p-1 rounded shadow"><LogOut size={20}/></button>
                                 ) : (
@@ -2337,11 +2416,8 @@ const App = () => {
                     />
                     
                     {/* --- Balance Card --- */}
-                    {/* FIXED: Added opacity-0 to hide this block when modal is open */}
                     <div className={`px-4 mb-6 transition-opacity duration-200 ${showLoginModal ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                         <div className="bg-gradient-to-br from-[#5b247a] to-[#1bcedf] rounded-2xl p-6 text-white shadow-2xl text-center relative overflow-hidden border border-white/10">
-                            
-                            {/* Background Decorations */}
                             <div className="absolute -top-10 -left-10 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl z-0"></div>
                             <div className="absolute top-2 right-[-10px] opacity-10 transform rotate-12 z-0">
                                 <Youtube size={80} className="text-white" />
@@ -2352,16 +2428,12 @@ const App = () => {
                             <div className="absolute top-1/2 left-10 opacity-5 transform -rotate-45 z-0">
                                 <Bell size={50} className="text-pink-300" />
                             </div>
-
-                            {/* Content Layer */}
                             <div className="relative z-10">
                                 <p className="text-sm font-medium opacity-90 tracking-wide">សមតុល្យរបស់អ្នក</p>
-                                
                                 <h1 className="text-5xl font-extrabold mt-3 mb-3 flex justify-center items-center gap-2 text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-300 drop-shadow-sm">
                                     {formatNumber(displayPoints)} 
                                     <Coins className="w-8 h-8 text-yellow-400 drop-shadow" fill="currentColor" />
                                 </h1>
-                                
                                 <div className="flex justify-center items-center mb-5">
                                     <div className="bg-white/10 backdrop-blur-md px-6 py-2 rounded-full flex items-center border border-white/20 shadow-inner">
                                         <span className="text-green-400 font-bold mr-1 text-xl">$</span>
@@ -2370,7 +2442,6 @@ const App = () => {
                                         </span>
                                     </div>
                                 </div>
-                                
                                 <div className="inline-block">
                                     <p className="text-xs font-bold text-white/70 bg-black/20 px-4 py-1.5 rounded-lg uppercase tracking-wider">
                                         ID: {displayShortId}
@@ -2380,7 +2451,7 @@ const App = () => {
                         </div>
                     </div>
 
-                    {/* Menu Grid - Dimmed when modal open */}
+                    {/* Menu Grid */}
                     <div className={`px-4 transition-opacity duration-200 ${showLoginModal ? 'opacity-20 pointer-events-none' : 'opacity-100'}`}>
                         <Card className="p-4 grid grid-cols-3 gap-3">
                             <IconButton icon={CalendarCheck} title="DAILY TASK" onClick={() => handleAuthAction(handleDailyCheckin)} iconColor={userProfile?.dailyCheckin ? 'text-gray-500' : 'text-blue-400'} textColor={userProfile?.dailyCheckin ? 'text-gray-400' : 'text-white'} disabled={!!userProfile?.dailyCheckin && !!userId} />
@@ -2395,7 +2466,7 @@ const App = () => {
                         </Card>
                     </div>
                     
-                     {/* Ad Banner - Hidden when modal open */}
+                     {/* Ad Banner */}
                     <div className={`px-4 mt-6 transition-opacity duration-200 ${showLoginModal ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                         <div className="w-full bg-white h-20 flex flex-col items-center justify-center rounded-lg border-2 border-yellow-500/50 shadow-lg relative overflow-hidden">
                              {globalConfig.adsSettings?.bannerImgUrl ? (<a href={globalConfig.adsSettings.bannerClickUrl || '#'} target="_blank" rel="noopener noreferrer" className="w-full h-full block"><img src={globalConfig.adsSettings.bannerImgUrl} alt="Ads" className="w-full h-full object-cover"/></a>) : (<div className="flex flex-col items-center"><span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-1 rounded mb-1">AD</span><p className="text-xs text-gray-500 font-mono">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p></div>)}
@@ -2422,6 +2493,16 @@ const App = () => {
                         <AuthForm onSubmit={handleLogin} onGoogleLogin={handleGoogleLogin} />
                     </div>
                 </div>
+            )}
+
+            {/* +++ WELCOME POPUP +++ */}
+            {showWelcomeModal && userId && globalConfig.welcomePopup?.isEnabled && (
+                <WelcomeModal 
+                    isOpen={showWelcomeModal} 
+                    onClose={() => setShowWelcomeModal(false)}
+                    title={globalConfig.welcomePopup.title}
+                    message={globalConfig.welcomePopup.message}
+                />
             )}
         </div>
     );
