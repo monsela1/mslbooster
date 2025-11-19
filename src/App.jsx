@@ -21,7 +21,7 @@ import {
     Settings, Copy, Save, Search, PlusCircle, MinusCircle,
     CheckCircle, XCircle, RefreshCw, User, ExternalLink, TrendingUp,
     ArrowUpRight, ArrowDownLeft, Clock, ChevronDown, Image as ImageIcon, LogIn,
-    Youtube, Bell 
+    Youtube, Bell, AlertTriangle // <--- Added AlertTriangle
 } from 'lucide-react';
 
 // --- 1. CONFIGURATION ---
@@ -610,7 +610,11 @@ const AdminWithdrawalsTab = ({ db, showNotification }) => {
 
     return (
         <div className="space-y-3 pb-10">
-            <h3 className="text-white font-bold border-b border-gray-600 pb-2">សំណើដកលុយ ({withdrawals.filter(w => w.status === 'pending').length} Pending)</h3>
+            <div className="border-b border-gray-600 pb-2 mb-2">
+                <h3 className="text-white font-bold">សំណើដកលុយ ({withdrawals.filter(w => w.status === 'pending').length} Pending)</h3>
+                <p className="text-xs text-red-400 mt-1 flex items-center"><AlertTriangle size={12} className="mr-1"/> សូមពិនិត្យលេខគណនីធនាគារ កុំឱ្យជាន់គ្នា!</p>
+            </div>
+            
             {withdrawals.map(w => (
                 <div key={w.id} className={`p-3 rounded-lg border ${w.status === 'pending' ? 'bg-purple-800 border-yellow-500' : 'bg-gray-800 border-gray-700 opacity-70'}`}>
                     <div className="flex justify-between items-start">
@@ -1389,7 +1393,14 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                 const campRef = doc(getCampaignsCollectionRef(), current.id);
                 const campDoc = await transaction.get(campRef);
                 if (!campDoc.exists() || campDoc.data().remaining <= 0) throw new Error("Campaign finished");
-                transaction.update(getProfileDocRef(userId), { points: increment(current.requiredDuration || 50), totalEarned: increment(current.requiredDuration || 50) });
+                
+                // Update User Points & TASKS COMPLETED Count
+                transaction.update(getProfileDocRef(userId), { 
+                    points: increment(current.requiredDuration || 50), 
+                    totalEarned: increment(current.requiredDuration || 50),
+                    tasksCompleted: increment(1) // <--- ADDED THIS: Track tasks
+                });
+                
                 transaction.update(campRef, { remaining: increment(-1) });
                 const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
                 transaction.set(historyRef, { title: type === 'view' ? 'Watched Video' : type === 'sub' ? 'Subscribed Channel' : 'Visited Website', amount: current.requiredDuration || 50, date: serverTimestamp(), type: 'earn' });
@@ -1597,6 +1608,15 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
             return;
         }
 
+        // +++ NEW SECURITY CHECK: Must complete 50 tasks +++
+        const MIN_TASKS = 50;
+        const userTasks = userProfile.tasksCompleted || 0;
+        
+        if (userTasks < MIN_TASKS) {
+            return alert(`អ្នកត្រូវមើលវីដេអូឱ្យបាន ${MIN_TASKS} ដងសិន ទើបអាចដកលុយបាន! (បច្ចុប្បន្ន: ${userTasks})`);
+        }
+        // ++++++++++++++++++++++++++++++++++++++++++++++++++
+
         const amount = parseFloat(withdrawAmount);
         if (!amount || amount <= 0) return alert("សូមជ្រើសរើសចំនួនទឹកប្រាក់!");
         if (amount > (userProfile.balance || 0)) return alert("ទឹកប្រាក់មិនគ្រប់គ្រាន់!");
@@ -1659,6 +1679,11 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                         <p className="text-xs opacity-70 mb-1">លុយ (Balance)</p>
                         <span className="text-2xl font-bold text-white">${(userProfile.balance || 0).toFixed(4)}</span>
                     </Card>
+                </div>
+                
+                {/* TASKS PROGRESS (Optional Display for user) */}
+                <div className="bg-purple-800/50 p-2 rounded text-center text-xs text-purple-200 border border-purple-700">
+                    បានមើលវីដេអូចំនួន: <span className="font-bold text-white">{userProfile.tasksCompleted || 0}</span> / 50 (ដើម្បីដកលុយ)
                 </div>
 
                 {/* EXCHANGE SECTION */}
@@ -2229,7 +2254,12 @@ const App = () => {
             const userDoc = await getDoc(userDocRef);
             
             if (!userDoc.exists()) {
-                 const shortId = getShortId(uid); const bonusPoints = 5000;
+                 const shortId = getShortId(uid); 
+                 
+                 // --- FIXED: Reduced Bonus to 100 ---
+                 const bonusPoints = 100; 
+                 // -----------------------------------
+
                  await setDoc(userDocRef, { userId: uid, email: user.email, userName: user.displayName || `User_${shortId}`, points: bonusPoints, totalEarned: bonusPoints, shortId, createdAt: serverTimestamp(), referredBy: null });
                  await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
                  showNotification('គណនីថ្មីត្រូវបានបង្កើតដោយជោគជ័យ!', 'success');
