@@ -78,7 +78,7 @@ const getEmbedUrl = (url) => {
     return null;
 };
 
-// --- KHQR LOGIC START (STANDARD EMVCo) ---
+// --- KHQR LOGIC START (UPDATED STANDARD) ---
 const crc16 = (str) => {
     let crc = 0xFFFF;
     for (let c = 0; c < str.length; c++) {
@@ -101,22 +101,23 @@ const formatTag = (id, value) => {
     return id + lenStr + value;
 };
 
-const generateKhqr = (bakongId, amount) => {
-    const tag29Content = formatTag("00", "bakong") + formatTag("01", bakongId);
+const generateKhqr = (bakongId, amount, merchantName = "KH Market") => {
+    // សំខាន់៖ ត្រូវប្រើ "kh.com.bakong" ដើម្បីឱ្យស្កេនបានគ្រប់ធនាគារ
+    const tag29Content = formatTag("00", "kh.com.bakong") + formatTag("01", bakongId);
     
     const tags = [
-        formatTag("00", "01"),              
-        formatTag("01", "12"),              
-        formatTag("29", tag29Content),      
-        formatTag("52", "5999"),            
-        formatTag("53", "840"),             
-        formatTag("54", amount.toFixed(2)), 
-        formatTag("58", "KH"),              
-        formatTag("59", "MSL BOOSTER"),     
-        formatTag("60", "PHNOM PENH"),      
+        formatTag("00", "01"),              // Payload Format
+        formatTag("01", "12"),              // Point of Initiation (Dynamic)
+        formatTag("29", tag29Content),      // Merchant Account Info
+        formatTag("52", "5999"),            // MCC
+        formatTag("53", "840"),             // Currency (USD)
+        formatTag("54", parseFloat(amount).toFixed(2)), // Amount
+        formatTag("58", "KH"),              // Country Code
+        formatTag("59", merchantName),      // Merchant Name
+        formatTag("60", "PHNOM PENH"),      // City
     ];
 
-    let qrString = tags.join("") + "6304"; 
+    let qrString = tags.join("") + "6304"; // CRC Tag
     return qrString + crc16(qrString);
 };
 // --- KHQR LOGIC END ---
@@ -133,7 +134,7 @@ const getHistoryCollectionRef = (userId) => db && userId ? collection(db, 'artif
 // Default Config
 const defaultGlobalConfig = {
     dailyCheckinReward: 50,
-    signupBonus: 100, // <--- Added signupBonus
+    signupBonus: 100,
     referrerReward: 200,
     referredBonus: 100,
     adsReward: 25,
@@ -238,7 +239,6 @@ const SelectionModal = ({ isOpen, onClose, title, options, onSelect }) => {
     );
 };
 
-// --- FIXED: ORANGE FULL CARD MODAL ---
 const WelcomeModal = ({ isOpen, onClose, title, message }) => {
     if (!isOpen) return null;
     return (
@@ -381,7 +381,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
             <Card className="p-4 border-l-4 border-yellow-400">
                 <h3 className="font-bold text-lg mb-3 text-yellow-400 flex items-center"><Coins className="w-5 h-5 mr-2"/> ការកំណត់រង្វាន់ & អត្រាប្តូរ</h3>
                 <div className="grid grid-cols-1 gap-3">
-                    {/* NEW: Sign-up Bonus */}
                     <div>
                         <label className="text-xs font-bold text-purple-300">Sign-up Bonus (New User)</label>
                         <InputField name="signupBonus" type="number" min="0" value={config.signupBonus || 0} onChange={handleChange} />
@@ -402,7 +401,6 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
                             <InputField name="exchangeRate" type="number" min="1" value={config.exchangeRate || 10000} onChange={handleChange} className="border-green-500 text-green-300" />
                         </div>
                         
-                        {/* Min Tasks for Withdraw */}
                         <div>
                             <label className="text-xs font-bold text-red-400">ចំនួនមើលអប្បបរមាដើម្បីដកលុយ (Min Tasks)</label>
                             <p className="text-[10px] text-gray-400 mb-1">User ត្រូវមើលបានប៉ុន្មានដងទើបដកលុយបាន?</p>
@@ -500,18 +498,17 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     );
 };
 
-// --- UPDATED: ADMIN USER MANAGER WITH PAGINATION ---
 const AdminUserManagerTab = ({ db, showNotification }) => {
     const [searchId, setSearchId] = useState('');
     const [foundUser, setFoundUser] = useState(null);
     const [pointsToAdd, setPointsToAdd] = useState(0);
     const [allUsers, setAllUsers] = useState([]);
     const [loadingList, setLoadingList] = useState(false);
-    const [lastDoc, setLastDoc] = useState(null); // Track last document for pagination
+    const [lastDoc, setLastDoc] = useState(null);
     const [hasMore, setHasMore] = useState(true);
 
     const loadUserList = async (isLoadMore = false) => {
-        if (isLoadMore && !lastDoc) return; // Safety check
+        if (isLoadMore && !lastDoc) return;
         
         setLoadingList(true);
         try {
@@ -519,10 +516,8 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
             
             let q;
             if (isLoadMore) {
-                // Fetch next 50
                 q = query(shortCodesRef, limit(50), startAfter(lastDoc));
             } else {
-                // Fetch initial 50
                 q = query(shortCodesRef, limit(50));
             }
 
@@ -552,11 +547,9 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                 setAllUsers(validUsers);
             }
 
-            // Update lastDoc
             const lastVisible = snap.docs[snap.docs.length - 1];
             setLastDoc(lastVisible);
             
-            // If we fetched less than limit, no more data
             if (snap.docs.length < 50) {
                 setHasMore(false);
             } else {
@@ -593,7 +586,6 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
             showNotification('Points updated successfully', 'success');
             setFoundUser(prev => ({...prev, points: prev.points + parseInt(pointsToAdd)}));
             setPointsToAdd(0);
-            // Refresh logic could be complex with pagination, maybe just update local state or reload
         } catch(e) { showNotification('Update failed', 'error'); }
     };
 
@@ -604,7 +596,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
             if(targetShortId) await deleteDoc(getShortCodeDocRef(targetShortId));
             showNotification('បានលុបគណនីដោយជោគជ័យ!', 'success');
             setFoundUser(null);
-            loadUserList(false); // Reload from scratch
+            loadUserList(false);
         } catch (e) {
             console.error(e);
             showNotification('បរាជ័យក្នុងការលុប: ' + e.message, 'error');
@@ -718,11 +710,9 @@ const AdminWithdrawalsTab = ({ db, showNotification }) => {
                 const withdrawRef = doc(db, 'artifacts', appId, 'public', 'data', 'withdrawals', item.id);
                 
                 if (action === 'rejected') {
-                    // Refund money if rejected
                     const userRef = getProfileDocRef(item.userId);
                     tx.update(userRef, { balance: increment(item.amount) });
                     
-                    // Add history
                     const historyRef = doc(collection(db, 'artifacts', appId, 'users', item.userId, 'history'));
                     tx.set(historyRef, {
                         title: 'Withdrawal Rejected (Refund)',
@@ -799,13 +789,11 @@ const AdminDepositsTab = ({ db, showNotification }) => {
                 const depositRef = doc(db, 'artifacts', appId, 'public', 'data', 'deposits', item.id);
                 const userRef = getProfileDocRef(item.userId);
 
-                // 1. បន្ថែមកាក់ឱ្យ User
                 tx.update(userRef, { 
                     points: increment(item.coins),
                     totalEarned: increment(item.coins)
                 });
 
-                // 2. កត់ត្រាប្រវត្តិ (History)
                 const historyRef = doc(collection(db, 'artifacts', appId, 'users', item.userId, 'history'));
                 tx.set(historyRef, {
                     title: 'Buy Coins (Approved)',
@@ -815,7 +803,6 @@ const AdminDepositsTab = ({ db, showNotification }) => {
                     type: 'deposit'
                 });
 
-                // 3. Update status
                 tx.update(depositRef, { status: 'approved' });
             });
             showNotification('Approved & Coins Added!', 'success');
@@ -938,7 +925,6 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
                         {campaigns.map(c => (
                             <div key={c.id} className={`bg-purple-800 p-3 rounded-lg shadow flex justify-between items-center border-l-4 ${c.remaining > 0 ? 'border-green-500' : 'border-red-500'}`}>
                                 <div className="flex items-center space-x-3 overflow-hidden">
-                                    {/* Image Block */}
                                     <div className="w-20 h-14 flex-shrink-0 bg-black rounded overflow-hidden border border-purple-600">
                                         <img
                                             src={getYouTubeID(c.link) ? `https://img.youtube.com/vi/${getYouTubeID(c.link)}/mqdefault.jpg` : 'https://via.placeholder.com/150'}
@@ -948,7 +934,6 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
                                         />
                                     </div>
 
-                                    {/* Text Block */}
                                     <div className="flex-1 overflow-hidden">
                                         <a href={c.link} target="_blank" rel="noreferrer" className="font-bold text-sm truncate text-blue-300 hover:underline block w-full">
                                             {c.link}
@@ -1014,7 +999,6 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
 
                 const referrerRef = getProfileDocRef(referrerId);
                 
-                // UPDATE TOTAL EARNED FOR REFERRER
                 transaction.update(referrerRef, {
                     points: increment(globalConfig.referrerReward),
                     totalEarned: increment(globalConfig.referrerReward)
@@ -1029,7 +1013,6 @@ const ReferralPage = ({ db, userId, userProfile, showNotification, setPage, glob
                 });
 
                 const bonus = globalConfig.referredBonus || 500;
-                // UPDATE TOTAL EARNED FOR CURRENT USER
                 transaction.update(userRef, {
                     referredBy: code,
                     points: increment(bonus),
@@ -1212,7 +1195,6 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                     isActive: true 
                 });
                 
-                // SAVE HISTORY
                 const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
                 transaction.set(historyRef, {
                     title: `Create ${type.toUpperCase()} Campaign`,
@@ -1308,7 +1290,6 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                         
                         <div className="space-y-1 bg-gray-200 p-1 rounded-b-lg min-h-[200px]">
                             {userCampaigns.map(c => {
-                                // Get Thumbnail Logic
                                 const videoId = getYouTubeID(c.link);
                                 const thumbnailUrl = videoId 
                                     ? `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` 
@@ -1319,7 +1300,6 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
 
                                 return (
                                     <div key={c.id} className="bg-white p-2 flex gap-3 shadow-sm border-b border-gray-300 last:border-0">
-                                        {/* Left: Thumbnail */}
                                         <div className="w-28 h-20 flex-shrink-0 bg-black">
                                             <img 
                                                 src={thumbnailUrl} 
@@ -1329,20 +1309,16 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
                                             />
                                         </div>
 
-                                        {/* Right: Content */}
                                         <div className="flex-1 flex flex-col justify-between py-0.5">
-                                            {/* Title */}
                                             <h4 className="text-gray-800 font-bold text-xs line-clamp-2 leading-tight">
                                                 {c.link}
                                             </h4>
 
-                                            {/* Details */}
                                             <div className="text-gray-500 text-[10px] space-y-0.5 mt-1">
                                                 <p>Seconds: <span className="font-medium text-gray-700">{c.requiredDuration}</span></p>
                                                 <p>{viewsDone} of {c.initialCount} views</p>
                                             </div>
 
-                                            {/* Status */}
                                             <div className="text-right mt-auto">
                                                 <span className={`text-[10px] font-bold ${isFinished ? 'text-green-600' : 'text-red-600'}`}>
                                                     {isFinished ? 'Completed' : 'In progress'}
@@ -1383,7 +1359,6 @@ const MyCampaignsPage = ({ db, userId, userProfile, setPage, showNotification })
 // --- NEW YOUTUBE PLAYER COMPONENT (Fixed Stuttering) ---
 const YouTubePlayer = ({ videoId, onStateChange }) => {
     const playerRef = useRef(null);
-    // Use a ref to store the latest callback, preventing re-renders of useEffect
     const callbackRef = useRef(onStateChange);
 
     useEffect(() => {
@@ -1399,7 +1374,7 @@ const YouTubePlayer = ({ videoId, onStateChange }) => {
         }
 
         const createPlayer = () => {
-            if (playerRef.current) return; // Prevent duplicate players
+            if (playerRef.current) return;
 
             playerRef.current = new window.YT.Player(`Youtubeer-${videoId}`, {
                 height: '100%',
@@ -1440,7 +1415,7 @@ const YouTubePlayer = ({ videoId, onStateChange }) => {
                 playerRef.current = null;
             }
         };
-    }, [videoId]); // Only re-run if videoId changes
+    }, [videoId]);
 
     return <div id={`Youtubeer-${videoId}`} className="w-full h-full bg-black" />;
 };
@@ -1475,7 +1450,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
         return () => { isMounted.current = false; };
     }, []);
 
-    // Helper function to pick a random item
     const pickRandomCampaign = (list) => {
         if (!list || list.length === 0) return null;
         const randomIndex = Math.floor(Math.random() * list.length);
@@ -1486,7 +1460,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
         const q = query(getCampaignsCollectionRef(), where('type', '==', type), limit(50));
         return onSnapshot(q, (snap) => {
             if(!isMounted.current) return;
-            // Filter valid campaigns
             const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
                 .filter(c => 
                     c.userId !== userId && 
@@ -1497,7 +1470,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
             
             setCampaigns(list);
 
-            // If currently no video is selected, pick a RANDOM one
             if (!current && list.length > 0) {
                 setCurrent(pickRandomCampaign(list));
             }
@@ -1512,7 +1484,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
         }
     }, [current]);
     
-    // --- TIMER LOGIC (DEPENDS ON VIDEO STATE) ---
     useEffect(() => {
         let interval = null;
         const isVideo = type === 'view' || type === 'sub';
@@ -1529,7 +1500,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
         return () => clearInterval(interval);
     }, [timer, claimed, current, type, isVideoPlaying]);
 
-    // Use Callback for Player State to prevent re-renders
     const handlePlayerStateChange = useCallback((isPlaying) => {
         setIsVideoPlaying(isPlaying);
     }, []);
@@ -1543,11 +1513,10 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                 const campDoc = await transaction.get(campRef);
                 if (!campDoc.exists() || campDoc.data().remaining <= 0) throw new Error("Campaign finished");
                 
-                // Update User Points & TASKS COMPLETED Count
                 transaction.update(getProfileDocRef(userId), { 
                     points: increment(current.requiredDuration || 50), 
                     totalEarned: increment(current.requiredDuration || 50),
-                    tasksCompleted: increment(1) // <--- ADDED THIS: Track tasks
+                    tasksCompleted: increment(1)
                 });
                 
                 transaction.update(campRef, { remaining: increment(-1) });
@@ -1557,7 +1526,6 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
                 transaction.set(watchedRef, { date: serverTimestamp() });
             });
             
-             // Add to watched list locally to avoid flicker
              setWatchedIds(prev => {
                 const newSet = new Set(prev);
                 newSet.add(current.id);
@@ -1572,11 +1540,9 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
     const handleNext = () => {
         setTimer(-1); setClaimed(false); setIsVideoPlaying(false);
         
-        // Filter out the current one and already watched ones
         const availableList = campaigns.filter(c => c.id !== current?.id && !watchedIds.has(c.id));
         
         if (availableList.length > 0) {
-            // Pick a RANDOM campaign from the remaining list
             const randomNext = pickRandomCampaign(availableList);
             setCurrent(randomNext);
         } else {
@@ -1674,17 +1640,14 @@ const EarnPage = ({ db, userId, type, setPage, showNotification, globalConfig, g
 };
 
 const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) => {
-    // +++ GUEST CHECK +++
     if (!userId) return <div className="p-10 text-white text-center">Please Login to view details.</div>;
 
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     
-    // Exchange State
     const [showExchange, setShowExchange] = useState(false);
     const [exchangeAmount, setExchangeAmount] = useState('');
     
-    // Withdraw State
     const [showWithdraw, setShowWithdraw] = useState(false);
     const [withdrawBank, setWithdrawBank] = useState('ABA'); 
     const [withdrawAccName, setWithdrawAccName] = useState('');
@@ -1693,7 +1656,6 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
 
     const [processing, setProcessing] = useState(false);
 
-    // Options for Withdraw
     const WITHDRAW_OPTIONS = globalConfig?.withdrawalOptions && globalConfig.withdrawalOptions.length > 0 
         ? globalConfig.withdrawalOptions 
         : [2, 5, 7, 10];
@@ -1713,7 +1675,6 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
         return () => unsub();
     }, [db, userId]);
 
-    // --- FUNCTION: EXCHANGE ---
     const handleExchange = async () => {
         const coinsToExchange = parseInt(exchangeAmount);
         if (!coinsToExchange || coinsToExchange <= 0) return alert("សូមបញ្ចូលចំនួនកាក់!");
@@ -1749,22 +1710,18 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
         } catch (e) { alert("បរាជ័យ!"); } finally { setProcessing(false); }
     };
 
-    // --- FUNCTION: WITHDRAW ---
     const handleWithdraw = async () => {
-        // +++ Check Enable Withdraw +++
         if (!globalConfig.enableWithdraw) {
             alert("សុំទោស! មុខងារដកលុយត្រូវបានបិទជាបណ្ដោះអាសន្នសម្រាប់ការថែទាំ។");
             return;
         }
 
-        // +++ NEW SECURITY CHECK: Must complete Min Tasks +++
         const MIN_TASKS = globalConfig.minTasksForWithdraw || 50;
         const userTasks = userProfile.tasksCompleted || 0;
         
         if (userTasks < MIN_TASKS) {
             return alert(`អ្នកត្រូវមើលវីដេអូឱ្យបាន ${MIN_TASKS} ដងសិន ទើបអាចដកលុយបាន! (បច្ចុប្បន្ន: ${userTasks})`);
         }
-        // ++++++++++++++++++++++++++++++++++++++++++++++++++
 
         const amount = parseFloat(withdrawAmount);
         if (!amount || amount <= 0) return alert("សូមជ្រើសរើសចំនួនទឹកប្រាក់!");
@@ -1780,10 +1737,8 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                 const userDoc = await transaction.get(userRef);
                 if ((userDoc.data().balance || 0) < amount) throw new Error("Balance low");
 
-                // 1. Deduct Balance
                 transaction.update(userRef, { balance: increment(-amount) });
 
-                // 2. Create Withdraw Request
                 const withdrawRef = doc(collection(db, 'artifacts', appId, 'public', 'data', 'withdrawals'));
                 transaction.set(withdrawRef, {
                     userId: userId,
@@ -1796,7 +1751,6 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                     date: serverTimestamp()
                 });
 
-                // 3. Add History
                 const historyRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'history'));
                 transaction.set(historyRef, {
                     title: `Request Withdraw (${withdrawBank})`,
@@ -1830,7 +1784,6 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                     </Card>
                 </div>
                 
-                {/* TASKS PROGRESS (Optional Display for user) */}
                 <div className="bg-purple-800/50 p-2 rounded text-center text-xs text-purple-200 border border-purple-700">
                     បានមើលវីដេអូចំនួន: <span className="font-bold text-white">{userProfile.tasksCompleted || 0}</span> / {globalConfig.minTasksForWithdraw || 50} (ដើម្បីដកលុយ)
                 </div>
@@ -1873,7 +1826,6 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                          </div>
                          <button 
                             onClick={() => {
-                                // +++ Check Toggle in Click +++
                                 if(globalConfig.enableWithdraw) {
                                     setShowWithdraw(!showWithdraw);
                                 } else {
@@ -1973,7 +1925,8 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig, use
 
     // --- CONFIGURATION ---
     const BAKONG_ID = "monsela@aclb"; 
-    // TOKEN នេះសម្រាប់ការសាកល្បង។ សម្រាប់ Production សូមដាក់នៅ Backend (Firebase Functions) ដើម្បីសុវត្ថិភាព។
+    const MERCHANT_NAME = "SELA MON"; // <--- ឈ្មោះបង្ហាញពេលស្កេន
+    
     const BAKONG_API_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJkYXRhIjp7ImlkIjoiZmYzNTdjNWRlNjM0NDgwOSJ9LCJpYXQiOjE3NjI2MTM0MjQsImV4cCI6MTc3MDM4OTQyNH0.6CogHoCPR5pqLVP9C1N6zkk4Wj2KgKdcEh9qy3qAXWU"; 
 
     const handleBuyClick = (pkg) => { 
@@ -2068,7 +2021,6 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig, use
         if(!manualTrxId.trim()) return showNotification('សូមបញ្ចូលលេខប្រតិបត្តិការ', 'error');
         setIsSubmitting(true);
         try {
-             // Check Duplicate again for manual
              const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'deposits'), where('transactionId', '==', manualTrxId.trim()));
              const snapshot = await getDocs(q);
              if(!snapshot.empty) {
@@ -2125,15 +2077,19 @@ const BuyCoinsPage = ({ db, userId, setPage, showNotification, globalConfig, use
                         
                         <div className="bg-purple-100 p-4 rounded-xl mb-4 inline-block shadow-inner border border-purple-200">
                             {(() => {
+                                // Extract numeric amount
                                 const priceStr = selectedPkg.price.toString().replace('$', '');
                                 const amount = parseFloat(priceStr);
-                                const khqrString = generateKhqr(BAKONG_ID, amount);
-                                // Using QR Server API to display QR Code
+                                
+                                // Generate KHQR string with updated parameters
+                                const khqrString = generateKhqr(BAKONG_ID, amount, MERCHANT_NAME);
+                                
+                                // Display QR Image
                                 const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(khqrString)}`;
                                 return (
                                     <>
                                         <img src={qrImageUrl} alt="KHQR" className="w-48 h-48 mx-auto mix-blend-multiply"/>
-                                        <div className="mt-2 text-[10px] text-gray-500 break-all font-mono opacity-50">{khqrString.substring(0, 20)}...</div>
+                                        <div className="mt-2 text-center font-bold text-purple-800">{MERCHANT_NAME}</div>
                                     </>
                                 );
                             })()}
@@ -2195,7 +2151,6 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
 
     const handleCloseAd = () => {
         setIsAdOpened(false);
-        // Reset timer if closed before finishing (optional)
         if (!finished) setTimer(15);
     };
 
@@ -2216,7 +2171,6 @@ const WatchAdsPage = ({ db, userId, setPage, showNotification, globalConfig }) =
 
     const isLimitReached = adsWatched >= maxDaily;
 
-    // Show Iframe Overlay
     if (isAdOpened) {
         return (
             <div className="fixed inset-0 z-[100] bg-black flex flex-col">
@@ -2337,7 +2291,7 @@ const AuthForm = ({ onSubmit, onGoogleLogin }) => {
 const App = () => {
     const [page, setPage] = useState('DASHBOARD');
     const [userId, setUserId] = useState(null);
-    const [userProfile, setUserProfile] = useState(null); // Null if guest
+    const [userProfile, setUserProfile] = useState(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [notification, setNotification] = useState(null);
     const [globalConfig, setGlobalConfig] = useState(defaultGlobalConfig);
@@ -2362,7 +2316,6 @@ const App = () => {
             if (user) {
                 setUserId(user.uid);
                 setShowLoginModal(false);
-                // Show Welcome Popup on login/refresh if enabled
                 setTimeout(() => setShowWelcomeModal(true), 1000);
             } else {
                 setUserId(null);
@@ -2408,9 +2361,7 @@ const App = () => {
             
             if (!userDoc.exists()) {
                  const shortId = getShortId(uid); 
-                 // --- FIXED: Reduced Bonus to 100 ---
                  const bonusPoints = globalConfig.signupBonus || 100; // Now pulls from globalConfig
-                 // -----------------------------------
                  await setDoc(userDocRef, { userId: uid, email: user.email, userName: user.displayName || `User_${shortId}`, points: bonusPoints, totalEarned: bonusPoints, shortId, createdAt: serverTimestamp(), referredBy: null });
                  await setDoc(getShortCodeDocRef(shortId), { fullUserId: uid, shortId });
                  showNotification('គណនីថ្មីត្រូវបានបង្កើតដោយជោគជ័យ!', 'success');
@@ -2425,7 +2376,6 @@ const App = () => {
 
     const handleLogout = async () => { await signOut(auth); showNotification('បានចាកចេញ', 'success'); };
 
-    // +++ HELPER: Check Auth before Action +++
     const handleAuthAction = (action) => {
         if (userId) {
             action();
@@ -2449,7 +2399,6 @@ const App = () => {
 
     if (!isAuthReady) return <Loading />;
 
-    // +++ PREPARE DISPLAY DATA (GUEST MODE) +++
     const displayPoints = userProfile?.points || 0;
     const displayBalance = userProfile?.balance || 0;
     const displayShortId = userProfile?.shortId || "GUEST";
@@ -2475,7 +2424,6 @@ const App = () => {
                         rightContent={
                             <div className="flex space-x-2">
                                 {isAdmin && (<button onClick={() => setPage('ADMIN_DASHBOARD')} className="bg-red-500 text-white p-1 rounded shadow"><Settings size={20}/></button>)}
-                                {/* +++ Login/Logout Logic +++ */}
                                 {userId ? (
                                     <button onClick={handleLogout} className="bg-gray-600 text-white p-1 rounded shadow"><LogOut size={20}/></button>
                                 ) : (
@@ -2487,12 +2435,8 @@ const App = () => {
                         } 
                     />
                     
-                    {/* --- Balance Card --- */}
-                    {/* FIXED: Added opacity-0 to hide this block when modal is open */}
                     <div className={`px-4 mb-6 transition-opacity duration-200 ${showLoginModal || showWelcomeModal ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                         <div className="bg-gradient-to-br from-[#5b247a] to-[#1bcedf] rounded-2xl p-6 text-white shadow-2xl text-center relative overflow-hidden border border-white/10">
-                            
-                            {/* Background Decorations */}
                             <div className="absolute -top-10 -left-10 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl z-0"></div>
                             <div className="absolute top-2 right-[-10px] opacity-10 transform rotate-12 z-0">
                                 <Youtube size={80} className="text-white" />
@@ -2504,7 +2448,6 @@ const App = () => {
                                 <Bell size={50} className="text-pink-300" />
                             </div>
 
-                            {/* Content Layer */}
                             <div className="relative z-10">
                                 <p className="text-sm font-medium opacity-90 tracking-wide">សមតុល្យរបស់អ្នក</p>
                                 
@@ -2531,7 +2474,6 @@ const App = () => {
                         </div>
                     </div>
 
-                    {/* Menu Grid - Dimmed when modal open */}
                     <div className={`px-4 transition-opacity duration-200 ${showLoginModal || showWelcomeModal ? 'opacity-20 pointer-events-none' : 'opacity-100'}`}>
                         <Card className="p-4 grid grid-cols-3 gap-3">
                             <IconButton icon={CalendarCheck} title="DAILY TASK" onClick={() => handleAuthAction(handleDailyCheckin)} iconColor={userProfile?.dailyCheckin ? 'text-gray-500' : 'text-blue-400'} textColor={userProfile?.dailyCheckin ? 'text-gray-400' : 'text-white'} disabled={!!userProfile?.dailyCheckin && !!userId} />
@@ -2546,7 +2488,6 @@ const App = () => {
                         </Card>
                     </div>
                     
-                     {/* Ad Banner - Hidden when modal open */}
                     <div className={`px-4 mt-6 transition-opacity duration-200 ${showLoginModal || showWelcomeModal ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                         <div className="w-full bg-white h-20 flex flex-col items-center justify-center rounded-lg border-2 border-yellow-500/50 shadow-lg relative overflow-hidden">
                              {globalConfig.adsSettings?.bannerImgUrl ? (<a href={globalConfig.adsSettings.bannerClickUrl || '#'} target="_blank" rel="noopener noreferrer" className="w-full h-full block"><img src={globalConfig.adsSettings.bannerImgUrl} alt="Ads" className="w-full h-full object-cover"/></a>) : (<div className="flex flex-col items-center"><span className="text-[10px] font-bold text-gray-400 bg-gray-200 px-1 rounded mb-1">AD</span><p className="text-xs text-gray-500 font-mono">{globalConfig.adsSettings?.bannerId || 'Banner Ad Space'}</p></div>)}
@@ -2575,7 +2516,6 @@ const App = () => {
                 </div>
             )}
 
-            {/* +++ WELCOME POPUP (ORANGE FULL CARD) +++ */}
             {showWelcomeModal && userId && globalConfig.welcomePopup?.isEnabled && (
                 <WelcomeModal 
                     isOpen={showWelcomeModal} 
