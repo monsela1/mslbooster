@@ -498,10 +498,17 @@ const AdminSettingsTab = ({ config, setConfig, onSave }) => {
     );
 };
 
+// --- UPDATED ADMIN USER MANAGER TAB (WITH BALANCE EDIT) ---
 const AdminUserManagerTab = ({ db, showNotification }) => {
     const [searchId, setSearchId] = useState('');
     const [foundUser, setFoundUser] = useState(null);
+    
+    // State សម្រាប់កែប្រែពិន្ទុ (Points)
     const [pointsToAdd, setPointsToAdd] = useState(0);
+    
+    // State សម្រាប់កែប្រែទឹកប្រាក់ (Balance) - បន្ថែមថ្មី
+    const [balanceToAdd, setBalanceToAdd] = useState(0);
+
     const [allUsers, setAllUsers] = useState([]);
     const [loadingList, setLoadingList] = useState(false);
     const [lastDoc, setLastDoc] = useState(null);
@@ -579,6 +586,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
         } catch(e) { console.error(e); }
     };
 
+    // Update Points Function
     const handleUpdatePoints = async () => {
         if(!foundUser) return;
         try {
@@ -586,6 +594,20 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
             showNotification('Points updated successfully', 'success');
             setFoundUser(prev => ({...prev, points: prev.points + parseInt(pointsToAdd)}));
             setPointsToAdd(0);
+        } catch(e) { showNotification('Update failed', 'error'); }
+    };
+
+    // Update Balance Function (បន្ថែមថ្មី)
+    const handleUpdateBalance = async () => {
+        if(!foundUser) return;
+        const amount = parseFloat(balanceToAdd);
+        if(isNaN(amount)) return showNotification('Invalid Amount', 'error');
+
+        try {
+            await updateDoc(getProfileDocRef(foundUser.uid), { balance: increment(amount) });
+            showNotification('Balance updated successfully', 'success');
+            setFoundUser(prev => ({...prev, balance: (prev.balance || 0) + amount}));
+            setBalanceToAdd(0);
         } catch(e) { showNotification('Update failed', 'error'); }
     };
 
@@ -606,7 +628,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
     return (
         <div className='space-y-4 pb-10'>
             <Card className="p-4">
-                <h3 className="font-bold text-lg mb-4 text-white">ស្វែងរក & កែប្រែ</h3>
+                <h3 className="font-bold text-lg mb-4 text-white">ស្វែងរក & កែប្រែ (Manage User)</h3>
                 <div className="flex space-x-2 mb-4">
                     <InputField
                         value={searchId}
@@ -619,7 +641,7 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                 </div>
                 
                 {foundUser && (
-                    <div className="bg-purple-900 p-4 rounded-lg border border-purple-600 relative">
+                    <div className="bg-purple-900 p-4 rounded-lg border border-purple-600 relative space-y-4">
                           <button 
                             onClick={() => handleDeleteUser(foundUser.uid, foundUser.shortId)}
                             className="absolute top-4 right-4 p-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
@@ -628,21 +650,51 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                             <Trash2 size={20} />
                         </button>
 
-                        <p className="font-bold text-lg text-white">{foundUser.userName}</p>
-                        <p className="text-purple-300 text-sm">Email: {foundUser.email}</p>
-                        <p className="text-purple-300 text-sm mb-2">Current Points: <span className="font-bold text-yellow-400">{formatNumber(foundUser.points)}</span></p>
-                        
-                        <div className="flex items-center space-x-2 mt-4">
-                            <button onClick={() => setPointsToAdd(p => p - 100)} className="p-2 bg-red-600 rounded text-white"><MinusCircle size={20}/></button>
-                            <InputField
-                                type="number"
-                                value={pointsToAdd}
-                                onChange={e => setPointsToAdd(parseInt(e.target.value) || 0)}
-                                className="text-center font-bold"
-                            />
-                            <button onClick={() => setPointsToAdd(p => p + 100)} className="p-2 bg-green-600 rounded text-white"><PlusCircle size={20}/></button>
+                        <div>
+                            <p className="font-bold text-lg text-white">{foundUser.userName}</p>
+                            <p className="text-purple-300 text-sm">Email: {foundUser.email}</p>
+                            <p className="text-purple-300 text-sm font-mono">ID: {foundUser.shortId}</p>
                         </div>
-                        <button onClick={handleUpdatePoints} className="w-full mt-3 bg-teal-600 text-white py-2 rounded font-bold hover:bg-teal-700">Update Points</button>
+
+                        {/* --- ផ្នែកកែប្រែ Points (COINS) --- */}
+                        <div className="bg-purple-800/50 p-3 rounded border border-purple-700">
+                            <p className="text-purple-200 text-xs mb-1">Points (Coins)</p>
+                            <p className="font-bold text-2xl text-yellow-400 mb-2">{formatNumber(foundUser.points)}</p>
+                            
+                            <div className="flex items-center space-x-2">
+                                <button onClick={() => setPointsToAdd(p => p - 100)} className="p-2 bg-red-600 rounded text-white hover:bg-red-700"><MinusCircle size={20}/></button>
+                                <InputField
+                                    type="number"
+                                    value={pointsToAdd}
+                                    onChange={e => setPointsToAdd(parseInt(e.target.value) || 0)}
+                                    className="text-center font-bold"
+                                    placeholder="+/- Points"
+                                />
+                                <button onClick={() => setPointsToAdd(p => p + 100)} className="p-2 bg-green-600 rounded text-white hover:bg-green-700"><PlusCircle size={20}/></button>
+                            </div>
+                            <button onClick={handleUpdatePoints} className="w-full mt-2 bg-yellow-600 text-white py-2 rounded font-bold hover:bg-yellow-700 text-sm">Update Points</button>
+                        </div>
+
+                        {/* --- ផ្នែកកែប្រែ Balance (MONEY $) - បន្ថែមថ្មី --- */}
+                        <div className="bg-purple-800/50 p-3 rounded border border-green-700">
+                            <p className="text-purple-200 text-xs mb-1">Balance (USD $)</p>
+                            <p className="font-bold text-2xl text-green-400 mb-2">${(foundUser.balance || 0).toFixed(4)}</p>
+                            
+                            <div className="flex items-center space-x-2">
+                                <button onClick={() => setBalanceToAdd(p => (parseFloat(p) - 1).toFixed(2))} className="p-2 bg-red-600 rounded text-white hover:bg-red-700"><MinusCircle size={20}/></button>
+                                <InputField
+                                    type="number"
+                                    step="0.01"
+                                    value={balanceToAdd}
+                                    onChange={e => setBalanceToAdd(e.target.value)}
+                                    className="text-center font-bold text-green-300 border-green-500"
+                                    placeholder="+/- USD"
+                                />
+                                <button onClick={() => setBalanceToAdd(p => (parseFloat(p) + 1).toFixed(2))} className="p-2 bg-green-600 rounded text-white hover:bg-green-700"><PlusCircle size={20}/></button>
+                            </div>
+                            <button onClick={handleUpdateBalance} className="w-full mt-2 bg-green-600 text-white py-2 rounded font-bold hover:bg-green-700 text-sm">Update Balance ($)</button>
+                        </div>
+
                     </div>
                 )}
             </Card>
@@ -660,18 +712,19 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
                                 <p className='font-bold text-white text-sm'>{u.userName}</p>
                                 <p className='text-xs text-purple-400 font-mono'>{u.shortId} | {u.email}</p>
                             </div>
-                            <div className="flex items-center space-x-3">
-                                <span className='font-bold text-yellow-400 mr-2'>{formatNumber(u.points)}</span>
-                                <button 
-                                    onClick={(e) => {
-                                        e.stopPropagation(); 
-                                        handleDeleteUser(u.uid, u.shortId);
-                                    }}
-                                    className="p-2 bg-red-900/50 text-red-400 rounded hover:bg-red-600 hover:text-white transition"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
+                            <div className="flex flex-col items-end mr-3">
+                                <span className='font-bold text-yellow-400 text-xs'>{formatNumber(u.points)} P</span>
+                                <span className='font-bold text-green-400 text-xs'>${(u.balance || 0).toFixed(2)}</span>
                             </div>
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation(); 
+                                    handleDeleteUser(u.uid, u.shortId);
+                                }}
+                                className="p-2 bg-red-900/50 text-red-400 rounded hover:bg-red-600 hover:text-white transition"
+                            >
+                                <Trash2 size={16} />
+                            </button>
                         </div>
                     ))}
                     
@@ -690,7 +743,6 @@ const AdminUserManagerTab = ({ db, showNotification }) => {
         </div>
     );
 };
-
 const AdminWithdrawalsTab = ({ db, showNotification }) => {
     const [withdrawals, setWithdrawals] = useState([]);
 
@@ -942,7 +994,7 @@ const AdminDashboardPage = ({ db, setPage, showNotification }) => {
                                            <span className='bg-purple-900 px-2 py-0.5 rounded text-purple-200'>{c.type}</span>
                                            <span className={`${c.remaining > 0 ? 'text-green-400' : 'text-red-400'} font-bold`}>
                                                 Rem: {c.remaining}
-                                            </span>
+                                           </span>
                                         </div>
                                     </div>
                                 </div>
@@ -1794,10 +1846,10 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                          <div>
                              <h3 className="font-bold text-white text-sm">ប្តូរកាក់ជាលុយ (Exchange)</h3>
                              <p className="text-[10px] text-purple-300">អត្រា: {formatNumber(EXCHANGE_RATE)} Coins = $1.00</p>
-                         </div>
-                         <button onClick={() => setShowExchange(!showExchange)} className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center transition">
+                          </div>
+                          <button onClick={() => setShowExchange(!showExchange)} className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center transition">
                             <RefreshCw size={14} className="mr-1"/> {showExchange ? 'បិទ' : 'ដូរឥឡូវ'}
-                         </button>
+                          </button>
                     </div>
                     {showExchange && (
                         <div className="mt-4 p-3 bg-purple-900 rounded-lg">
@@ -1823,8 +1875,8 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                          <div>
                              <h3 className="font-bold text-white text-sm">ដកលុយ (Withdraw)</h3>
                              <p className="text-[10px] text-purple-300">ABA / ACLEDA</p>
-                         </div>
-                         <button 
+                          </div>
+                          <button 
                             onClick={() => {
                                 if(globalConfig.enableWithdraw) {
                                     setShowWithdraw(!showWithdraw);
@@ -1835,7 +1887,7 @@ const BalanceDetailsPage = ({ db, userId, setPage, userProfile, globalConfig }) 
                             className={`${globalConfig.enableWithdraw ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-600 cursor-not-allowed'} text-white px-4 py-2 rounded-lg text-xs font-bold flex items-center transition`}
                         >
                             <DollarSign size={14} className="mr-1"/> {showWithdraw ? 'បិទ' : 'ដកលុយ'}
-                         </button>
+                          </button>
                     </div>
 
                     {showWithdraw && (
